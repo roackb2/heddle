@@ -3,26 +3,45 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { McpCallToolResult, McpClientSessionInfo, McpServerConfig, McpToolDescriptor } from './types.js';
+import type {
+  McpCallToolResult,
+  McpClientSessionInfo,
+  McpHttpServerConfig,
+  McpRequestHeadersProviderInput,
+  McpRequestHeadersProvider,
+  McpServerConfig,
+  McpToolDescriptor,
+} from './types.js';
 
 const DEFAULT_MCP_TIMEOUT_MS = 30_000;
 
 export class McpClientService {
-  async listTools(server: McpServerConfig, signal?: AbortSignal): Promise<McpClientSessionInfo> {
-    return await this.withClient(server, async (client) => {
-      const tools = await client.listTools({}, {
-        signal,
-        timeout: DEFAULT_MCP_TIMEOUT_MS,
-      });
-      const serverVersion = client.getServerVersion();
+  async listTools(
+    server: McpServerConfig,
+    signal?: AbortSignal,
+    requestHeaders?: McpRequestHeadersProvider,
+  ): Promise<McpClientSessionInfo> {
+    try {
+      return await this.withClient(server, async (client) => {
+        const tools = await client.listTools({}, {
+          signal,
+          timeout: DEFAULT_MCP_TIMEOUT_MS,
+        });
+        const serverVersion = client.getServerVersion();
 
-      return {
-        serverName: serverVersion?.name,
-        serverVersion: serverVersion?.version,
-        instructions: client.getInstructions(),
-        tools: tools.tools.map(toToolDescriptor),
-      };
-    }, signal);
+        return {
+          serverName: serverVersion?.name,
+          serverVersion: serverVersion?.version,
+          instructions: client.getInstructions(),
+          tools: tools.tools.map(toToolDescriptor),
+        };
+      }, { operation: 'list_tools', serverId: server.id, signal }, signal, requestHeaders);
+    } catch (error) {
+      if (requestHeaders) {
+        throw requestScopedOperationError(server.id, 'list_tools');
+      }
+      throw error;
+    }
   }
 
   async callTool(
@@ -30,6 +49,7 @@ export class McpClientService {
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    requestHeaders?: McpRequestHeadersProvider,
   ): Promise<McpCallToolResult> {
     try {
       return await this.withClient(server, async (client) => {
@@ -45,11 +65,13 @@ export class McpClientService {
           ok: true,
           output: normalizeToolResult(result),
         };
-      }, signal);
+      }, { operation: 'call_tool', serverId: server.id, toolName, signal }, signal, requestHeaders);
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: requestHeaders
+          ? requestScopedOperationError(server.id, 'call_tool').message
+          : error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -57,13 +79,15 @@ export class McpClientService {
   private async withClient<T>(
     server: McpServerConfig,
     callback: (client: Client) => Promise<T>,
+    operation: McpRequestHeadersProviderInput,
     signal?: AbortSignal,
+    requestHeaders?: McpRequestHeadersProvider,
   ): Promise<T> {
     const client = new Client({
       name: 'heddle',
       version: '0.0.0',
     });
-    const transport = createTransport(server);
+    const transport = await createTransport(server, operation, requestHeaders);
 
     try {
       await client.connect(transport, {
@@ -78,7 +102,15 @@ export class McpClientService {
   }
 }
 
-function createTransport(server: McpServerConfig): Transport {
+function requestScopedOperationError(serverId: string, operation: 'list_tools' | 'call_tool'): Error {
+  return new Error(`Request-scoped MCP operation failed: ${serverId}/${operation}`);
+}
+
+async function createTransport(
+  server: McpServerConfig,
+  operation: McpRequestHeadersProviderInput,
+  requestHeaders?: McpRequestHeadersProvider,
+): Promise<Transport> {
   if (server.transport === 'stdio') {
     return new StdioClientTransport({
       command: server.command,
@@ -91,16 +123,55 @@ function createTransport(server: McpServerConfig): Transport {
 
   if (server.transport === 'sse') {
     return new SSEClientTransport(new URL(server.url), {
-      requestInit: {
-        headers: resolveEnv(server.headers),
-      },
+      requestInit: await resolveHttpRequestInit(server, operation, requestHeaders),
     });
   }
 
   return new StreamableHTTPClientTransport(new URL(server.url), {
-    requestInit: {
-      headers: resolveEnv(server.headers),
-    },
+    requestInit: await resolveHttpRequestInit(server, operation, requestHeaders),
+  });
+}
+
+async function resolveHttpRequestInit(
+  server: McpHttpServerConfig,
+  operation: McpRequestHeadersProviderInput,
+  provider?: McpRequestHeadersProvider,
+): Promise<RequestInit> {
+  if (!provider) {
+    return { headers: new Headers(resolveEnv(server.headers)) };
+  }
+
+  try {
+    const timeoutSignal = AbortSignal.timeout(DEFAULT_MCP_TIMEOUT_MS);
+    const providerSignal = operation.signal
+      ? AbortSignal.any([operation.signal, timeoutSignal])
+      : timeoutSignal;
+    providerSignal.throwIfAborted();
+    const providerOperation = { ...operation, signal: providerSignal };
+    const provided = await settleWithSignal(
+      Promise.resolve(provider(providerOperation)),
+      providerSignal,
+    );
+    return {
+      headers: new Headers(provided),
+      redirect: 'error',
+    };
+  } catch {
+    throw new Error(`MCP request headers unavailable: ${server.id}/${operation.operation}`);
+  }
+}
+
+async function settleWithSignal<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    throw signal.reason;
+  }
+
+  return await new Promise<T>((resolve, reject) => {
+    const rejectOnAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', rejectOnAbort, { once: true });
+    pending.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', rejectOnAbort);
+    });
   });
 }
 

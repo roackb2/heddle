@@ -37,6 +37,27 @@ export type McpHttpServerConfig = {
 
 export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig;
 
+export type McpRequestHeadersProviderInput =
+  | {
+      operation: 'list_tools';
+      serverId: string;
+      signal?: AbortSignal;
+    }
+  | {
+      operation: 'call_tool';
+      serverId: string;
+      toolName: string;
+      signal?: AbortSignal;
+    };
+
+/**
+ * Supplies host-owned HTTP headers immediately before an MCP client connection.
+ * Returned values stay in memory and are never added to MCP configuration.
+ */
+export type McpRequestHeadersProvider = (
+  input: McpRequestHeadersProviderInput,
+) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
+
 export type McpConfigIssueCode =
   | 'config_missing'
   | 'config_invalid'

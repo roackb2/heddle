@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ import {
   prepareMcpHostExtension,
   prepareMcpHostExtensionCatalog,
 } from '@/core/chat/engine/index.js';
+import type { PrepareRequestScopedMcpHostExtensionOptions } from '@/core/chat/engine/index.js';
 import type { ToolToolkitContext } from '@/core/tools/index.js';
 
 function contextFixture(): ToolToolkitContext {
@@ -110,6 +111,18 @@ function contextFixture(): ToolToolkitContext {
 describe('defineMcpHostExtension', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('preserves legacy prepareMcpHostExtension utility-type inference', () => {
+    const legacy: Parameters<typeof prepareMcpHostExtension>[0] = {
+      id: 'legacy',
+      workspaceRoot: '/workspace',
+      stateRoot: '/workspace/.heddle',
+      serverId: 'documents',
+      server: { type: 'stdio', command: 'documents-mcp' },
+    };
+
+    expect(legacy.workspaceRoot).toBe('/workspace');
   });
 
   it('creates host tools from cached MCP descriptors without manual schema mapping', () => {
@@ -261,6 +274,7 @@ describe('defineMcpHostExtension', () => {
       resolved.server,
       'create-deck',
       { title: 'Quarterly plan' },
+      undefined,
       undefined,
     );
     expect(stateCall).not.toHaveBeenCalled();
@@ -760,6 +774,174 @@ describe('defineMcpHostExtension', () => {
     });
 
     expect(extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context))).toEqual([]);
+  });
+
+  it('prepares and executes a request-scoped HTTP extension without persistent MCP state', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-request-scoped-mcp-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    mkdirSync(stateRoot, { recursive: true });
+    const context: ToolToolkitContext = {
+      workspaceRoot,
+      stateRoot,
+      artifactRoot: join(stateRoot, 'artifacts'),
+      sessionId: 'request-scoped-session',
+      model: 'gpt-5.5',
+      memoryDir: join(stateRoot, 'memory'),
+      memoryMode: 'none',
+    };
+    const capability = 'request-scoped-capability-secret';
+    const resolveRequestHeaders = vi.fn().mockResolvedValue({
+      Authorization: `Bearer ${capability}`,
+    });
+    const listTools = vi.spyOn(McpClientService.prototype, 'listTools').mockResolvedValue({
+      tools: [{
+        name: 'read_scope',
+        description: 'Read the verified adopter scope.',
+        inputSchema: { type: 'object', properties: {} },
+      }],
+    });
+    const callTool = vi.spyOn(McpClientService.prototype, 'callTool').mockResolvedValue({
+      ok: true,
+      output: { tenantId: 'tenant-a' },
+    });
+    const stateCall = vi.spyOn(McpService.prototype, 'callTool');
+
+    const prepared = await prepareMcpHostExtension({
+      mode: 'request-scoped',
+      id: 'adopter-capabilities',
+      serverId: 'adopter_backend',
+      server: {
+        transport: 'http',
+        url: 'https://adopter.example/mcp',
+        tools: { allow: ['read_scope'], approval: 'never' },
+      },
+      resolveRequestHeaders,
+      includeTools: ['read_scope'],
+      tenantId: 'tenant-a',
+    });
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) {
+      throw new Error(prepared.error);
+    }
+    expect(prepared.extension.mcp).toEqual({ hideDefaultServers: ['adopter_backend'] });
+    expect(prepared.toolNames).toEqual(['read_scope']);
+    expect(JSON.stringify(prepared)).not.toContain(capability);
+    expect(listTools).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'adopter_backend',
+        transport: 'http',
+        headers: {},
+      }),
+      undefined,
+      resolveRequestHeaders,
+    );
+
+    const [tool] = prepared.extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+    const result = await tool?.execute({});
+
+    expect(result).toEqual({ ok: true, output: { tenantId: 'tenant-a' } });
+    expect(callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'adopter_backend', headers: {} }),
+      'read_scope',
+      {},
+      undefined,
+      resolveRequestHeaders,
+    );
+    expect(stateCall).not.toHaveBeenCalled();
+    expect(existsSync(FileMcpConfigRepository.resolvePath(stateRoot))).toBe(false);
+    expect(existsSync(FileMcpCatalogRepository.resolvePath(stateRoot))).toBe(false);
+  });
+
+  it.each([
+    {
+      name: 'static headers',
+      server: {
+        transport: 'http',
+        url: 'https://adopter.example/mcp',
+        headers: { Authorization: 'Bearer persisted-secret' },
+      },
+    },
+    {
+      name: 'non-HTTP URL',
+      server: { transport: 'http', url: 'file:///tmp/mcp' },
+    },
+    {
+      name: 'URL credentials',
+      server: { transport: 'http', url: 'https://user:secret@adopter.example/mcp' },
+    },
+    {
+      name: 'stdio transport',
+      server: { transport: 'stdio', command: 'node' },
+    },
+  ])('rejects $name in request-scoped preparation', async ({ server }) => {
+    const listTools = vi.spyOn(McpClientService.prototype, 'listTools');
+    const prepared = await prepareMcpHostExtension({
+      mode: 'request-scoped',
+      id: 'adopter-capabilities',
+      serverId: 'adopter_backend',
+      server,
+      resolveRequestHeaders: async () => ({ Authorization: 'Bearer capability' }),
+    } as unknown as PrepareRequestScopedMcpHostExtensionOptions);
+
+    expect(prepared).toEqual(expect.objectContaining({
+      ok: false,
+      serverId: 'adopter_backend',
+      step: 'validate_server',
+    }));
+    expect(listTools).not.toHaveBeenCalled();
+  });
+
+  it('rejects mixed request-scoped and workspace preparation without persistence', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-mixed-scope-mcp-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const saveConfig = vi.spyOn(McpService.prototype, 'saveConfigDocument');
+    const listTools = vi.spyOn(McpClientService.prototype, 'listTools');
+
+    const prepared = await prepareMcpHostExtension({
+      mode: 'request-scoped',
+      id: 'adopter-capabilities',
+      serverId: 'adopter_backend',
+      server: { transport: 'http', url: 'https://adopter.example/mcp' },
+      resolveRequestHeaders: async () => ({ Authorization: 'Bearer capability' }),
+      workspaceRoot,
+      stateRoot,
+    } as unknown as PrepareRequestScopedMcpHostExtensionOptions);
+
+    expect(prepared).toEqual({
+      ok: false,
+      serverId: 'adopter_backend',
+      step: 'validate_server',
+      error: 'Request-scoped MCP preparation cannot use workspace or state roots.',
+    });
+    expect(saveConfig).not.toHaveBeenCalled();
+    expect(listTools).not.toHaveBeenCalled();
+    expect(existsSync(stateRoot)).toBe(false);
+  });
+
+  it('stops request-scoped discovery with the owning invocation signal', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('invocation cancelled'));
+    const resolveRequestHeaders = vi.fn().mockResolvedValue({
+      Authorization: 'Bearer unused-capability',
+    });
+
+    const prepared = await prepareMcpHostExtension({
+      mode: 'request-scoped',
+      id: 'adopter-capabilities',
+      serverId: 'adopter_backend',
+      server: { transport: 'http', url: 'https://adopter.example/mcp' },
+      resolveRequestHeaders,
+      signal: controller.signal,
+    });
+
+    expect(prepared).toEqual({
+      ok: false,
+      serverId: 'adopter_backend',
+      step: 'discover_tools',
+      error: 'Request-scoped MCP operation failed: adopter_backend/list_tools',
+    });
+    expect(resolveRequestHeaders).not.toHaveBeenCalled();
   });
 
   it('reports MCP catalog preparation failures with the failing setup step', async () => {

@@ -112,6 +112,7 @@ export class McpHostToolDefinitionService {
               args.tool.name,
               callArgs,
               execution?.signal,
+              args.resolved.requestHeaders,
             )
           : await McpHostToolDefinitionService.createMcpService(args.context)
               .callTool(args.options.serverId, args.tool.name, callArgs, execution?.signal);
@@ -161,10 +162,11 @@ export class McpHostToolDefinitionService {
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    requestHeaders?: ResolvedMcpHostExtensionData['requestHeaders'],
   ): Promise<McpCallToolResult> {
     if (!isToolAllowed(server, toolName)) {
       return { ok: false, error: `MCP tool is denied by Heddle config: ${server.id}/${toolName}` };
     }
-    return await new McpClientService().callTool(server, toolName, args, signal);
+    return await new McpClientService().callTool(server, toolName, args, signal, requestHeaders);
   }
 }

@@ -113,10 +113,15 @@ export type {
   McpHostResultArtifactRule,
   McpHostResultArtifactsOptions,
   McpHostToolOverride,
+  McpRequestHeadersProvider,
+  McpRequestHeadersProviderInput,
+  McpRequestScopedHttpServer,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,
   PrepareMcpHostExtensionCatalogOptions,
   PrepareMcpHostExtensionCatalogResult,
+  PrepareRequestScopedMcpHostExtensionOptions,
+  PrepareRequestScopedMcpHostExtensionResult,
 } from './core/chat/engine/mcp-host-extension.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './core/chat/engine/host-extension.js';
 export type {

@@ -49,6 +49,10 @@ Do not store tokens or resolved secret values in these state files. Config may
 contain env references such as `${env:NOTION_TOKEN}`; runtime connection code
 resolves those at the boundary where the SDK transport is created.
 
+Hosted, tenant-scoped credentials are a different boundary. They use
+request-scoped MCP host-extension preparation and never enter these files or
+the process environment.
+
 ## Why Cached Catalogs Exist
 
 `RuntimeToolService.createDefaultAgentTools()` and `ToolToolkit.createTools()`
@@ -95,6 +99,13 @@ work inside a synchronous toolkit.
   - forwards the owning run's abort signal to connection and request calls;
   - closes client and transport resources after each operation, on both success
     and failure.
+  - accepts an optional request-header provider for capability-bearing HTTP/SSE
+    operations, resolves it once per fresh transport, rejects redirects, and
+    redacts provider failures without falling back to configured headers.
+- `McpServerConfigService`
+  - owns deterministic server id, transport, path, and URL normalization;
+  - is shared by file repositories and in-memory request-scoped preparation so
+    the two paths cannot drift.
 - `McpPolicyContextService`
   - converts configured server identity, transport, environment, and optional
     host-verified effects into immutable tool policy context;
@@ -154,6 +165,11 @@ then closes both in `finally`. Agent-exposed MCP tools forward
 and legacy SSE work before teardown. Do not introduce a persistent client pool
 without a separate ownership, health-check, reconnect, and shutdown design.
 
+Request-scoped HTTP/SSE connections receive their complete headers from the
+embedding host immediately before transport creation. The provider sees only
+the server id, operation, optional tool name, and abort signal. It never sees
+model arguments or claimed identity. Stdio never invokes this provider.
+
 ## Slash Commands And Web UI
 
 Shared slash commands live in `src/core/commands/slash/modules/mcp/`.
@@ -187,6 +203,8 @@ Keep these invariants:
 - Local stdio servers run commands with the user's OS permissions.
 - Secret values should be resolved at connection time and redacted from
   diagnostics/logs where possible.
+- Request-scoped credentials must fail closed: no static-header or environment
+  fallback, no redirect forwarding, and no generic state-backed MCP tool path.
 
 Server-level tool policy is intentionally small:
 

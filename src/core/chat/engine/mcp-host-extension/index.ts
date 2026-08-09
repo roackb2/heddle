@@ -15,19 +15,29 @@ export type {
   McpHostResultArtifactRule,
   McpHostResultArtifactsOptions,
   McpHostToolOverride,
+  McpRequestScopedHttpServer,
   PrepareMcpHostExtensionCatalogOptions,
   PrepareMcpHostExtensionCatalogResult,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,
+  PrepareRequestScopedMcpHostExtensionOptions,
+  PrepareRequestScopedMcpHostExtensionResult,
 } from './types.js';
+export type {
+  McpRequestHeadersProvider,
+  McpRequestHeadersProviderInput,
+} from '@/core/mcp/index.js';
 
 import { McpHostExtensionPreparationService } from './preparation-service.js';
 import { McpHostExtensionService } from './service.js';
 import type {
   PrepareMcpHostExtensionCatalogOptions,
   PrepareMcpHostExtensionCatalogResult,
+  PrepareMcpHostExtensionInput,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,
+  PrepareRequestScopedMcpHostExtensionOptions,
+  PrepareRequestScopedMcpHostExtensionResult,
 } from './types.js';
 
 export const defineMcpHostExtension = McpHostExtensionService.define;
@@ -36,8 +46,14 @@ export const prepareMcpHostExtensionCatalog = (
 ): Promise<PrepareMcpHostExtensionCatalogResult> => (
   McpHostExtensionPreparationService.prepareCatalog(options)
 );
-export const prepareMcpHostExtension = (
+export function prepareMcpHostExtension(
+  options: PrepareRequestScopedMcpHostExtensionOptions,
+): Promise<PrepareRequestScopedMcpHostExtensionResult>;
+export function prepareMcpHostExtension(
   options: PrepareMcpHostExtensionOptions,
-): Promise<PrepareMcpHostExtensionResult> => (
-  McpHostExtensionPreparationService.prepare(options)
-);
+): Promise<PrepareMcpHostExtensionResult>;
+export function prepareMcpHostExtension(
+  options: PrepareMcpHostExtensionInput,
+): Promise<PrepareMcpHostExtensionResult | PrepareRequestScopedMcpHostExtensionResult> {
+  return McpHostExtensionPreparationService.prepare(options);
+}
