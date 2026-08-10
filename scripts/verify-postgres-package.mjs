@@ -25,7 +25,7 @@ assert.deepEqual(
 );
 assert.equal(
   postgresPackage.peerDependencies['@roackb2/heddle'],
-  '>=5.12.0 <6',
+  '>=5.13.0 <6',
   '@roackb2/heddle-postgres must declare its minimum compatible Heddle contract.',
 );
 assert.equal(
