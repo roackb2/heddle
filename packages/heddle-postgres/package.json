@@ -1,0 +1,57 @@
+{
+  "name": "@roackb2/heddle-postgres",
+  "version": "5.12.0",
+  "description": "PostgreSQL task authority for durable Heddle heartbeat workers",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/heddle-postgres"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "heartbeat",
+    "postgresql",
+    "drizzle",
+    "durable-worker"
+  ],
+  "peerDependencies": {
+    "@roackb2/heddle": ">=5.12.0 <6",
+    "drizzle-orm": ">=0.45.2 <1"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.20"
+  }
+}

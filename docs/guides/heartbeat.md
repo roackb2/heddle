@@ -149,6 +149,39 @@ itself make a scheduler safe for multiple workers.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
+### Use the optional PostgreSQL authority
+
+Install `@roackb2/heddle-postgres` when the host needs multiple processes or
+short-lived workers to share one durable heartbeat authority without
+reimplementing Heddle's task transitions:
+
+```ts
+import { createPostgresHeartbeatTaskAuthority } from '@roackb2/heddle-postgres';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const database = drizzle(new Pool({
+  connectionString: process.env.DATABASE_URL,
+}));
+const heartbeat = createPostgresHeartbeatTaskAuthority({
+  database,
+  namespace: trustedServiceScope,
+  executionLeaseMs: 20 * 60_000,
+});
+
+const workerStore = heartbeat.store;
+const operatorControls = heartbeat.administration;
+```
+
+The separate ports keep task workers least-privileged. The package supplies the
+row locks, claim fencing, expired-lease recovery, checkpoints, history, and
+atomic administration policy; it does not open a connection, run migrations,
+authenticate a namespace, deliver tasks, or start a scheduler. Adopt the
+bundled baseline SQL into exactly one application migration history, and choose
+an execution lease longer than the maximum duration of one bounded attempt.
+See the [`@roackb2/heddle-postgres` boundary](../../packages/heddle-postgres/README.md)
+for the full operational contract.
+
 ### Targeted one-shot workers
 
 Use `HeartbeatSchedulerService.runTask()` when the host has already routed one
