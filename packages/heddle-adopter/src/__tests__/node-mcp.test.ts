@@ -17,6 +17,9 @@ import {
   type VerifiedMcpCapability,
 } from '../mcp/index.js';
 import {
+  defineNodeMcpJsonTool,
+  NodeMcpJsonToolset,
+  NodeMcpJsonToolsetConfigurationError,
   NodeStreamableHttpMcpService,
   type NodeMcpToolset,
 } from '../mcp/node/index.js';
@@ -152,6 +155,120 @@ describe('Node Streamable HTTP MCP service', () => {
     app.clients.delete(client);
     await call.catch(() => undefined);
     await closing;
+  });
+
+  it('turns product declarations into capability-scoped JSON tools', async () => {
+    const readScope = defineNodeMcpJsonTool({
+      name: 'read_scope' as const,
+      description: 'Read the authenticated product scope.',
+      inputSchema: z.object({ detail: z.boolean() }).strict(),
+      annotations: { readOnlyHint: true },
+      failureMessage: 'Product scope is unavailable.',
+      execute: ({ detail }, { capability: verified }) => ({
+        tenantId: verified.scope.tenantId,
+        detail,
+      }),
+    });
+    const hidden = defineNodeMcpJsonTool({
+      name: 'wait_for_shutdown' as const,
+      description: 'A second configured tool.',
+      inputSchema: z.object({}).strict(),
+      failureMessage: 'The second tool failed.',
+      execute: () => ({ hidden: false }),
+    });
+    const service = new NodeStreamableHttpMcpService<ToolName>({
+      capabilityVerifier: verifier(['read_scope']),
+      toolset: new NodeMcpJsonToolset({
+        serverInfo: { name: 'test-product', version: '1.0.0' },
+        tools: [readScope, hidden],
+        now: () => new Date('2026-08-10T12:00:00.000Z'),
+      }),
+    });
+    const app = await start(service);
+    const client = await connect(app.endpoint);
+    app.clients.add(client);
+
+    const tools = await client.listTools();
+    const result = await client.callTool({
+      name: 'read_scope',
+      arguments: { detail: true },
+    });
+
+    expect(tools.tools.map(({ name }) => name)).toEqual(['read_scope']);
+    expect(result).toMatchObject({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({ tenantId: 'company-a', detail: true }),
+      }],
+    });
+  });
+
+  it('rechecks declarative tool authority and hides product failures', async () => {
+    const secret = 'database-password';
+    let now = new Date('2026-08-10T12:00:00.000Z');
+    const toolset = new NodeMcpJsonToolset<ToolName>({
+      serverInfo: { name: 'test-product', version: '1.0.0' },
+      now: () => now,
+      tools: [defineNodeMcpJsonTool({
+        name: 'read_scope' as const,
+        description: 'Read a product projection.',
+        inputSchema: z.object({ fail: z.boolean() }).strict(),
+        failureMessage: 'Product projection is unavailable.',
+        execute: ({ fail }) => {
+          if (fail) {
+            throw new Error(secret);
+          }
+          now = new Date('2026-08-10T12:11:00.000Z');
+          return { shouldNotBeReturned: true };
+        },
+      })],
+    });
+    const service = new NodeStreamableHttpMcpService<ToolName>({
+      capabilityVerifier: verifier(['read_scope']),
+      toolset,
+    });
+    const app = await start(service);
+    const client = await connect(app.endpoint);
+    app.clients.add(client);
+
+    const failed = await client.callTool({
+      name: 'read_scope',
+      arguments: { fail: true },
+    });
+    expect(JSON.stringify(failed)).toContain('Product projection is unavailable.');
+    expect(JSON.stringify(failed)).not.toContain(secret);
+
+    now = new Date('2026-08-10T12:00:00.000Z');
+    const expiredAfterWork = await client.callTool({
+      name: 'read_scope',
+      arguments: { fail: false },
+    });
+    expect(JSON.stringify(expiredAfterWork)).toContain('Product tool authority expired.');
+    expect(JSON.stringify(expiredAfterWork)).not.toContain('shouldNotBeReturned');
+  });
+
+  it('rejects duplicate and capability-selected missing declarations', () => {
+    const definition = defineNodeMcpJsonTool({
+      name: 'read_scope' as const,
+      description: 'Read scope.',
+      inputSchema: z.object({}).strict(),
+      failureMessage: 'Unavailable.',
+      execute: () => ({}),
+    });
+    expect(() => new NodeMcpJsonToolset({
+      serverInfo: { name: 'test-product', version: '1.0.0' },
+      tools: [definition, definition],
+    })).toThrow(NodeMcpJsonToolsetConfigurationError);
+
+    const toolset = new NodeMcpJsonToolset<ToolName>({
+      serverInfo: { name: 'test-product', version: '1.0.0' },
+      tools: [definition],
+    });
+    expect(() => toolset.registerAllowedTools({
+      server: { registerTool: vi.fn() } as never,
+      capability: capability(['wait_for_shutdown']),
+      requestSignal: new AbortController().signal,
+    })).toThrow(NodeMcpJsonToolsetConfigurationError);
   });
 });
 

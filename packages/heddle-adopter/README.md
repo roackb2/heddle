@@ -165,6 +165,40 @@ assertMcpCapabilityActive(capability)
 await readWorkspaceSnapshot(capability.scope)
 ```
 
+For Node adopters, the declarative JSON-tool path also removes the repetitive
+allowlist, expiry, cancellation, serialization, and safe-error code:
+
+```ts
+import {
+  defineNodeMcpJsonTool,
+  NodeMcpJsonToolset,
+  NodeStreamableHttpMcpService,
+} from '@roackb2/heddle-adopter/mcp/node'
+import { z } from 'zod'
+
+const toolset = new NodeMcpJsonToolset({
+  serverInfo: { name: 'example-product', version: '1.0.0' },
+  tools: [defineNodeMcpJsonTool({
+    name: 'read_workspace_snapshot' as const,
+    description: 'Read the authenticated subject workspace.',
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true },
+    failureMessage: 'The workspace is unavailable.',
+    execute: async (_input, { capability, signal }) => (
+      readWorkspaceSnapshot(capability.scope, signal)
+    ),
+  })],
+})
+
+const productMcp = new NodeStreamableHttpMcpService({
+  capabilityVerifier: verifier,
+  toolset,
+})
+```
+
+Use the lower-level `NodeMcpToolset` interface only when a tool needs custom MCP
+content or lifecycle semantics.
+
 ## Invoke the direct development host
 
 The direct client is useful for local and reviewed HTTPS deployments. A
