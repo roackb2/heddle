@@ -35,9 +35,10 @@ plus `jose`, `zod`, and `eventsource-parser`, for its optional reference edges.
 Non-TypeScript adopters can consume the published
 [`spec/v1`](spec/v1/README.md) OpenAPI 3.1.1 document, JSON Schema bundle, and
 golden conformance fixtures directly. The
-[`Python adopter reference`](examples/python-reference/README.md) is an
-independent executable proof of that path, not another required service or a
-separately supported SDK.
+[`Python v1 conformance reference`](conformance/reference-adopters/python-v1/README.md)
+is an independent executable proof of that path, not another required service
+or a separately supported SDK. It follows the contract version, not the
+TypeScript source-module layout.
 
 The adopter still owns:
 

@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 
-SPEC_ROOT = Path(__file__).resolve().parents[1] / ".." / ".." / "spec" / "v1"
+PACKAGE_ROOT = Path(__file__).resolve().parents[4]
+SPEC_ROOT = PACKAGE_ROOT / "spec" / "v1"
 FIXTURE_ROOT = SPEC_ROOT / "fixtures"
 
 

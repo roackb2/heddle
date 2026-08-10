@@ -15,5 +15,6 @@ The Zod schemas generate the checked-in
 [`spec/v1`](../../spec/v1/README.md) OpenAPI, JSON Schema, and golden fixtures.
 Non-TypeScript implementations should verify those artifacts rather than
 reimplementing behavior from prose alone. The clean-room
-[Python reference](../../examples/python-reference/README.md) demonstrates that
+[Python v1 conformance reference](../../conformance/reference-adopters/python-v1/README.md)
+demonstrates that
 path without importing this TypeScript package.

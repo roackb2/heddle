@@ -82,7 +82,7 @@ copyable code.
 Backends outside TypeScript can use the published
 [OpenAPI, JSON Schema, and golden fixtures](../../../packages/heddle-adopter/spec/v1/README.md)
 as the canonical v1 contract. The
-[clean-room Python reference](../../../packages/heddle-adopter/examples/python-reference/README.md)
+[clean-room Python v1 conformance reference](../../../packages/heddle-adopter/conformance/reference-adopters/python-v1/README.md)
 shows the same ES256 authority, independent MCP verification, and strict SSE
 rules with no Heddle or private-host import.
 

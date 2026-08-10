@@ -71,7 +71,7 @@
     "adopter:build": "yarn adopter:clean && yarn adopter:compile",
     "adopter:test": "vitest run --config packages/heddle-adopter/vitest.config.ts",
     "adopter:example:node-control-plane": "yarn adopter:build && tsx packages/heddle-adopter/examples/node-control-plane.ts",
-    "adopter:example:python-reference": "python3 -m ruff check packages/heddle-adopter/examples/python-reference && python3 -m ruff format --check packages/heddle-adopter/examples/python-reference && python3 -m pytest packages/heddle-adopter/examples/python-reference",
+    "adopter:conformance:python-v1": "python3 -m ruff check packages/heddle-adopter/conformance/reference-adopters/python-v1 && python3 -m ruff format --check packages/heddle-adopter/conformance/reference-adopters/python-v1 && python3 -m pytest packages/heddle-adopter/conformance/reference-adopters/python-v1",
     "adopter:pack": "yarn adopter:build && npm pack ./packages/heddle-adopter",
     "adopter:publish": "yarn adopter:build && npm publish ./packages/heddle-adopter",
     "postgres:clean": "node scripts/clean-dist.mjs postgres",

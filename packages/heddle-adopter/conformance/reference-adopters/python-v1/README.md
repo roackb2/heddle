@@ -1,12 +1,12 @@
-# Python adopter reference
+# Python adopter contract v1 conformance reference
 
 This is a small, clean-room Python implementation of the published Execution
 Host adopter contract. It proves that a non-TypeScript backend can integrate
 without importing Heddle or the private Execution Host implementation.
 
-It is deliberately a reference, not a separately published or supported Python
-SDK. Its boundaries mirror the stable protocol concepts rather than the
-TypeScript package layout:
+It is deliberately a version-pinned conformance reference, not a separately
+published or supported Python SDK. It does not mirror new TypeScript helpers.
+Its boundaries implement only the stable v1 protocol concepts:
 
 - `authority.py` issues an ES256 execution assertion and optional MCP
   capability, then publishes public JWKS.
@@ -33,7 +33,7 @@ python -m ruff check .
 python -m pytest
 ```
 
-The tests consume `../../spec/v1` directly. They execute the same golden
+The tests consume `../../../spec/v1` directly. They execute the same golden
 request, SSE, authority, expiry, unsupported-tool, and swapped-scope cases as
 the TypeScript implementation.
 
@@ -51,3 +51,6 @@ verified capability claims.
 
 This reference stops at the contract boundary. It does not add an adopter
 gateway, web framework starter, AgentCore client, or deployment automation.
+It changes only when the normative v1 wire contract, security invariants, or
+golden fixtures change. Node conveniences and provider-specific adapters do
+not create Python parity work.
