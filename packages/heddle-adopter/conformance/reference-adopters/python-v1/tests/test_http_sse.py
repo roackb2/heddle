@@ -116,6 +116,47 @@ async def test_never_infers_success_from_incomplete_or_invalid_streams(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("invocationId", "../invalid"),
+        ("runId", "../invalid"),
+        ("timestamp", "not-a-timestamp"),
+    ],
+)
+async def test_projects_malformed_envelope_fields_as_protocol_errors(
+    field: str,
+    value: str,
+) -> None:
+    accepted = {
+        "schemaVersion": 1,
+        "invocationId": "invocation-001",
+        "runId": "run-001",
+        "sequence": 0,
+        "timestamp": "2026-08-10T04:00:00.000Z",
+        "kind": "accepted",
+        field: value,
+    }
+    body = f"event: accepted\nid: 0\ndata: {json.dumps(accepted)}\n\n"
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=body.encode(),
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        host = DirectHttpExecutionHost(
+            "http://127.0.0.1:8080",
+            "local-runtime-token",
+            client=client,
+        )
+        with pytest.raises(ExecutionHostProtocolError):
+            await _collect(host.stream_conversation_turn(_turn()))
+
+
+@pytest.mark.asyncio
 async def test_rejected_response_projects_only_a_safe_error_code() -> None:
     def handle(_: httpx.Request) -> httpx.Response:
         return httpx.Response(

@@ -25,6 +25,13 @@ export const OpaqueIdSchema = z
     'must be an opaque, path-free identifier',
   );
 
+export const JwtIssuerSchema = z.url().refine(
+  (value) => isSafeWebUrl(new URL(value)),
+  'must use HTTPS or loopback HTTP and contain no credentials, query, or fragment',
+);
+
+export const JwtAudienceSchema = z.string().min(1).max(512);
+
 export const RuntimeSessionIdSchema = z
   .string()
   .min(33)
@@ -135,6 +142,8 @@ export const ExecutionHostStreamEventSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const ExecutionAssertionClaimsSchema = z.object({
+  iss: JwtIssuerSchema,
+  aud: JwtAudienceSchema,
   contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
   adopterId: OpaqueIdSchema,
   tenantId: OpaqueIdSchema,
@@ -148,6 +157,8 @@ export const ExecutionAssertionClaimsSchema = z.object({
 }).passthrough();
 
 export const McpCapabilityClaimsSchema = z.object({
+  iss: JwtIssuerSchema,
+  aud: JwtAudienceSchema,
   contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
   adopterId: OpaqueIdSchema,
   tenantId: OpaqueIdSchema,

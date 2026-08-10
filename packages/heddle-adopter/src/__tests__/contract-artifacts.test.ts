@@ -37,6 +37,17 @@ describe('published language-neutral contract artifacts', () => {
         McpCapabilityClaims: expect.any(Object),
       },
     });
+    const definitions = schemaBundle.$defs as Record<string, {
+      required?: string[];
+    }>;
+    for (const definitionName of [
+      'ExecutionAssertionClaims',
+      'McpCapabilityClaims',
+    ]) {
+      expect(definitions[definitionName]?.required).toEqual(
+        expect.arrayContaining(['iss', 'aud']),
+      );
+    }
   });
 });
 

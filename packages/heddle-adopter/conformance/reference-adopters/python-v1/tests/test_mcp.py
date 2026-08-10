@@ -148,6 +148,35 @@ def test_rejects_invalid_shared_capability_cases(
         verifier.verify(token)
 
 
+@pytest.mark.parametrize(
+    ("not_before_offset", "accepted"),
+    [(0, True), (60, False)],
+)
+def test_enforces_not_before_against_the_injected_clock(
+    authority_fixture: dict[str, Any],
+    not_before_offset: int,
+    accepted: bool,
+) -> None:
+    authority, verifier, key, _, mcp = _build_fixture(authority_fixture)
+    reference_time = datetime.fromisoformat(authority_fixture["referenceTime"])
+    token = jwt.encode(
+        {**mcp, "nbf": int(reference_time.timestamp()) + not_before_offset},
+        key,
+        algorithm="ES256",
+        headers={
+            "alg": "ES256",
+            "kid": authority_fixture["keyId"],
+            "typ": MCP_CAPABILITY_TYPE,
+        },
+    )
+
+    if accepted:
+        assert verifier.verify(token).capability_id == mcp["jti"]
+    else:
+        with pytest.raises(McpCapabilityVerificationError):
+            verifier.verify(token)
+
+
 def test_shared_swapped_scope_breaks_execution_to_capability_binding(
     authority_fixture: dict[str, Any],
 ) -> None:

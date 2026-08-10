@@ -167,6 +167,7 @@ class JwtMcpCapabilityVerifier:
         contract_version = _integer_claim(claims, "contractVersion")
         issued_at = _integer_claim(claims, "iat")
         expires_at = _integer_claim(claims, "exp")
+        not_before = _optional_integer_claim(claims, "nbf")
         adopter_id = _string_claim(claims, "adopterId", validate_opaque_id)
         tenant_id = _string_claim(claims, "tenantId", validate_opaque_id)
         subject_id = _string_claim(claims, "sub", validate_opaque_id)
@@ -190,6 +191,7 @@ class JwtMcpCapabilityVerifier:
             lifetime > 0
             and lifetime <= self._config.max_capability_age_seconds
             and issued_at <= now + tolerance
+            and (not_before is None or not_before <= now + tolerance)
             and now - issued_at <= self._config.max_capability_age_seconds + tolerance
             and now < expires_at + tolerance
         )
@@ -293,6 +295,12 @@ def _integer_claim(claims: Mapping[str, Any], name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"Invalid {name} claim.")
     return value
+
+
+def _optional_integer_claim(claims: Mapping[str, Any], name: str) -> int | None:
+    if name not in claims:
+        return None
+    return _integer_claim(claims, name)
 
 
 def _epoch_seconds(value: datetime) -> int:

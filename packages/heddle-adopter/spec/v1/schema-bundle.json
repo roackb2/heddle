@@ -431,6 +431,15 @@
     "ExecutionAssertionClaims": {
       "type": "object",
       "properties": {
+        "iss": {
+          "type": "string",
+          "format": "uri"
+        },
+        "aud": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
         "contractVersion": {
           "type": "number",
           "const": 1
@@ -487,6 +496,8 @@
         }
       },
       "required": [
+        "iss",
+        "aud",
         "contractVersion",
         "adopterId",
         "tenantId",
@@ -503,6 +514,15 @@
     "McpCapabilityClaims": {
       "type": "object",
       "properties": {
+        "iss": {
+          "type": "string",
+          "format": "uri"
+        },
+        "aud": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
         "contractVersion": {
           "type": "number",
           "const": 1
@@ -584,6 +604,8 @@
         }
       },
       "required": [
+        "iss",
+        "aud",
         "contractVersion",
         "adopterId",
         "tenantId",

@@ -218,9 +218,12 @@ def _validate_event(
         or state.terminal
     ):
         raise ExecutionHostProtocolError()
-    validate_opaque_id(_required_string(decoded, "invocationId"))
-    run_id = validate_opaque_id(_required_string(decoded, "runId"))
-    _validate_timestamp(_required_string(decoded, "timestamp"))
+    try:
+        validate_opaque_id(_required_string(decoded, "invocationId"))
+        run_id = validate_opaque_id(_required_string(decoded, "runId"))
+        _validate_timestamp(_required_string(decoded, "timestamp"))
+    except ValueError as error:
+        raise ExecutionHostProtocolError() from error
 
     if not state.accepted:
         if kind != "accepted" or sequence != 0:
