@@ -21,6 +21,7 @@ Terraform, MCP server, or product logic. It depends only on `jose`, `zod`, and
 | `@roackb2/heddle-adopter/authority` | ES256 execution assertion and optional MCP capability issuance plus public JWKS projection |
 | `@roackb2/heddle-adopter/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@roackb2/heddle-adopter/http-sse` | Transport-neutral `ExecutionHost` port and strict direct-development HTTP/SSE client |
+| `@roackb2/heddle-adopter/testing` | Node-only loopback v1 fixture for local product/MCP integration tests |
 
 The adopter still owns:
 
@@ -138,6 +139,38 @@ for await (const event of host.streamConversationTurn({
 The client refuses redirects, bounds parser and error bodies, validates ordered
 SSE identity, streams accepted/activity events incrementally, and withholds the
 terminal event until clean EOF. It never retries an ambiguous invocation.
+
+## Verify an adopter integration locally
+
+The explicit `testing` subpath provides a real loopback implementation of the
+v1 request/SSE boundary. Its callback can call the adopter's real local MCP
+server, while the fixture supplies deterministic success, cancellation,
+failure, and interrupted-EOF behavior without invoking a model or AWS.
+
+```ts
+import {
+  LocalExecutionHostContractFixture,
+} from '@roackb2/heddle-adopter/testing'
+
+const fixture = await LocalExecutionHostContractFixture.start({
+  execute: async (invocation) => {
+    await callProductMcp(invocation.mcpCapability(), invocation.signal)
+    return { kind: 'result', result: { outcome: 'done' } }
+  },
+})
+
+try {
+  const host = fixture.createExecutionHost()
+  await consume(host.streamConversationTurn(input))
+} finally {
+  await fixture.close()
+}
+```
+
+This proves the adopter-facing wire and product callback, not the Heddle loop,
+real-host JWT verification, shell/filesystem behavior, tenant isolation, or
+managed AgentCore behavior. See the [testing boundary](src/testing/README.md)
+for the exact evidence limit.
 
 ## Language-neutral posture
 

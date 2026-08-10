@@ -44,6 +44,10 @@
       "types": "./dist/http-sse/index.d.ts",
       "import": "./dist/http-sse/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

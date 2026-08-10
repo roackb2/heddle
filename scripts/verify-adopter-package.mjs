@@ -27,7 +27,15 @@ assert.deepEqual(
 );
 assert.deepEqual(
   Object.keys(adopterPackage.exports),
-  ['.', './contracts', './authority', './mcp', './http-sse', './package.json'],
+  [
+    '.',
+    './contracts',
+    './authority',
+    './mcp',
+    './http-sse',
+    './testing',
+    './package.json',
+  ],
   '@roackb2/heddle-adopter public subpaths must stay deliberate.',
 );
 assert.equal(

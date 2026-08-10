@@ -187,7 +187,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, ES256 authority/JWKS, product-MCP verification, and an `ExecutionHost` client port |
+| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, ES256 authority/JWKS, product-MCP verification, an `ExecutionHost` client port, and a local contract fixture |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks

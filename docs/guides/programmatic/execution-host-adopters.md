@@ -62,7 +62,9 @@ Its subpaths separate responsibility:
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
 - `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
-  direct-development transport.
+  direct-development transport;
+- `/testing` provides a Node-only loopback v1 fixture for local product/MCP
+  integration tests without a model or AWS.
 
 See the [package README](../../../packages/heddle-adopter/README.md) for
 copyable code.
@@ -106,6 +108,21 @@ the AWS SDK and SigV4 while preserving the same v1 body, forwarded custom
 headers, ordered stream semantics, and no-ambiguous-retry rule. Keeping that
 adapter separate prevents AWS types from leaking into the product application
 service.
+
+## Local contract verification
+
+`LocalExecutionHostContractFixture` exercises the real v1 request and SSE
+parsers while delegating execution to an adopter callback. Use that callback to
+call the product's real local MCP endpoint, then return a deterministic result,
+cancellation, error, or intentionally interrupted stream. The fixture owns a
+hidden local token and aborts active callbacks during client or fixture
+shutdown.
+
+This test proves request/header placement, product callback reachability,
+ordered streaming, terminal handling, and ambiguous-EOF behavior. It does not
+prove Heddle execution, JWT verification inside the real host, shell or
+filesystem behavior, tenant isolation, or AgentCore. Keep at least one real
+Execution Host integration test for those properties.
 
 ## Language-neutral contract
 
