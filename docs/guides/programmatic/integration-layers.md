@@ -165,9 +165,11 @@ normal client architecture.
 Use `@roackb2/heddle-adopter` when Heddle runs in a separate Execution Host
 rather than inside the product backend. The package owns v1 validation, short-
 lived execution authority, independent MCP capability verification, and the
-`ExecutionHost` outbound port. The adopter retains product authentication,
-tenant mapping, signing-key operations, durable invocation identity, product
-MCP behavior, database access, and result application. The Execution Host alone
+`ExecutionHost` outbound port. Its optional conversation and Node surfaces also
+own generic turn orchestration, JWKS/conversation HTTP mechanics, and safe local
+key-file loading. The adopter retains product authentication, tenant mapping,
+production key storage/rotation, durable invocation identity, product MCP
+behavior, database access, and result application. The Execution Host alone
 imports Heddle and receives no adopter database credential. See
 [Build an Execution Host adopter backend](execution-host-adopters.md).
 

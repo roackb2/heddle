@@ -5,6 +5,10 @@ and instead invokes a separately deployed Heddle Execution Host. The package is
 small on purpose: it provides the security-sensitive contract machinery while
 your product keeps its language stack and domain ownership.
 
+The package is currently an experimental public contract and local proving
+surface. Heddle does not distribute the compatible Execution Host or offer a
+hosted service today.
+
 ```text
 ADOPTER BACKEND
   product authentication and authorization
@@ -59,12 +63,18 @@ Its subpaths separate responsibility:
 
 - `/contracts` provides executable TypeScript/Zod v1 claim and wire contracts;
 - `/authority` issues ES256 assertions/capabilities and projects public JWKS;
+- `/conversation` composes assertion/capability issuance, model credentials,
+  fixed tool policy, and one `ExecutionHost` turn;
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
+- `/mcp/node` owns a stateless official-SDK Streamable HTTP lifecycle around
+  an adopter-defined product toolset;
 - `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
   direct-development transport;
 - `/testing` provides a Node-only loopback v1 fixture for local product/MCP
   integration tests without a model or AWS.
+- `/node` provides an optional standard Node JWKS/conversation HTTP edge and
+  owner-only local signing-key file helpers.
 
 See the [package README](../../../packages/heddle-adopter/README.md) for
 copyable code.
@@ -72,7 +82,8 @@ copyable code.
 The package deliberately excludes:
 
 - end-user authentication, authorization, or tenant lookup;
-- signing-key storage, rotation, and JWKS route registration;
+- production signing-key storage and rotation, route placement, and key
+  revocation;
 - MCP tool registration, product APIs, or database access;
 - AWS AgentCore/SigV4 transport and deployment;
 - Heddle's loop, tools, model runtime, workspace, or state serialization;
@@ -108,6 +119,34 @@ the AWS SDK and SigV4 while preserving the same v1 body, forwarded custom
 headers, ordered stream semantics, and no-ambiguous-retry rule. Keeping that
 adapter separate prevents AWS types from leaking into the product application
 service.
+
+## Progressive Node adoption
+
+Node adopters can start with `NodeExecutionAdopterHttpService`. It handles the
+two generic inbound routes, bounded JSON, authorization-header scrubbing, safe
+errors, SSE framing/backpressure, disconnect cancellation, and shutdown. Pass
+it the authority, product authenticator, and a product admission service. The
+admission service is the small intentional product seam: it decides the
+authorized scope and durable invocation identity, then delegates to
+`HostedConversationTurnService`.
+
+Teams with an existing router that exposes Node `IncomingMessage` and
+`ServerResponse`—including raw Node, Express, or a framework's raw adapter—can
+call `handleJwks` and `handleConversationTurn` directly instead of using the
+default path matcher. Fetch-native and non-Node adopters implement the same
+small wire contract in their normal framework; the Node helper is convenience,
+not protocol authority.
+
+The package can generate and load an owner-only local private-JWK file. That is
+appropriate for development and a carefully managed single-host pilot. It does
+not replace production secret management, rotation, KMS/HSM policy, Windows
+ACL review, or durable revocation.
+
+When product tools use MCP, `NodeStreamableHttpMcpService` owns the generic
+official-SDK request lifecycle. The adopter supplies a `NodeMcpToolset`, which
+is the intentionally product-specific place for names, schemas, descriptions,
+handlers, and scoped data access. This keeps protocol and cleanup mechanics out
+of each product without moving its capabilities into Heddle.
 
 ## Local contract verification
 

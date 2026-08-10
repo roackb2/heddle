@@ -68,6 +68,7 @@
     "adopter:compile": "yarn adopter:verify && tsc -p packages/heddle-adopter/tsconfig.build.json",
     "adopter:build": "yarn adopter:clean && yarn adopter:compile",
     "adopter:test": "vitest run --config packages/heddle-adopter/vitest.config.ts",
+    "adopter:example:node-control-plane": "yarn adopter:build && tsx packages/heddle-adopter/examples/node-control-plane.ts",
     "adopter:pack": "yarn adopter:build && npm pack ./packages/heddle-adopter",
     "adopter:publish": "yarn adopter:build && npm publish ./packages/heddle-adopter",
     "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p packages/heddle-adopter/tsconfig.test.json --noEmit",

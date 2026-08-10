@@ -19,6 +19,7 @@ assert.equal(
 assert.deepEqual(
   adopterPackage.dependencies,
   {
+    '@modelcontextprotocol/sdk': rootPackage.dependencies['@modelcontextprotocol/sdk'],
     'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
     jose: rootPackage.devDependencies.jose,
     zod: rootPackage.dependencies.zod,
@@ -31,9 +32,12 @@ assert.deepEqual(
     '.',
     './contracts',
     './authority',
+    './conversation',
     './mcp',
+    './mcp/node',
     './http-sse',
     './testing',
+    './node',
     './package.json',
   ],
   '@roackb2/heddle-adopter public subpaths must stay deliberate.',

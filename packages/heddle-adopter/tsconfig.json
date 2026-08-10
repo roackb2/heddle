@@ -8,6 +8,6 @@
     "sourceMap": true,
     "inlineSources": true
   },
-  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "include": ["src/**/*.ts", "examples/**/*.ts", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

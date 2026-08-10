@@ -10,16 +10,16 @@ describe('@roackb2/heddle-adopter package boundary', () => {
     expect(rootPackage.exports['./adopter']).toBeUndefined();
   });
 
-  it('keeps only the contract, JOSE, and SSE dependencies', () => {
+  it('keeps a bounded contract, JOSE, SSE, and official MCP boundary', () => {
     expect(adopterPackage.dependencies).toEqual({
+      '@modelcontextprotocol/sdk':
+        rootPackage.dependencies['@modelcontextprotocol/sdk'],
       'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
       jose: rootPackage.devDependencies.jose,
       zod: rootPackage.dependencies.zod,
     });
     expect(adopterPackage.dependencies['@roackb2/heddle']).toBeUndefined();
     expect(adopterPackage.dependencies['@aws-sdk/client-bedrock-agentcore'])
-      .toBeUndefined();
-    expect(adopterPackage.dependencies['@modelcontextprotocol/sdk'])
       .toBeUndefined();
   });
 
@@ -28,9 +28,12 @@ describe('@roackb2/heddle-adopter package boundary', () => {
       '.',
       './contracts',
       './authority',
+      './conversation',
       './mcp',
+      './mcp/node',
       './http-sse',
       './testing',
+      './node',
       './package.json',
     ]);
   });
