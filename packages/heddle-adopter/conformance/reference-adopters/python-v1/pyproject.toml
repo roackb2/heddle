@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heddle-adopter-reference"
+version = "0.1.0"
+description = "Clean-room Python reference for the Heddle Execution Host adopter contract"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28,<1",
+  "httpx-sse>=0.4,<1",
+  "jsonschema[format]>=4.25,<5",
+  "mcp>=2,<3",
+  "PyJWT[crypto]>=2.10,<3",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1,<2",
+  "ruff>=0.12,<1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

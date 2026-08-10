@@ -32,6 +32,14 @@ plus `jose`, `zod`, and `eventsource-parser`, for its optional reference edges.
 | `@roackb2/heddle-adopter/testing` | Node-only loopback v1 fixture for local product/MCP integration tests |
 | `@roackb2/heddle-adopter/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
+Non-TypeScript adopters can consume the published
+[`spec/v1`](spec/v1/README.md) OpenAPI 3.1.1 document, JSON Schema bundle, and
+golden conformance fixtures directly. The
+[`Python v1 conformance reference`](conformance/reference-adopters/python-v1/README.md)
+is an independent executable proof of that path, not another required service
+or a separately supported SDK. It follows the contract version, not the
+TypeScript source-module layout.
+
 The adopter still owns:
 
 - authenticating its users and mapping them to tenant, subject, and product
@@ -265,10 +273,14 @@ for the exact evidence limit.
 
 This TypeScript package is a reference implementation, not a requirement that
 adopter backends use TypeScript. The wire and claim contracts are
-language-neutral. Future Python and Go packages can implement the same compact
-surface without importing Heddle or the private Execution Host code. Canonical
-JSON Schema/OpenAPI and golden conformance fixtures are the next step for
-preventing language-specific drift.
+language-neutral. The checked-in OpenAPI 3.1.1 document, JSON Schema bundle,
+and golden fixtures are the canonical interoperability surface. A clean-room
+Python implementation passes those fixtures without importing Heddle or the
+private Execution Host code.
+
+That is the deliberate stop line for this milestone. Heddle does not promise a
+gateway, generated clients for every language, or a framework starter matrix.
+Further adapters should follow a real adopter and a concrete protocol gap.
 
 The runnable
 [`node-control-plane.ts`](examples/node-control-plane.ts) example composes the

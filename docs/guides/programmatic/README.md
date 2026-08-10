@@ -25,15 +25,17 @@ hosting assumptions.
 - `@roackb2/heddle-adopter` — an independently installable backend reference
   SDK for invoking a separate Execution Host: v1 contracts, ES256 authority,
   hosted-turn orchestration, product-MCP verification, a provider-neutral
-  client port, and optional Node HTTP/key conveniences.
+  client port, optional Node HTTP/key conveniences, and canonical
+  OpenAPI/JSON Schema/golden artifacts for other languages.
 - `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,
   integrations). It does not implicitly opt into remote hosting or a transport.
 
-Before choosing an API, read
-[Choose a Programmatic Integration Layer](integration-layers.md). It maps common
-host stacks to the smallest useful Heddle boundary and makes the responsibility
+Before choosing an API, read the
+[Heddle Component and Deployment Model](component-model.md), then
+[Choose a Programmatic Integration Layer](integration-layers.md). They map common
+host stacks to the smallest useful Heddle boundary and make the responsibility
 split between Heddle and the host explicit for developers and coding agents.
 When you already know the host shape, use the
 [starter recipes](starter-recipes.md) for the smallest copyable path and its

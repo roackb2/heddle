@@ -63,6 +63,19 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 
 ## Architecture Map
 
+At the distribution boundary:
+
+- `@roackb2/heddle` ships the in-process TypeScript runtime and SDK;
+- `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` add adopter-operated
+  run lifecycle and remote-consumption mechanics, not a managed service;
+- `@roackb2/heddle-adopter` defines the public, language-neutral boundary for
+  a backend invoking a separate compatible Execution Host;
+- the current compatible Execution Host and AgentCore deployment are private
+  research. Public docs may describe the contract and evidence goal but must
+  not imply that Heddle distributes or operates that service.
+
+See `docs/guides/programmatic/component-model.md` for the user-facing model.
+
 - `src/core/agent/` owns the inner model/tool execution loop.
 - `src/core/runtime/` owns host-facing runtime boundaries, default tool
   assembly, credentials, workspace catalogs, daemon discovery, and evented

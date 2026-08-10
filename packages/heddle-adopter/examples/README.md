@@ -15,3 +15,8 @@ The example uses an ephemeral signing key, a fake user, a placeholder model
 credential, and the local contract fixture. It proves composition and the
 adopter-facing wire only; it is not a production key, identity, model, Heddle,
 or AgentCore integration.
+
+The clean-room Python implementation is intentionally not an example beside
+the supported TypeScript SDK. It lives under
+[`conformance/reference-adopters/python-v1`](../conformance/reference-adopters/python-v1/README.md)
+as a version-pinned interoperability proof.

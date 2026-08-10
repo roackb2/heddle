@@ -1,0 +1,9 @@
+id: 0
+event: accepted
+data: {"schemaVersion":1,"invocationId":"invocation-001","runId":"run-001","sequence":0,"timestamp":"2026-08-10T04:00:00.000Z","kind":"accepted"}
+
+id: 2
+event: activity
+data: {"schemaVersion":1,"invocationId":"invocation-001","runId":"run-001","sequence":2,"timestamp":"2026-08-10T04:00:00.000Z","kind":"activity","activity":{"type":"checkpointed"}}
+
+: fixture-clean-eof

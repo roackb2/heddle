@@ -5,6 +5,8 @@ import {
 } from 'jose';
 import { z } from 'zod';
 import {
+  JwtAudienceSchema,
+  JwtIssuerSchema,
   MCP_CAPABILITY_TYPE,
   McpAllowedToolsSchema,
   McpCapabilityClaimsSchema,
@@ -25,11 +27,8 @@ import type {
 
 const CapabilityAssertionSchema = z.string().min(32).max(4_096);
 const ConfigSchema = z.object({
-  issuer: z.url().refine(
-    (value) => isSafeWebUrl(new URL(value)),
-    'must use HTTPS or loopback HTTP and contain no credentials, query, or fragment',
-  ),
-  audience: z.string().min(1).max(512),
+  issuer: JwtIssuerSchema,
+  audience: JwtAudienceSchema,
   jwksUrl: z.instanceof(URL).refine(
     isSafeWebUrl,
     'must use HTTPS or loopback HTTP and contain no credentials, query, or fragment',

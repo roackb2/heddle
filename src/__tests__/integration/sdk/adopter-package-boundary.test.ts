@@ -34,6 +34,9 @@ describe('@roackb2/heddle-adopter package boundary', () => {
       './http-sse',
       './testing',
       './node',
+      './spec/v1/openapi.json',
+      './spec/v1/schema-bundle.json',
+      './spec/v1/fixtures/*',
       './package.json',
     ]);
   });

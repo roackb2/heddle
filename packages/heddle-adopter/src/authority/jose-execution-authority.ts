@@ -14,12 +14,13 @@ import {
   EXECUTION_ASSERTION_TYPE,
   EXECUTION_CONTRACT_VERSION,
   ExecutionScopeSchema,
+  JwtAudienceSchema,
+  JwtIssuerSchema,
   MCP_CAPABILITY_TYPE,
   McpAllowedToolsSchema,
   McpServerIdSchema,
   OpaqueIdSchema,
   RuntimeSessionIdSchema,
-  isSafeWebUrl,
   type ExecutionScope,
 } from '../contracts/index.js';
 import type {
@@ -33,20 +34,15 @@ import type {
 } from './types.js';
 
 const SIGNING_ALGORITHM = 'ES256';
-const AudienceSchema = z.string().min(1).max(512);
-const SafeIssuerSchema = z.url().refine(
-  (value) => isSafeWebUrl(new URL(value)),
-  'must use HTTPS or loopback HTTP and contain no credentials, query, or fragment',
-);
 const ExecutionAuthorityMcpConfigSchema = z.object({
-  audience: AudienceSchema,
+  audience: JwtAudienceSchema,
   serverId: McpServerIdSchema,
   ttlSeconds: z.number().int().min(1).max(15 * 60),
 }).strict();
 const ExecutionAuthorityConfigSchema = z.object({
-  issuer: SafeIssuerSchema,
+  issuer: JwtIssuerSchema,
   adopterId: OpaqueIdSchema,
-  executionAudience: AudienceSchema,
+  executionAudience: JwtAudienceSchema,
   keyId: OpaqueIdSchema,
   executionTtlSeconds: z.number().int().min(1).max(15 * 60),
   mcp: ExecutionAuthorityMcpConfigSchema.optional(),

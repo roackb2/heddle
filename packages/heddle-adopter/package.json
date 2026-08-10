@@ -60,10 +60,14 @@
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node/index.js"
     },
+    "./spec/v1/openapi.json": "./spec/v1/openapi.json",
+    "./spec/v1/schema-bundle.json": "./spec/v1/schema-bundle.json",
+    "./spec/v1/fixtures/*": "./spec/v1/fixtures/*",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "spec",
     "README.md",
     "LICENSE"
   ],

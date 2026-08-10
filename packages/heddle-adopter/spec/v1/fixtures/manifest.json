@@ -1,0 +1,47 @@
+{
+  "contractVersion": 1,
+  "cases": [
+    {
+      "id": "valid-request",
+      "file": "valid-request.json",
+      "kind": "json-schema",
+      "expected": "valid"
+    },
+    {
+      "id": "request-authority-in-body",
+      "file": "invalid-request-extra-field.json",
+      "kind": "json-schema",
+      "expected": "invalid"
+    },
+    {
+      "id": "valid-result",
+      "file": "valid-result.sse",
+      "kind": "sse",
+      "expected": "complete"
+    },
+    {
+      "id": "cancelled",
+      "file": "cancelled.sse",
+      "kind": "sse",
+      "expected": "cancelled"
+    },
+    {
+      "id": "ambiguous-eof",
+      "file": "ambiguous-eof.sse",
+      "kind": "sse",
+      "expected": "interrupted"
+    },
+    {
+      "id": "invalid-sequence-gap",
+      "file": "invalid-sequence-gap.sse",
+      "kind": "sse",
+      "expected": "protocol_error"
+    },
+    {
+      "id": "authority",
+      "file": "authority.json",
+      "kind": "authority",
+      "expected": "valid"
+    }
+  ]
+}

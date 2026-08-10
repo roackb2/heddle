@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "kind": "conversation-turn",
+  "invocationId": "invocation-001",
+  "prompt": "Summarize the current product state.",
+  "deadlineAt": "2026-08-10T04:10:00.000Z"
+}

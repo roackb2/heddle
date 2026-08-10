@@ -1,0 +1,70 @@
+{
+  "referenceTime": "2026-08-10T04:00:00.000Z",
+  "issuer": "https://api.example.test",
+  "keyId": "test-key-001",
+  "executionAudience": "urn:heddle-execution-host:example",
+  "mcpAudience": "urn:example:mcp",
+  "supportedTools": [
+    "read_snapshot"
+  ],
+  "expected": {
+    "executionClaims": {
+      "iss": "https://api.example.test",
+      "aud": "urn:heddle-execution-host:example",
+      "contractVersion": 1,
+      "adopterId": "example-adopter",
+      "tenantId": "tenant-a",
+      "productSessionId": "product-session-a",
+      "runtimeSessionId": "runtime-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workflow": "conversation-turn",
+      "sub": "subject-a",
+      "jti": "invocation-001",
+      "iat": 1786334400,
+      "exp": 1786334700
+    },
+    "mcpClaims": {
+      "iss": "https://api.example.test",
+      "aud": "urn:example:mcp",
+      "contractVersion": 1,
+      "adopterId": "example-adopter",
+      "tenantId": "tenant-a",
+      "productSessionId": "product-session-a",
+      "runtimeSessionId": "runtime-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workflow": "conversation-turn",
+      "sub": "subject-a",
+      "jti": "capability-001",
+      "iat": 1786334400,
+      "exp": 1786335000,
+      "invocationId": "invocation-001",
+      "serverId": "product_capabilities",
+      "allowedTools": [
+        "read_snapshot"
+      ]
+    }
+  },
+  "invalidMcpCases": [
+    {
+      "id": "expired",
+      "overrides": {
+        "exp": 1786334399
+      },
+      "expected": "invalid"
+    },
+    {
+      "id": "unsupported-tool",
+      "overrides": {
+        "allowedTools": [
+          "delete_workspace"
+        ]
+      },
+      "expected": "invalid"
+    },
+    {
+      "id": "swapped-runtime-session",
+      "overrides": {
+        "runtimeSessionId": "runtime-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": "host_binding_invalid"
+    }
+  ]
+}
