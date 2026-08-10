@@ -187,7 +187,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, ES256 authority/JWKS, product-MCP verification, an `ExecutionHost` client port, and a local contract fixture |
+| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, authority/JWKS, hosted-turn orchestration, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and a local fixture |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks
@@ -350,8 +350,10 @@ Heddle is designed to make assumptions and limitations visible:
 - `@roackb2/heddle-remote` validates the run protocol but does not own product
   messages, UI state, authentication, or result rendering;
 - `@roackb2/heddle-adopter` helps a backend invoke a separately deployed
-  Execution Host without importing Heddle, AWS, an MCP server, or product data
-  adapters; the adopter still owns identity, policy, keys, tools, and results;
+  Execution Host without importing Heddle, AWS, or product data
+  adapters; optional Node helpers own generic HTTP/key mechanics, while the
+  adopter still owns identity, policy, production key operations, tools, and
+  results;
 - the SDK is actively evolving, so review
   [release notes](docs/releases/README.md) before upgrading public APIs.
 

@@ -8,14 +8,21 @@ independent so an adopter can use only the machinery it needs:
   executable TypeScript/Zod schemas;
 - `authority`: short-lived ES256 execution assertion and optional MCP
   capability issuance plus public JWKS projection;
+- `conversation`: provider-neutral authority, credential, tool-policy, and
+  Execution Host turn orchestration;
 - `mcp`: independent product-edge capability verification against a fixed
   deployment and supported-tool set;
+- `mcp/node`: optional official-SDK Streamable HTTP lifecycle around an
+  adopter-owned product toolset;
 - `http-sse`: a strict direct-development client behind a transport-neutral
   `ExecutionHost` port;
 - `testing`: a Node-only loopback v1 contract fixture for adopter integration
   tests. It is intentionally available only through its explicit subpath.
+- `node`: optional Node HTTP edge and safe local signing-key conveniences. It
+  owns generic mechanics, never product identity or tool policy.
 
 The package must never import the Heddle runtime, Execution Host internals, AWS
-SDK, MCP server SDK, a database adapter, or product domain code. New reusable
+SDK, a database adapter, or product domain code. The explicit `mcp/node`
+surface may import the official MCP SDK, but owns no model-visible tools. New reusable
 machinery belongs here only when it is required by more than one adopter and
 can preserve that dependency boundary.
