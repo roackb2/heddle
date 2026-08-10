@@ -1,6 +1,6 @@
 {
   "name": "@roackb2/heddle-adopter",
-  "version": "5.10.0",
+  "version": "5.11.0",
   "description": "Backend contracts, execution authority, MCP verification, and clients for Heddle Execution Host adopters",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
