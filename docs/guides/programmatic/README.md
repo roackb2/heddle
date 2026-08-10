@@ -22,6 +22,9 @@ hosting assumptions.
   terminal, and reconnect correctness.
 - `@roackb2/heddle-remote/http-sse` — opt-in browser-safe fetch/SSE parsing and
   transport validation for the conventional REST run resource.
+- `@roackb2/heddle-adopter` — an independently installable backend reference
+  SDK for invoking a separate Execution Host: v1 contracts, ES256 authority,
+  product-MCP verification, and a provider-neutral client port.
 - `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,
@@ -59,6 +62,9 @@ product-owned TODOs.
    - [Hosted agent stack](../../../examples/sdk/05-hosted-agent/README.md): compose
      a transport-neutral run service, Express/SSE API, browser client, and
      optional React reference product while keeping each layer replaceable.
+   - [Execution Host adopter backend](execution-host-adopters.md): keep Heddle in
+     an isolated external host while the adopter backend owns product identity,
+     capability policy, MCP tools, and result application.
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Durability support matrix](durability-support.md): choose between local,
      completed-conversation, and durable in-flight promises, and see which

@@ -1,0 +1,68 @@
+{
+  "name": "@roackb2/heddle-adopter",
+  "version": "5.10.0",
+  "description": "Backend contracts, execution authority, MCP verification, and clients for Heddle Execution Host adopters",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/heddle-adopter"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
+    },
+    "./authority": {
+      "types": "./dist/authority/index.d.ts",
+      "import": "./dist/authority/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
+    },
+    "./http-sse": {
+      "types": "./dist/http-sse/index.d.ts",
+      "import": "./dist/http-sse/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "ai-agent",
+    "backend",
+    "execution-host",
+    "mcp",
+    "sdk",
+    "streaming"
+  ],
+  "dependencies": {
+    "eventsource-parser": "^3.1.0",
+    "jose": "^6.2.8",
+    "zod": "^4.3.6"
+  }
+}

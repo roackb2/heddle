@@ -84,6 +84,7 @@ disconnect as implicit cancellation.
 | A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
 | A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
+| A backend invoking a separately deployed Execution Host | `@roackb2/heddle-adopter` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -158,6 +159,17 @@ Add a transport client only when it matches the host's API. Keep protocol
 parsing, cursors, and abort propagation below product UI state. Keep messages,
 tool rendering, retry UX, and product result handling in the application's
 normal client architecture.
+
+### Execution Host adopter
+
+Use `@roackb2/heddle-adopter` when Heddle runs in a separate Execution Host
+rather than inside the product backend. The package owns v1 validation, short-
+lived execution authority, independent MCP capability verification, and the
+`ExecutionHost` outbound port. The adopter retains product authentication,
+tenant mapping, signing-key operations, durable invocation identity, product
+MCP behavior, database access, and result application. The Execution Host alone
+imports Heddle and receives no adopter database credential. See
+[Build an Execution Host adopter backend](execution-host-adopters.md).
 
 ## Extension points
 

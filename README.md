@@ -187,6 +187,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
+| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, ES256 authority/JWKS, product-MCP verification, and an `ExecutionHost` client port |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks
@@ -348,6 +349,9 @@ Heddle is designed to make assumptions and limitations visible:
   authentication, authorization, CORS, limits, billing, or deployment;
 - `@roackb2/heddle-remote` validates the run protocol but does not own product
   messages, UI state, authentication, or result rendering;
+- `@roackb2/heddle-adopter` helps a backend invoke a separately deployed
+  Execution Host without importing Heddle, AWS, an MCP server, or product data
+  adapters; the adopter still owns identity, policy, keys, tools, and results;
 - the SDK is actively evolving, so review
   [release notes](docs/releases/README.md) before upgrading public APIs.
 
@@ -366,6 +370,7 @@ framework, or deployment platform.
 - [Host extensions](docs/guides/programmatic/host-extensions.md)
 - [MCP host extensions](docs/guides/programmatic/mcp-host-extensions.md)
 - [Remote conversation runs](docs/guides/programmatic/remote-runs.md)
+- [Execution Host adopter backend](docs/guides/programmatic/execution-host-adopters.md)
 - [Durability support matrix](docs/guides/programmatic/durability-support.md)
 - [Result artifacts](docs/guides/programmatic/result-artifacts.md)
 - [Runnable SDK examples](examples/sdk/README.md)
