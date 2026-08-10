@@ -188,6 +188,7 @@ that already owns the mechanics your host needs:
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
 | A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, authority/JWKS, hosted-turn orchestration, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and a local fixture |
+| Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks
@@ -354,6 +355,9 @@ Heddle is designed to make assumptions and limitations visible:
   adapters; optional Node helpers own generic HTTP/key mechanics, while the
   adopter still owns identity, policy, production key operations, tools, and
   results;
+- `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
+  but the adopter still owns PostgreSQL operations, migration rollout, trusted
+  namespace resolution, delivery, and product-side idempotency;
 - the SDK is actively evolving, so review
   [release notes](docs/releases/README.md) before upgrading public APIs.
 

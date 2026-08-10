@@ -5,6 +5,7 @@ const OUTPUT_DIRECTORIES = new Map([
   ['root', new URL('../dist/', import.meta.url)],
   ['remote', new URL('../packages/heddle-remote/dist/', import.meta.url)],
   ['adopter', new URL('../packages/heddle-adopter/dist/', import.meta.url)],
+  ['postgres', new URL('../packages/heddle-postgres/dist/', import.meta.url)],
 ]);
 
 const requestedTargets = process.argv.slice(2);

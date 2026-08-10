@@ -23,7 +23,8 @@ For a user-facing release:
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
 3. Update the package version in `package.json`,
    `packages/heddle-remote/package.json`, and
-   `packages/heddle-adopter/package.json`. The packages initially release in
+   `packages/heddle-adopter/package.json`, and
+   `packages/heddle-postgres/package.json`. The packages initially release in
    lockstep, and the build fails when their versions diverge.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
@@ -41,6 +42,7 @@ Before tagging a release, use the normal green checkpoint baseline:
 - `npm pack --dry-run --cache /tmp/heddle-npm-cache`
 - `npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache`
 - `npm pack ./packages/heddle-adopter --dry-run --cache /tmp/heddle-npm-cache`
+- `npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache`
 
 Add more verification if the release changes a workflow that needs manual validation.
 
@@ -109,7 +111,8 @@ For the actual release pass:
 1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
 2. Confirm the intended next version matches in `package.json`,
    `packages/heddle-remote/package.json`, and
-   `packages/heddle-adopter/package.json`.
+   `packages/heddle-adopter/package.json`, and
+   `packages/heddle-postgres/package.json`.
 3. Run the release verification baseline.
 4. Review the git range since the previous release tag.
 5. Update or draft the release note in `docs/releases/`.
@@ -127,6 +130,7 @@ Typical release sequence:
 npm view @roackb2/heddle version
 npm view @roackb2/heddle-remote version
 npm view @roackb2/heddle-adopter version
+npm view @roackb2/heddle-postgres version
 gh release list --limit 5
 gh auth status
 gh auth switch -u <username-if-needed>
@@ -136,6 +140,7 @@ yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
 npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache
 npm pack ./packages/heddle-adopter --dry-run --cache /tmp/heddle-npm-cache
+npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache
 yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
 git push origin main
@@ -143,24 +148,28 @@ git push origin vX.Y.Z
 gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md
 ```
 
-Before the adopter package's first publication, its `npm view` command is
-expected to return `E404`; confirm the package name is genuinely unpublished
-rather than treating that first-release state as a failed preflight.
+Before a package's first publication, its `npm view` command is expected to
+return `E404`; confirm the package name is genuinely unpublished rather than
+treating that first-release state as a failed preflight.
 
 After the GitHub release, the operator publishes all verified artifacts. The
 remote and adopter packages have no dependency on the Node package, so publish
-both independent packages first and then publish Heddle:
+both independent packages first. Publish Heddle next, then the optional
+PostgreSQL package whose peer dependency requires that Heddle version:
 
 ```bash
 yarn remote:publish
 yarn adopter:publish
 npm publish
+yarn postgres:publish
 ```
 
 `yarn remote:publish` cleans, verifies, and compiles the remote package before
 invoking npm, so the operator cannot accidentally publish stale `dist` output.
 `yarn adopter:publish` provides the same protection for the adopter package.
-Pass normal npm publish flags through either script when needed, for example
+`yarn postgres:publish` verifies and builds the optional adapter against the
+same Heddle version before publication. Pass normal npm publish flags through
+these scripts when needed, for example
 `yarn adopter:publish --dry-run`.
 
 This remains a manual operator step unless npm publication was explicitly
