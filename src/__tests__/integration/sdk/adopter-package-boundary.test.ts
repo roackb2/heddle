@@ -23,13 +23,14 @@ describe('@roackb2/heddle-adopter package boundary', () => {
       .toBeUndefined();
   });
 
-  it('publishes only its intentional capability subpaths', () => {
+  it('publishes only its intentional subpaths', () => {
     expect(Object.keys(adopterPackage.exports)).toEqual([
       '.',
       './contracts',
       './authority',
       './mcp',
       './http-sse',
+      './testing',
       './package.json',
     ]);
   });
