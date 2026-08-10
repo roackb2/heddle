@@ -6,11 +6,10 @@
  * executions started by this handle, and awaiting their outer settlement.
  */
 import {
-  MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
-  type HeartbeatTask,
   type HeartbeatTaskRunRecord,
   type HeartbeatTaskStore,
 } from '../tasks/index.js';
+import { HeartbeatTaskCancellationPolicy } from './cancellation-policy.js';
 import type {
   CancelHeartbeatTaskOptions,
   HeartbeatTaskCancellationResult,
@@ -25,24 +24,6 @@ type ActiveHeartbeatTask = {
   controller: AbortController;
   settlement: Promise<HeartbeatTaskSettlement | undefined>;
 };
-
-class HeartbeatTaskCancellationSignal extends Error {
-  readonly #operatorReason: string;
-
-  constructor(operatorReason: string) {
-    super('Heartbeat task cancellation requested by the scheduler host.');
-    this.name = 'HeartbeatTaskCancellationSignal';
-    this.#operatorReason = operatorReason;
-  }
-
-  get operatorReason(): string {
-    return this.#operatorReason;
-  }
-}
-
-export function heartbeatTaskCancellationReason(signal: AbortSignal | undefined): string | undefined {
-  return signal?.reason instanceof HeartbeatTaskCancellationSignal ? signal.reason.operatorReason : undefined;
-}
 
 export class HeartbeatSchedulerTaskLifecycle {
   private readonly activeTasks = new Map<string, ActiveHeartbeatTask>();
@@ -99,7 +80,7 @@ export class HeartbeatSchedulerTaskLifecycle {
 
     let reason: string;
     try {
-      reason = HeartbeatSchedulerTaskLifecycle.normalizeCancellationReason(options.reason);
+      reason = HeartbeatTaskCancellationPolicy.normalizeReason(options.reason);
     } catch (error) {
       return Promise.reject(error);
     }
@@ -139,7 +120,7 @@ export class HeartbeatSchedulerTaskLifecycle {
       return await this.classifyInactiveTask(taskId, reason);
     }
 
-    activeTask.controller.abort(new HeartbeatTaskCancellationSignal(reason));
+    activeTask.controller.abort(HeartbeatTaskCancellationPolicy.createSignal(reason));
     const settlement = await activeTask.settlement;
     const result = HeartbeatSchedulerTaskLifecycle.cancellationResult({
       taskId,
@@ -161,29 +142,8 @@ export class HeartbeatSchedulerTaskLifecycle {
 
   private async classifyInactiveTask(taskId: string, reason: string): Promise<HeartbeatTaskCancellationResult> {
     const task = (await this.store.listTasks()).find((candidate) => candidate.id === taskId);
-    const disposition = HeartbeatSchedulerTaskLifecycle.inactiveDisposition(task);
+    const disposition = HeartbeatTaskCancellationPolicy.inactiveDisposition(task);
     return { taskId, disposition, reason };
-  }
-
-  private static inactiveDisposition(
-    task: HeartbeatTask | undefined,
-  ): HeartbeatTaskCancellationResult['disposition'] {
-    if (!task) {
-      return 'not-found';
-    }
-    if (task.state?.status === 'running') {
-      return 'not-owned';
-    }
-    if (task.state?.status === 'blocked') {
-      return 'blocked';
-    }
-    if (task.state?.status === 'complete') {
-      return 'completed';
-    }
-    if (!task.enabled) {
-      return 'disabled';
-    }
-    return 'not-running';
   }
 
   private static cancellationResult(args: {
@@ -217,16 +177,4 @@ export class HeartbeatSchedulerTaskLifecycle {
     };
   }
 
-  private static normalizeCancellationReason(reason: string): string {
-    const normalized = reason.trim().replace(/\s+/g, ' ');
-    if (!normalized) {
-      throw new Error('Heartbeat cancellation reason cannot be empty.');
-    }
-    if (normalized.length > MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH) {
-      throw new Error(
-        `Heartbeat cancellation reason must be at most ${MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH} characters.`,
-      );
-    }
-    return normalized;
-  }
 }

@@ -334,6 +334,28 @@ export type {
   HeartbeatTaskView,
 } from './core/heartbeat/views/index.js';
 export {
+  HeartbeatTargetedTaskDispatcher,
+  HeartbeatTargetedTaskHost,
+  HeartbeatTargetedTaskWorker,
+  resolveHeartbeatTargetedTaskDispatchDecision,
+} from './core/heartbeat/targeted-host/index.js';
+export type {
+  HeartbeatTargetedTaskDispatchDecision,
+  HeartbeatTargetedTaskDispatchError,
+  HeartbeatTargetedTaskDispatchOutcome,
+  HeartbeatTargetedTaskDispatcherOptions,
+  HeartbeatTargetedTaskHostHandle,
+  HeartbeatTargetedTaskHostOptions,
+  HeartbeatTargetedTaskInvocation,
+  HeartbeatTargetedTaskInvocationTarget,
+  HeartbeatTargetedTaskLocalCancellationResult,
+  HeartbeatTargetedTaskNotificationResult,
+  HeartbeatTargetedTaskWorkerOptions,
+  StartHeartbeatTargetedTaskDispatcherOptions,
+  StartHeartbeatTargetedTaskHostInput,
+  StopHeartbeatTargetedTaskDispatcherOptions,
+} from './core/heartbeat/targeted-host/index.js';
+export {
   HeartbeatLucidPresenter,
   HeartbeatTaskViewProjector,
 } from './core/heartbeat/views/index.js';

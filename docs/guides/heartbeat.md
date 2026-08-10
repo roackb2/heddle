@@ -224,6 +224,48 @@ expiry. Remote stores need an explicit lease-expiry or operator recovery policy,
 and `runTask()` never recovers or steals another worker's claim. Late settlement
 writes remain fenced after an explicit recovery.
 
+### Use the standard low-volume targeted host
+
+Most product pilots do not need to build a queue dispatcher around `runTask()`.
+`HeartbeatTargetedTaskHost` supplies an in-process default with notification
+coalescing, a polling fallback, bounded concurrency, per-invocation timeouts,
+pause/resume, cancellation, and periodic interrupted-owner recovery:
+
+```ts
+import {
+  HeartbeatTargetedTaskHost,
+  HeartbeatTargetedTaskWorker,
+} from '@roackb2/heddle/advanced';
+
+const host = new HeartbeatTargetedTaskHost({
+  store: heartbeatTasks,
+  createTarget: (handler) => new HeartbeatTargetedTaskWorker({
+    store: heartbeatTasks,
+    handler,
+    runtime: { workspaceRoot, stateDir },
+  }),
+  pollIntervalMs: 30_000,
+  recoveryIntervalMs: 30_000,
+  invocationTimeoutMs: 15 * 60_000,
+  maxConcurrentInvocations: 1,
+  isAdmissionEnabled: readDurableProductGate,
+});
+
+host.start({ handler, admissionEnabled: true });
+```
+
+The store must already be scoped to the task or tenant namespace this process
+may execute. An optional `taskIdPrefix` is defense in depth, not authorization.
+Notifications are latency hints; polling durable state is the correctness path.
+Only `busy` and `claim-lost` receive short delivery retries. Normal Heddle retry,
+failure, not-due, and cancellation results wait for their persisted schedule.
+
+This host is intentionally for low-volume single-process admission. It is not a
+distributed queue, leader election service, or cross-replica concurrency limit.
+Replace its invocation target or the dispatcher itself when production scale
+requires a durable queue or workflow engine; keep the same targeted worker and
+task-store contracts.
+
 ### Certify a custom targeted store
 
 Before using a remote adapter with ephemeral or replicated workers, run the
