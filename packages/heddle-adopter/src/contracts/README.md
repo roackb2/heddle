@@ -11,6 +11,9 @@ MCP tool behavior, persistence, AWS transport, or the Heddle runtime loop. An
 adopter must derive scope from its authenticated product state before using
 these schemas.
 
-The Zod schemas are executable reference contracts. Future non-TypeScript SDKs
-should be verified against canonical JSON Schema and golden fixtures rather
-than reimplementing behavior from prose alone.
+The Zod schemas generate the checked-in
+[`spec/v1`](../../spec/v1/README.md) OpenAPI, JSON Schema, and golden fixtures.
+Non-TypeScript implementations should verify those artifacts rather than
+reimplementing behavior from prose alone. The clean-room
+[Python reference](../../examples/python-reference/README.md) demonstrates that
+path without importing this TypeScript package.

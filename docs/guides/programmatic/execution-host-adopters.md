@@ -79,6 +79,13 @@ Its subpaths separate responsibility:
 See the [package README](../../../packages/heddle-adopter/README.md) for
 copyable code.
 
+Backends outside TypeScript can use the published
+[OpenAPI, JSON Schema, and golden fixtures](../../../packages/heddle-adopter/spec/v1/README.md)
+as the canonical v1 contract. The
+[clean-room Python reference](../../../packages/heddle-adopter/examples/python-reference/README.md)
+shows the same ES256 authority, independent MCP verification, and strict SSE
+rules with no Heddle or private-host import.
+
 The package deliberately excludes:
 
 - end-user authentication, authorization, or tenant lookup;
@@ -167,10 +174,14 @@ Execution Host integration test for those properties.
 
 TypeScript is the first reference implementation, not a requirement for
 adopters. Python, Go, Java, or other backends can implement the same compact
-claim and wire semantics without porting Heddle. Canonical JSON Schema/OpenAPI,
-golden event/token fixtures, and clean-room Python/Go consumers are planned
-conformance work; until then, treat this package and the Execution Host's v1
-tests as the executable reference.
+claim and wire semantics without porting Heddle. Canonical OpenAPI 3.1.1, JSON
+Schema Draft 2020-12, golden event/authority fixtures, TypeScript conformance,
+and one independent Python implementation now form the executable reference.
+
+This is also the deliberate stop line. More languages, generated clients,
+framework starters, alternate transports, or an adopter gateway require a real
+adopter and a specific interoperability gap; they are not open-ended roadmap
+work.
 
 ## Current limits
 

@@ -5,7 +5,8 @@ invoke a separately deployed Heddle Execution Host. Its modules are kept
 independent so an adopter can use only the machinery it needs:
 
 - `contracts`: language-neutral v1 claim and wire semantics, expressed as
-  executable TypeScript/Zod schemas;
+  executable TypeScript/Zod schemas and published OpenAPI/JSON Schema/golden
+  artifacts;
 - `authority`: short-lived ES256 execution assertion and optional MCP
   capability issuance plus public JWKS projection;
 - `conversation`: provider-neutral authority, credential, tool-policy, and
@@ -26,3 +27,7 @@ SDK, a database adapter, or product domain code. The explicit `mcp/node`
 surface may import the official MCP SDK, but owns no model-visible tools. New reusable
 machinery belongs here only when it is required by more than one adopter and
 can preserve that dependency boundary.
+
+The repository includes one clean-room Python consumer to prove the released
+contract is implementable outside TypeScript. It is a bounded conformance
+reference, not a reason to add a parallel framework or language matrix.

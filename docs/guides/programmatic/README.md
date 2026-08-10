@@ -25,7 +25,8 @@ hosting assumptions.
 - `@roackb2/heddle-adopter` — an independently installable backend reference
   SDK for invoking a separate Execution Host: v1 contracts, ES256 authority,
   hosted-turn orchestration, product-MCP verification, a provider-neutral
-  client port, and optional Node HTTP/key conveniences.
+  client port, optional Node HTTP/key conveniences, and canonical
+  OpenAPI/JSON Schema/golden artifacts for other languages.
 - `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,

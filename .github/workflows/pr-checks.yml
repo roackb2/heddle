@@ -127,6 +127,31 @@ jobs:
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
 
+  test-python-adopter-reference:
+    name: test-python-adopter-reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/heddle-adopter/examples/python-reference/pyproject.toml
+
+      - name: Install Python adopter reference
+        run: python -m pip install -e 'packages/heddle-adopter/examples/python-reference[test]'
+
+      - name: Check Python adopter reference
+        run: |
+          python -m ruff check packages/heddle-adopter/examples/python-reference
+          python -m ruff format --check packages/heddle-adopter/examples/python-reference
+          python -m pytest packages/heddle-adopter/examples/python-reference
+
   test-browser-integration:
     name: test-browser-integration
     runs-on: ubuntu-latest

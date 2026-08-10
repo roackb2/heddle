@@ -354,7 +354,8 @@ Heddle is designed to make assumptions and limitations visible:
   Execution Host without importing Heddle, AWS, or product data
   adapters; optional Node helpers own generic HTTP/key mechanics, while the
   adopter still owns identity, policy, production key operations, tools, and
-  results;
+  results; canonical OpenAPI/JSON Schema/golden fixtures and a clean-room
+  Python proof keep this boundary language-neutral;
 - `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
   but the adopter still owns PostgreSQL operations, migration rollout, trusted
   namespace resolution, delivery, and product-side idempotency;

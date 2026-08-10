@@ -38,6 +38,9 @@ assert.deepEqual(
     './http-sse',
     './testing',
     './node',
+    './spec/v1/openapi.json',
+    './spec/v1/schema-bundle.json',
+    './spec/v1/fixtures/*',
     './package.json',
   ],
   '@roackb2/heddle-adopter public subpaths must stay deliberate.',
@@ -46,6 +49,11 @@ assert.equal(
   rootPackage.exports['./adopter'],
   undefined,
   'The root package must not recreate the adopter SDK as an install-heavy subpath.',
+);
+assert.deepEqual(
+  adopterPackage.files,
+  ['dist', 'spec', 'README.md', 'LICENSE'],
+  '@roackb2/heddle-adopter must publish its language-neutral contract artifacts.',
 );
 assert.equal(
   readFileSync(new URL('../packages/heddle-adopter/LICENSE', import.meta.url), 'utf8'),
