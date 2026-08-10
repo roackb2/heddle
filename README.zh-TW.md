@@ -18,11 +18,30 @@ conversation 與 run 基礎之上。
 官方網站：[heddleagent.com](https://heddleagent.com)
 
 從這裡開始：
+[選擇 Heddle 形態](docs/guides/programmatic/component-model.md) ·
 [SDK 快速入門](docs/guides/programmatic/quickstart.md) ·
 [複製 starter recipe](docs/guides/programmatic/starter-recipes.md) ·
 [選擇整合層級](docs/guides/programmatic/integration-layers.md) ·
 [可執行的 SDK 範例](examples/sdk/README.md) ·
 [試用 coding agent](#將-heddle-當作-coding-agent-試用)
+
+## 選擇需要的 Heddle 形態
+
+| 形態 | 心智模型 | Public entry point |
+| --- | --- | --- |
+| Heddle SDK 與 runtime | 把 model、tool 與 conversation runtime 匯入 TypeScript 或 Node backend | `@roackb2/heddle` |
+| Hosted run layer | Heddle 仍在你的 server 或 worker 內，額外提供可定址 run、replay、cancellation 與 remote client | `@roackb2/heddle/hosted` 與 `@roackb2/heddle-remote` |
+| 獨立 Execution Host | 任何語言的 backend 都能呼叫另外部署的 compatible host，並透過 invocation-bound MCP 暴露產品能力 | `@roackb2/heddle-adopter` 或 OpenAPI／JSON Schema contract |
+| Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `heddle` |
+
+**Runtime** 是 library code。**Hosted run layer** 在你營運的 infrastructure
+內執行，並不是 Heddle cloud service。Compatible **Execution Host** 則是另一個
+嵌入 Heddle 的部署邊界。目前公開的是 experimental adopter contract；compatible
+host 與 AWS AgentCore deployment 仍是 private research，不是公開發行的產品或
+hosted offering。
+
+完整邊界、可用狀態與選擇路徑請參考
+[component and deployment model](docs/guides/programmatic/component-model.md)。
 
 ## 為什麼選 Heddle
 
@@ -181,6 +200,7 @@ mechanics 的最低層即可：
 | 一般 Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
 | Remote browser 或 client | `@roackb2/heddle-remote` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
+| Backend 呼叫獨立 Execution Host | `@roackb2/heddle-adopter` | v1 contract、authority/JWKS、hosted-turn orchestration、product-MCP verification 與 provider-neutral client port |
 | 更底層的 runtime 組裝 | `@roackb2/heddle/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 
 既有的 tRPC、Fastify、Hono、Nest、WebSocket、IPC、queue、React 或其他技術棧，

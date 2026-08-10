@@ -32,9 +32,10 @@ hosting assumptions.
   models, awareness) and specialized runtimes (agent loop, heartbeat,
   integrations). It does not implicitly opt into remote hosting or a transport.
 
-Before choosing an API, read
-[Choose a Programmatic Integration Layer](integration-layers.md). It maps common
-host stacks to the smallest useful Heddle boundary and makes the responsibility
+Before choosing an API, read the
+[Heddle Component and Deployment Model](component-model.md), then
+[Choose a Programmatic Integration Layer](integration-layers.md). They map common
+host stacks to the smallest useful Heddle boundary and make the responsibility
 split between Heddle and the host explicit for developers and coding agents.
 When you already know the host shape, use the
 [starter recipes](starter-recipes.md) for the smallest copyable path and its

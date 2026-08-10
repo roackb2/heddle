@@ -9,6 +9,7 @@ context first, then branch to deeper material only when needed.
 If you are new to Heddle, begin with:
 
 - [Root README](../README.md) for installation and product overview
+- [Component and deployment model](guides/programmatic/component-model.md) for the SDK, hosted-run, Execution Host, and coding-agent mental model
 - [Runtime host model](guides/runtime-host-model.md) for how terminal chat, daemon mode, workspace identity, and the shared control-plane server fit together
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
 - [Agent Skills](guides/agent-skills.md) for opt-in reusable agent workflows and skill activation
@@ -54,6 +55,7 @@ Task-oriented guides:
 - [Heartbeat](guides/heartbeat.md)
 - [Heartbeat SDK examples](../examples/heartbeat/README.md)
 - [Programmatic hosts](guides/programmatic/README.md)
+- [Component and deployment model](guides/programmatic/component-model.md)
 - [Durability support matrix](guides/programmatic/durability-support.md)
 - [Development and contributing](guides/development.md)
 - [Debugging](guides/debugging.md)
@@ -131,10 +133,11 @@ Evaluation:
 
 ### I want to build on Heddle programmatically
 
-1. [Programmatic hosts](guides/programmatic/README.md) for the conversation engine alpha, persisted sessions, and turn submission
-2. [Durability support matrix](guides/programmatic/durability-support.md) before choosing local or remote storage boundaries
-3. [Capabilities and tools](reference/capabilities.md)
-4. [Providers and models](reference/providers-and-models.md)
+1. [Component and deployment model](guides/programmatic/component-model.md) to choose embedded, adopter-hosted, or separate-host execution
+2. [Programmatic hosts](guides/programmatic/README.md) for the conversation engine, persisted sessions, and turn submission
+3. [Durability support matrix](guides/programmatic/durability-support.md) before choosing local or remote storage boundaries
+4. [Capabilities and tools](reference/capabilities.md)
+5. [Providers and models](reference/providers-and-models.md)
 
 ### I want to contribute or develop locally
 

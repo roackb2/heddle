@@ -1,5 +1,9 @@
 # Choose a Programmatic Integration Layer
 
+First use the [component and deployment model](component-model.md) to decide
+whether Heddle belongs inside your backend or behind a separate Execution Host.
+This guide then selects the narrowest public API within that deployment shape.
+
 Heddle's curated SDK assumes a Node.js 20+ TypeScript host that wants to build a
 conversational agent experience. It intentionally does not assume how that host
 is deployed, which server framework it uses, how events are transported, or

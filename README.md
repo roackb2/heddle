@@ -20,11 +20,31 @@ conversation and run foundations exposed through the SDK.
 Official website: [heddleagent.com](https://heddleagent.com)
 
 Start here:
+[choose a Heddle shape](docs/guides/programmatic/component-model.md) ·
 [SDK quickstart](docs/guides/programmatic/quickstart.md) ·
 [copy a starter recipe](docs/guides/programmatic/starter-recipes.md) ·
 [choose an integration layer](docs/guides/programmatic/integration-layers.md) ·
 [runnable SDK examples](examples/sdk/README.md) ·
 [try the coding agent](#try-heddle-as-a-coding-agent)
+
+## Choose the Heddle Shape You Need
+
+| Shape | Mental model | Public entry point |
+| --- | --- | --- |
+| Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@roackb2/heddle` |
+| Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` |
+| Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@roackb2/heddle-adopter` or its OpenAPI/JSON Schema contract |
+| Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
+
+The **runtime** is library code. The **hosted run layer** runs inside
+infrastructure you operate; it is not a Heddle cloud service. A compatible
+**Execution Host** is a separate deployment that embeds Heddle. Its adopter
+contract is public and experimental, while the current compatible host and
+AWS AgentCore deployment work remain private research—not a distributed
+product or hosted offering.
+
+See the [component and deployment model](docs/guides/programmatic/component-model.md)
+for the boundaries, availability, and decision path.
 
 ## Why Heddle
 
