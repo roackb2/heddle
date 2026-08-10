@@ -96,11 +96,15 @@ operator-facing heartbeat views.
   catalog. The method reads durable eligibility and makes the final due claim
   through the store; its typed result distinguishes settlement, normal failure,
   missing/disabled/not-due/busy work, a lost claim, and cancellation.
-- Targeted execution does not scan unrelated tasks, start polling, subscribe to
-  run requests, or recover interrupted executions. Queue delivery, tenant
-  authorization, retries, visibility timeouts, and host-domain idempotency stay
-  with the host. The store's atomic claim fences duplicate at-least-once worker
-  deliveries; it does not make host tool side effects exactly once.
+- The one-shot `runTask()` method does not scan unrelated tasks, poll, subscribe,
+  or recover interrupted executions. `HeartbeatTargetedTaskHost` is the
+  low-volume in-process default around that primitive: it owns notification
+  coalescing, polling fallback, bounded local delivery, cancellation, and
+  recovery cadence. It is not a distributed queue or authorization boundary.
+  Queue visibility, cross-replica admission, tenant authorization, and
+  host-domain idempotency remain host responsibilities. The store's atomic
+  claim fences duplicate at-least-once worker deliveries; it does not make host
+  tool side effects exactly once.
 - The file service serializes task/checkpoint/run mutations with a shared
   in-process mutex for one resolved heartbeat root. Task, checkpoint, and run
   JSON files are replaced atomically, so readers see a complete previous or next

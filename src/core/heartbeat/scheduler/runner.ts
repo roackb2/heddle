@@ -38,7 +38,7 @@ import {
   MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
   MAX_HEARTBEAT_HANDLER_RETRY_MS,
 } from './types.js';
-import { heartbeatTaskCancellationReason } from './task-lifecycle.js';
+import { HeartbeatTaskCancellationPolicy } from './cancellation-policy.js';
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 const CANCELLATION_SUMMARY = 'Heartbeat execution cancelled by its scheduler host.';
@@ -498,7 +498,7 @@ export class HeartbeatTaskRunnerService {
     execution: HeartbeatTaskExecution;
   }): Promise<HeartbeatTaskExecutionResult> {
     const settledAt = args.now?.() ?? dayjs().toDate();
-    const reason = heartbeatTaskCancellationReason(args.signal);
+    const reason = HeartbeatTaskCancellationPolicy.readSignalReason(args.signal);
     const completion = await args.store.recordTaskExecutionOutcome({
       execution: args.execution,
       taskId: args.task.id,

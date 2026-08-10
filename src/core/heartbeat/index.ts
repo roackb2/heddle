@@ -97,3 +97,25 @@ export type {
   LucidAgentStatus,
   LucidAgentStatusNotification,
 } from './views/index.js';
+export {
+  HeartbeatTargetedTaskDispatcher,
+  HeartbeatTargetedTaskHost,
+  HeartbeatTargetedTaskWorker,
+  resolveHeartbeatTargetedTaskDispatchDecision,
+} from './targeted-host/index.js';
+export type {
+  HeartbeatTargetedTaskDispatchDecision,
+  HeartbeatTargetedTaskDispatchError,
+  HeartbeatTargetedTaskDispatchOutcome,
+  HeartbeatTargetedTaskDispatcherOptions,
+  HeartbeatTargetedTaskHostHandle,
+  HeartbeatTargetedTaskHostOptions,
+  HeartbeatTargetedTaskInvocation,
+  HeartbeatTargetedTaskInvocationTarget,
+  HeartbeatTargetedTaskLocalCancellationResult,
+  HeartbeatTargetedTaskNotificationResult,
+  HeartbeatTargetedTaskWorkerOptions,
+  StartHeartbeatTargetedTaskDispatcherOptions,
+  StartHeartbeatTargetedTaskHostInput,
+  StopHeartbeatTargetedTaskDispatcherOptions,
+} from './targeted-host/index.js';
