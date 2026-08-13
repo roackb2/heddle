@@ -6,7 +6,6 @@ import json
 import re
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import httpx
@@ -23,6 +22,7 @@ from .contracts import (
     validate_opaque_id,
     validate_runtime_session_id,
     validate_safe_web_url,
+    validate_timestamp,
 )
 from .errors import (
     ExecutionHostProtocolError,
@@ -58,9 +58,7 @@ class ExecutionHostConversationTurn:
         if self.mcp_capability is not None:
             _validate_secret(self.mcp_capability, minimum=32)
         if self.deadline_at is not None:
-            parsed = datetime.fromisoformat(self.deadline_at.replace("Z", "+00:00"))
-            if parsed.tzinfo is None:
-                raise ValueError("Execution deadline must contain an offset.")
+            validate_timestamp(self.deadline_at)
 
 
 class DirectHttpExecutionHost:
@@ -221,7 +219,7 @@ def _validate_event(
     try:
         validate_opaque_id(_required_string(decoded, "invocationId"))
         run_id = validate_opaque_id(_required_string(decoded, "runId"))
-        _validate_timestamp(_required_string(decoded, "timestamp"))
+        validate_timestamp(_required_string(decoded, "timestamp"))
     except ValueError as error:
         raise ExecutionHostProtocolError() from error
 
@@ -325,15 +323,6 @@ def _required_string(value: Mapping[str, Any], name: str) -> str:
     if not isinstance(item, str):
         raise ExecutionHostProtocolError()
     return item
-
-
-def _validate_timestamp(value: str) -> None:
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise ExecutionHostProtocolError() from error
-    if parsed.tzinfo is None:
-        raise ExecutionHostProtocolError()
 
 
 def _validate_secret(value: str, *, minimum: int) -> None:

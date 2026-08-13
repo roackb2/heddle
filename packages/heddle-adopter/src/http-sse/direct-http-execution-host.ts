@@ -13,6 +13,7 @@ import {
   OpaqueIdSchema,
   RuntimeSessionIdSchema,
   TimestampSchema,
+  isExecutionHostTerminalEvent,
   isSafeWebUrl,
   type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
@@ -127,7 +128,7 @@ export class DirectHttpExecutionHost implements ExecutionHost {
         }
         while (pending.length > 0) {
           const event = validateEvent(pending.shift()!, state);
-          if (isTerminalEvent(event)) {
+          if (isExecutionHostTerminalEvent(event)) {
             terminalEvent = event;
           } else {
             yield event;
@@ -141,7 +142,7 @@ export class DirectHttpExecutionHost implements ExecutionHost {
       }
       while (pending.length > 0) {
         const event = validateEvent(pending.shift()!, state);
-        if (isTerminalEvent(event)) {
+        if (isExecutionHostTerminalEvent(event)) {
           terminalEvent = event;
         } else {
           yield event;
@@ -233,7 +234,7 @@ function validateEvent(
   }
 
   state.nextSequence += 1;
-  state.terminal = isTerminalEvent(event);
+  state.terminal = isExecutionHostTerminalEvent(event);
   return event;
 }
 
@@ -258,12 +259,6 @@ function createSensitiveHeaders(
 function isEventStream(contentType: string | null): boolean {
   return contentType?.split(';', 1)[0]?.trim().toLowerCase()
     === 'text/event-stream';
-}
-
-function isTerminalEvent(event: ExecutionHostStreamEvent): boolean {
-  return event.kind === 'result'
-    || event.kind === 'cancelled'
-    || event.kind === 'error';
 }
 
 async function readSafeErrorCode(response: Response): Promise<string> {

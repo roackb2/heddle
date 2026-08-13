@@ -1,18 +1,28 @@
-import type {
-  ExecutionHostStreamEvent,
-  ExecutionScope,
+import { z } from 'zod';
+import {
+  ExecutionHostConversationTurnRequestSchema,
+  ExecutionScopeSchema,
+  RuntimeSessionIdSchema,
+  type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
 import type { ExecutionAuthority } from '../authority/index.js';
 import type { ExecutionHost } from '../http-sse/index.js';
 
-export type HostedConversationTurnInput = {
-  scope: Omit<ExecutionScope, 'adopterId'>;
-  runtimeSessionId: string;
-  invocationId: string;
-  prompt: string;
-  deadlineAt?: string;
-  signal?: AbortSignal;
-};
+export const HostedConversationTurnInputSchema = z.object({
+  scope: ExecutionScopeSchema.omit({ adopterId: true }),
+  runtimeSessionId: RuntimeSessionIdSchema,
+  invocationId: ExecutionHostConversationTurnRequestSchema.shape.invocationId,
+  prompt: ExecutionHostConversationTurnRequestSchema.shape.prompt,
+  deadlineAt: ExecutionHostConversationTurnRequestSchema.shape.deadlineAt,
+  signal: z.custom<AbortSignal>(
+    (value) => value instanceof AbortSignal,
+    'signal must be an AbortSignal',
+  ).optional(),
+}).strict();
+
+export type HostedConversationTurnInput = z.infer<
+  typeof HostedConversationTurnInputSchema
+>;
 
 export type HostedConversationCredentialContext = Pick<
   HostedConversationTurnInput,

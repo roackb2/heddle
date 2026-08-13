@@ -1,4 +1,16 @@
-# Local Execution Host contract fixture
+# Adopter test and conformance support
+
+## Durable lifecycle store conformance
+
+`HostedConversationTurnStoreConformance.verify(...)` certifies the atomic
+storage behavior required by `DurableHostedConversationTurnService`: unique
+creation, full-scope fencing, idempotent exact repeats, conflicting and late
+transition rejection, and scoped expiry reconciliation. Supply the real store,
+a scoped inspection callback, and cleanup for the test's reserved conformance
+records. The helper is database-neutral and does not create schemas or run
+migrations.
+
+## Local Execution Host contract fixture
 
 This test-only Node.js boundary lets an adopter exercise its integration
 through the real v1 HTTP/SSE contract without running a model, Heddle, Docker,

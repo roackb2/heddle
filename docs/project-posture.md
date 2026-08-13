@@ -48,6 +48,10 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - Prefer domain-owned services with clear responsibility boundaries for
   non-trivial backend behavior. Do not spread one domain's logic across hosts,
   adapters, and generic helpers when a focused service/module can own it.
+- When an adopter exposes a reusable correctness problem, first decide whether
+  Heddle should own the state machine or protocol. Keep product identity,
+  policy, schema, queries, and UI in the adopter, but do not make every adopter
+  independently reimplement generic transition or ordering semantics.
 - Keep layering simple and legible: presentation surfaces render state,
   application/controller layers orchestrate user intent, and core domains own
   semantics, policy, and persisted meaning.
@@ -69,7 +73,10 @@ At the distribution boundary:
 - `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` add adopter-operated
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@roackb2/heddle-adopter` defines the public, language-neutral boundary for
-  a backend invoking a separate compatible Execution Host;
+  a backend invoking a separate compatible Execution Host. Its TypeScript
+  conversation surface owns the reusable durable-turn lifecycle over an
+  adopter-implemented atomic store; the v1 artifacts and fixtures define the
+  same optional profile for other languages;
 - the current compatible Execution Host and AgentCore deployment are private
   research. Public docs may describe the contract and evidence goal but must
   not imply that Heddle distributes or operates that service.

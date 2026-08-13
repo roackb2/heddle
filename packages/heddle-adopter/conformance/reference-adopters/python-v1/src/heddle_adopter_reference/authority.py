@@ -19,6 +19,7 @@ from .contracts import (
     EXECUTION_ASSERTION_TYPE,
     EXECUTION_CONTRACT_VERSION,
     MCP_CAPABILITY_TYPE,
+    ExecutionScope,
     validate_allowed_tools,
     validate_mcp_server_id,
     validate_opaque_id,
@@ -28,20 +29,6 @@ from .contracts import (
 
 _MAX_AUDIENCE_LENGTH = 512
 _MAX_TTL_SECONDS = 15 * 60
-
-
-@dataclass(frozen=True)
-class ExecutionScope:
-    """Product-authorized identity selected by the adopter backend."""
-
-    tenant_id: str
-    subject_id: str
-    product_session_id: str
-
-    def __post_init__(self) -> None:
-        validate_opaque_id(self.tenant_id)
-        validate_opaque_id(self.subject_id)
-        validate_opaque_id(self.product_session_id)
 
 
 @dataclass(frozen=True)

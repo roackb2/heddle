@@ -13,10 +13,10 @@ hosted service today.
 ADOPTER BACKEND
   product authentication and authorization
   tenant / subject / product-session mapping
-  durable invocation identity and result application
+  durable invocation identity + database adapter + result application
           |
   @roackb2/heddle-adopter
-  authority + v1 contracts + ExecutionHost client port
+  authority + v1 contracts + durable turn lifecycle + ExecutionHost port
           |
   HEDDLE EXECUTION HOST
   isolated Heddle loop and workstation
@@ -37,13 +37,16 @@ For each invocation, the adopter backend must:
 1. authenticate the product request;
 2. authorize the relevant tenant, subject, and product session;
 3. allocate or resolve the Runtime session ID and a durable, unique invocation
-   ID;
+   ID plus a product deadline;
 4. issue a short-lived execution assertion and, only when needed, an MCP
    capability with the exact product tools allowed for that invocation;
-5. invoke an `ExecutionHost` implementation and consume one ordered stream to a
+5. use the durable lifecycle over its atomic store adapter so `requested`,
+   accepted, and terminal checkpoints commit before their corresponding work
+   or public events;
+6. invoke an `ExecutionHost` implementation and consume one ordered stream to a
    truthful terminal event;
-6. apply the terminal result to product state idempotently;
-7. independently verify the same MCP bearer at every product-MCP request and
+7. apply the terminal result to product state idempotently; and
+8. independently verify the same MCP bearer at every product-MCP request and
    resolve identity only from the verified capability scope.
 
 Do not automatically retry an invocation when the stream ends without a
@@ -64,7 +67,8 @@ Its subpaths separate responsibility:
 - `/contracts` provides executable TypeScript/Zod v1 claim and wire contracts;
 - `/authority` issues ES256 assertions/capabilities and projects public JWKS;
 - `/conversation` composes assertion/capability issuance, model credentials,
-  fixed tool policy, and one `ExecutionHost` turn;
+  fixed tool policy, one `ExecutionHost` turn, and an optional durable lifecycle
+  over an adopter-implemented store;
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
 - `/mcp/node` owns a stateless official-SDK Streamable HTTP lifecycle around
@@ -72,7 +76,8 @@ Its subpaths separate responsibility:
 - `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
   direct-development transport;
 - `/testing` provides a Node-only loopback v1 fixture for local product/MCP
-  integration tests without a model or AWS.
+  integration tests without a model or AWS plus real-store lifecycle
+  conformance.
 - `/node` provides an optional standard Node JWKS/conversation HTTP edge and
   owner-only local signing-key file helpers.
 
@@ -84,7 +89,9 @@ Backends outside TypeScript can use the published
 as the canonical v1 contract. The
 [clean-room Python v1 conformance reference](../../../packages/heddle-adopter/conformance/reference-adopters/python-v1/README.md)
 shows the same ES256 authority, independent MCP verification, and strict SSE
-rules with no Heddle or private-host import.
+rules plus the optional durable lifecycle with no Heddle or private-host
+import. It is an executable conformance proof, not a published or supported
+Python SDK.
 
 The package deliberately excludes:
 
@@ -94,7 +101,8 @@ The package deliberately excludes:
 - MCP tool registration, product APIs, or database access;
 - AWS AgentCore/SigV4 transport and deployment;
 - Heddle's loop, tools, model runtime, workspace, or state serialization;
-- durable invocation deduplication, result recovery, billing, and UI.
+- invocation-ID allocation, database implementation, explicit result lookup or
+  retry after ambiguity, billing, and UI.
 
 ## Identity and capability rules
 
@@ -135,7 +143,11 @@ errors, SSE framing/backpressure, disconnect cancellation, and shutdown. Pass
 it the authority, product authenticator, and a product admission service. The
 admission service is the small intentional product seam: it decides the
 authorized scope and durable invocation identity, then delegates to
-`HostedConversationTurnService`.
+`DurableHostedConversationTurnService` wrapping
+`HostedConversationTurnService`. The durable wrapper owns the generic
+requested/accepted/terminal state machine and requires only the adopter's
+database adapter. The normative lifecycle profile and shared scenarios live in
+the [v1 durable lifecycle specification](../../../packages/heddle-adopter/spec/v1/durable-hosted-conversation-lifecycle.md).
 
 Teams with an existing router that exposes Node `IncomingMessage` and
 `ServerResponse`—including raw Node, Express, or a framework's raw adapter—can
@@ -174,9 +186,10 @@ Execution Host integration test for those properties.
 
 TypeScript is the first reference implementation, not a requirement for
 adopters. Python, Go, Java, or other backends can implement the same compact
-claim and wire semantics without porting Heddle. Canonical OpenAPI 3.1.1, JSON
-Schema Draft 2020-12, golden event/authority fixtures, TypeScript conformance,
-and one independent Python implementation now form the executable reference.
+claim, wire, and optional durable-lifecycle semantics without porting Heddle.
+Canonical OpenAPI 3.1.1, JSON Schema Draft 2020-12, golden event/authority/
+lifecycle fixtures, TypeScript conformance, and one independent Python
+implementation now form the executable reference.
 
 This is also the deliberate stop line. More languages, generated clients,
 framework starters, alternate transports, or an adopter gateway require a real
@@ -190,5 +203,7 @@ work.
 - MCP capability refresh and durable early revocation are not implemented;
 - managed AgentCore transport and isolation evidence live outside this package;
 - the direct stream has no reconnect/result-lookup protocol;
-- adopters remain responsible for durable invocation uniqueness, key rotation,
-  data retention, and result idempotency.
+- adopters remain responsible for choosing unique invocation IDs, key rotation,
+  implementing the lifecycle store, data retention, and idempotent product
+  side effects. Heddle's conformance helper certifies the store's generic
+  transition and fencing behavior.

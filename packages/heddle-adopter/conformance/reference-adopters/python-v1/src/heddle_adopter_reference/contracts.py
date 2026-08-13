@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -24,6 +26,20 @@ MODEL_API_KEY_HEADER = "x-heddle-execution-host-model-api-key"
 _OPAQUE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@-]*$")
 _MCP_SERVER_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 _MCP_TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+
+@dataclass(frozen=True)
+class ExecutionScope:
+    """Product-authorized identity selected by the adopter backend."""
+
+    tenant_id: str
+    subject_id: str
+    product_session_id: str
+
+    def __post_init__(self) -> None:
+        validate_opaque_id(self.tenant_id)
+        validate_opaque_id(self.subject_id)
+        validate_opaque_id(self.product_session_id)
 
 
 class ContractBundle:
@@ -63,6 +79,16 @@ def validate_opaque_id(value: str) -> str:
 def validate_runtime_session_id(value: str) -> str:
     if not 33 <= len(value) <= 256 or value != value.strip():
         raise ValueError("Expected a trimmed runtime session identifier.")
+    return value
+
+
+def validate_timestamp(value: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError) as error:
+        raise ValueError("Expected an ISO timestamp with an offset.") from error
+    if parsed.tzinfo is None:
+        raise ValueError("Expected an ISO timestamp with an offset.")
     return value
 
 

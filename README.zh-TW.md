@@ -40,6 +40,13 @@ conversation 與 run 基礎之上。
 host 與 AWS AgentCore deployment 仍是 private research，不是公開發行的產品或
 hosted offering。
 
+在獨立 host 形態中，Heddle 選用的 durable lifecycle 會定義
+requested／accepted／terminal 的順序、interruption、安全投影、到期協調與 store
+conformance。產品仍擁有經過驗證的 ID、database adapter／schema／migration、history
+query、retention 與 UI。受維護的 embedded runtime 是 TypeScript／Node；獨立 host
+的 wire 與 lifecycle profile 則是 language-neutral。Python 實作是 clean-room
+conformance proof，不是已發布或受支援的 Python SDK。
+
 完整邊界、可用狀態與選擇路徑請參考
 [component and deployment model](docs/guides/programmatic/component-model.md)。
 
@@ -200,7 +207,8 @@ mechanics 的最低層即可：
 | 一般 Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
 | Remote browser 或 client | `@roackb2/heddle-remote` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
-| Backend 呼叫獨立 Execution Host | `@roackb2/heddle-adopter` | v1 contract、authority/JWKS、hosted-turn orchestration、product-MCP verification 與 provider-neutral client port |
+| Backend 呼叫獨立 Execution Host | `@roackb2/heddle-adopter` | v1 contract、authority/JWKS、hosted-turn orchestration、選用的 durable lifecycle/store conformance、product-MCP verification、provider-neutral client port 與共用 language-neutral fixture |
+| PostgreSQL heartbeat worker | `@roackb2/heddle-postgres` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
 | 更底層的 runtime 組裝 | `@roackb2/heddle/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 
 既有的 tRPC、Fastify、Hono、Nest、WebSocket、IPC、queue、React 或其他技術棧，

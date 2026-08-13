@@ -3,10 +3,10 @@ import {
   McpAllowedToolsSchema,
 } from '../contracts/index.js';
 import type {
-  HostedConversationTurnInput,
   HostedConversationTurnRunner,
   HostedConversationTurnServiceConfig,
 } from './types.js';
+import { HostedConversationTurnInputSchema } from './types.js';
 
 export class HostedConversationConfigurationError extends Error {
   readonly name = 'HostedConversationConfigurationError';
@@ -38,8 +38,9 @@ implements HostedConversationTurnRunner {
   }
 
   async *streamTurn(
-    input: HostedConversationTurnInput,
+    rawInput: Parameters<HostedConversationTurnRunner['streamTurn']>[0],
   ): ReturnType<HostedConversationTurnRunner['streamTurn']> {
+    const input = HostedConversationTurnInputSchema.parse(rawInput);
     input.signal?.throwIfAborted();
     const issued = await this.#authority.issue({
       scope: input.scope,

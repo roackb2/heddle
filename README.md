@@ -43,6 +43,14 @@ contract is public and experimental, while the current compatible host and
 AWS AgentCore deployment work remain private research—not a distributed
 product or hosted offering.
 
+In the separate-host shape, Heddle's optional durable lifecycle defines
+requested/accepted/terminal ordering, interruption, safe projection, expiry,
+and store conformance. Your product still owns the authenticated IDs, database
+adapter/schema/migrations, history query, retention, and UI. The maintained
+embedded runtime is TypeScript/Node; the separate-host wire and lifecycle
+profiles are language-neutral. The Python implementation is clean-room
+conformance proof, not a published or supported Python SDK.
+
 See the [component and deployment model](docs/guides/programmatic/component-model.md)
 for the boundaries, availability, and decision path.
 
@@ -207,7 +215,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, authority/JWKS, hosted-turn orchestration, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and a local fixture |
+| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, authority/JWKS, hosted-turn orchestration, optional durable lifecycle/store conformance, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and shared language-neutral fixtures |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 

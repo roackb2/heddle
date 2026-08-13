@@ -16,6 +16,16 @@ import {
   McpCapabilityClaimsSchema,
   RuntimePublicResultSchema,
 } from '../src/contracts/index.js';
+import {
+  HOSTED_CONVERSATION_FAILURE_CODES,
+  HOSTED_CONVERSATION_TURN_STATUSES,
+  HostedConversationAcceptedTurnSchema,
+  HostedConversationExpiredTurnReconciliationSchema,
+  HostedConversationPersistenceScopeSchema,
+  HostedConversationRequestedTurnSchema,
+  HostedConversationTurnIdentitySchema,
+  HostedConversationTurnSettlementSchema,
+} from '../src/conversation/lifecycle-types.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -33,6 +43,9 @@ export function createContractArtifacts(): ReadonlyMap<string, string> {
     ['openapi.json', serialize(createOpenApi(fixtures.validStream))],
     ['fixtures/manifest.json', serialize(fixtures.manifest)],
     ['fixtures/authority.json', serialize(fixtures.authority)],
+    ['fixtures/durable-conversation-lifecycle.json', serialize(
+      fixtures.durableConversationLifecycle,
+    )],
     ['fixtures/valid-request.json', serialize(fixtures.validRequest)],
     ['fixtures/invalid-request-extra-field.json', serialize(
       fixtures.invalidRequestExtraField,
@@ -63,7 +76,8 @@ export function createSchemaBundle(): JsonObject {
 }
 
 export function createOpenApi(validStream: string): JsonObject {
-  const schemas = createSchemaDefinitions();
+  const schemas = createExecutionSchemaDefinitions();
+  annotateSemantics(schemas);
   return {
     openapi: '3.1.1',
     jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
@@ -137,6 +151,32 @@ export function createOpenApi(validStream: string): JsonObject {
 
 function createSchemaDefinitions(): JsonObject {
   const definitions: JsonObject = {
+    ...createExecutionSchemaDefinitions(),
+    HostedConversationPersistenceScope: jsonSchema(
+      HostedConversationPersistenceScopeSchema,
+    ),
+    HostedConversationTurnIdentity: jsonSchema(
+      HostedConversationTurnIdentitySchema,
+    ),
+    HostedConversationRequestedTurn: jsonSchema(
+      HostedConversationRequestedTurnSchema,
+    ),
+    HostedConversationAcceptedTurn: jsonSchema(
+      HostedConversationAcceptedTurnSchema,
+    ),
+    HostedConversationTurnSettlement: jsonSchema(
+      HostedConversationTurnSettlementSchema,
+    ),
+    HostedConversationExpiredTurnReconciliation: jsonSchema(
+      HostedConversationExpiredTurnReconciliationSchema,
+    ),
+  };
+  annotateSemantics(definitions);
+  return definitions;
+}
+
+function createExecutionSchemaDefinitions(): JsonObject {
+  return {
     ExecutionScope: jsonSchema(ExecutionScopeSchema),
     ConversationTurnRequest: jsonSchema(
       ExecutionHostConversationTurnRequestSchema,
@@ -151,8 +191,6 @@ function createSchemaDefinitions(): JsonObject {
     McpCapabilityProtectedHeader: protectedHeaderSchema(MCP_CAPABILITY_TYPE),
     ApiError: apiErrorSchema(),
   };
-  annotateSemantics(definitions);
-  return definitions;
 }
 
 function createInvocationHeaderParameters(): JsonObject[] {
@@ -331,6 +369,7 @@ function createFixtures() {
     streamEvent(2, { kind: 'activity', activity: { type: 'checkpointed' } }),
   ]);
   const authority = createAuthorityFixture();
+  const durableConversationLifecycle = createDurableLifecycleFixture();
   const manifest = {
     contractVersion: EXECUTION_CONTRACT_VERSION,
     cases: [
@@ -351,11 +390,18 @@ function createFixtures() {
         'protocol_error',
       ),
       fixtureCase('authority', 'authority.json', 'authority', 'valid'),
+      fixtureCase(
+        'durable-conversation-lifecycle',
+        'durable-conversation-lifecycle.json',
+        'lifecycle',
+        'conformant',
+      ),
     ],
   };
   return {
     manifest,
     authority,
+    durableConversationLifecycle,
     validRequest,
     invalidRequestExtraField,
     validStream,
@@ -363,6 +409,318 @@ function createFixtures() {
     ambiguousEofStream,
     invalidSequenceGapStream,
   };
+}
+
+function createDurableLifecycleFixture(): JsonObject {
+  const scope = {
+    tenantId: 'tenant-a',
+    subjectId: 'subject-a',
+    productSessionId: 'product-session-a',
+  };
+  const otherScope = {
+    tenantId: 'tenant-b',
+    subjectId: 'subject-b',
+    productSessionId: 'product-session-b',
+  };
+  const requestedAt = '2026-08-14T00:00:00.000Z';
+  const acceptedAt = '2026-08-14T00:00:01.000Z';
+  const settledAt = '2026-08-14T00:00:02.000Z';
+  const deadlineAt = '2026-08-14T00:05:00.000Z';
+  const requested = lifecycleRequested(
+    'lifecycle-invocation-001',
+    scope,
+    requestedAt,
+    deadlineAt,
+  );
+  const accepted = {
+    invocationId: requested.invocationId,
+    scope,
+    runId: 'lifecycle-run-001',
+    acceptedAt,
+  };
+  const completed = {
+    invocationId: requested.invocationId,
+    scope,
+    status: 'completed',
+    summary: 'Done.',
+    settledAt,
+  };
+  const terminalCases = [
+    lifecycleTerminalCase(
+      'completed',
+      { outcome: 'done', summary: 'Done.' },
+      { status: 'completed', summary: 'Done.' },
+    ),
+    lifecycleTerminalCase(
+      'max-steps',
+      { outcome: 'max_steps', summary: 'Part.' },
+      { status: 'max_steps', summary: 'Part.' },
+    ),
+    lifecycleTerminalCase(
+      'result-error',
+      { outcome: 'error' },
+      { status: 'failed', failureCode: 'execution_result_error' },
+    ),
+    lifecycleTerminalCase(
+      'result-interrupted',
+      { outcome: 'interrupted', summary: 'Part.' },
+      {
+        status: 'interrupted',
+        summary: 'Part.',
+        failureCode: 'execution_interrupted',
+      },
+    ),
+    ...Object.entries({
+      authentication: 'model_authentication',
+      permission: 'model_permission',
+      quota: 'model_quota',
+      rate_limit: 'model_rate_limit',
+      context_window: 'model_context_window',
+      request: 'model_request',
+      transport: 'model_transport',
+      empty_response: 'model_empty_response',
+      unknown: 'model_unknown',
+    }).map(([modelCode, failureCode]) => lifecycleTerminalCase(
+      `model-${modelCode}`,
+      {
+        outcome: 'error',
+        failure: { source: 'model', code: modelCode },
+      },
+      { status: 'failed', failureCode },
+    )),
+    {
+      id: 'explicit-cancellation',
+      maxSummaryCharacters: 100,
+      event: lifecycleEvent({
+        sequence: 1,
+        kind: 'cancelled',
+        reason: 'private cancellation detail',
+      }),
+      expectedEvent: lifecycleEvent({
+        sequence: 1,
+        kind: 'cancelled',
+        reason: 'private cancellation detail',
+      }),
+      expectedSettlement: {
+        status: 'cancelled',
+        failureCode: 'invocation_cancelled',
+      },
+    },
+    {
+      id: 'public-host-error',
+      maxSummaryCharacters: 100,
+      event: lifecycleEvent({
+        sequence: 1,
+        kind: 'error',
+        error: {
+          code: 'provider_token_ghp_secret',
+          message: 'private host detail',
+        },
+      }),
+      expectedEvent: lifecycleEvent({
+        sequence: 1,
+        kind: 'error',
+        error: {
+          code: 'provider_token_ghp_secret',
+          message: 'private host detail',
+        },
+      }),
+      expectedSettlement: {
+        status: 'failed',
+        failureCode: 'execution_error',
+      },
+    },
+    {
+      id: 'unicode-summary-bound',
+      maxSummaryCharacters: 5,
+      event: lifecycleEvent({
+        sequence: 1,
+        kind: 'result',
+        result: { outcome: 'done', summary: 'A😀BCDE' },
+      }),
+      expectedEvent: lifecycleEvent({
+        sequence: 1,
+        kind: 'result',
+        result: { outcome: 'done', summary: 'A😀BCD' },
+      }),
+      expectedSettlement: {
+        status: 'completed',
+        summary: 'A😀BCD',
+      },
+    },
+  ];
+  return {
+    profile: 'durable-hosted-conversation-lifecycle',
+    contractVersion: EXECUTION_CONTRACT_VERSION,
+    summaryCharacterUnit: 'unicode-code-point',
+    statuses: HOSTED_CONVERSATION_TURN_STATUSES,
+    failureCodes: HOSTED_CONVERSATION_FAILURE_CODES,
+    scope,
+    otherScope,
+    timestamps: { requestedAt, acceptedAt, settledAt, deadlineAt },
+    terminalProjectionCases: terminalCases,
+    thrownFailureCases: [
+      thrownFailureCase('stream-interrupted', 'stream_interrupted'),
+      thrownFailureCase('invocation-aborted', 'invocation_aborted'),
+      thrownFailureCase('protocol-error', 'host_protocol_error', 'failed'),
+      thrownFailureCase('host-rejected', 'host_rejected', 'failed'),
+      thrownFailureCase('unexpected-error', 'execution_failed', 'failed'),
+    ],
+    storeCases: {
+      lifecycleAndFencing: {
+        requested,
+        wrongScopeAccepted: { ...accepted, scope: otherScope },
+        accepted,
+        conflictingAccepted: {
+          ...accepted,
+          runId: 'lifecycle-run-conflict',
+        },
+        conflictingAcceptedAt: {
+          ...accepted,
+          acceptedAt: '2026-08-14T00:00:01.500Z',
+        },
+        completed,
+        wrongScopeCompleted: { ...completed, scope: otherScope },
+        conflictingCompleted: {
+          ...completed,
+          status: 'failed',
+          summary: undefined,
+          failureCode: 'execution_failed',
+        },
+        conflictingSettledAt: {
+          ...completed,
+          settledAt: '2026-08-14T00:00:02.500Z',
+        },
+        expectedRunning: {
+          ...requested,
+          status: 'running',
+          runId: accepted.runId,
+          acceptedAt,
+        },
+        expectedCompleted: {
+          ...requested,
+          status: 'completed',
+          runId: accepted.runId,
+          acceptedAt,
+          summary: completed.summary,
+          settledAt,
+        },
+      },
+      preAcceptanceFailure: {
+        requested: lifecycleRequested(
+          'lifecycle-pre-accept-failure',
+          scope,
+          requestedAt,
+          deadlineAt,
+        ),
+        settlement: {
+          invocationId: 'lifecycle-pre-accept-failure',
+          scope,
+          status: 'failed',
+          failureCode: 'execution_failed',
+          settledAt,
+        },
+      },
+      expiry: {
+        expiredRequested: lifecycleRequested(
+          'lifecycle-expired-requested',
+          scope,
+          '2026-08-13T23:55:00.000Z',
+          '2026-08-13T23:58:00.000Z',
+        ),
+        expiredRunning: lifecycleRequested(
+          'lifecycle-expired-running',
+          scope,
+          '2026-08-13T23:55:00.000Z',
+          '2026-08-13T23:58:00.000Z',
+        ),
+        expiredRunningAcceptance: {
+          invocationId: 'lifecycle-expired-running',
+          scope,
+          runId: 'lifecycle-expired-run',
+          acceptedAt: '2026-08-13T23:56:00.000Z',
+        },
+        futureRequested: lifecycleRequested(
+          'lifecycle-future-requested',
+          scope,
+          requestedAt,
+          '2026-08-14T00:10:00.000Z',
+        ),
+        terminalRequested: lifecycleRequested(
+          'lifecycle-terminal-before-expiry',
+          scope,
+          '2026-08-13T23:55:00.000Z',
+          '2026-08-13T23:58:00.000Z',
+        ),
+        terminalSettlement: {
+          invocationId: 'lifecycle-terminal-before-expiry',
+          scope,
+          status: 'failed',
+          failureCode: 'execution_failed',
+          settledAt: '2026-08-13T23:57:00.000Z',
+        },
+        otherScopeExpired: lifecycleRequested(
+          'lifecycle-other-scope-expired',
+          otherScope,
+          '2026-08-13T23:55:00.000Z',
+          '2026-08-13T23:58:00.000Z',
+        ),
+        reconciliation: {
+          scope,
+          expiredBefore: '2026-08-13T23:59:00.000Z',
+          settledAt,
+        },
+      },
+    },
+  };
+}
+
+function lifecycleRequested(
+  invocationId: string,
+  scope: JsonObject,
+  requestedAt: string,
+  deadlineAt: string,
+): JsonObject {
+  return {
+    invocationId,
+    scope,
+    prompt: 'Run the durable lifecycle conformance case.',
+    deadlineAt,
+    requestedAt,
+  };
+}
+
+function lifecycleTerminalCase(
+  id: string,
+  result: JsonObject,
+  expectedSettlement: JsonObject,
+): JsonObject {
+  const event = lifecycleEvent({ sequence: 1, kind: 'result', result });
+  return {
+    id,
+    maxSummaryCharacters: 100,
+    event,
+    expectedEvent: event,
+    expectedSettlement,
+  };
+}
+
+function lifecycleEvent(body: JsonObject): JsonObject {
+  return {
+    schemaVersion: EXECUTION_CONTRACT_VERSION,
+    invocationId: 'lifecycle-invocation-001',
+    runId: 'lifecycle-run-001',
+    timestamp: '2026-08-14T00:00:02.000Z',
+    ...body,
+  };
+}
+
+function thrownFailureCase(
+  id: string,
+  failureCode: string,
+  status = 'interrupted',
+): JsonObject {
+  return { id, expectedSettlement: { status, failureCode } };
 }
 
 function createAuthorityFixture(): JsonObject {

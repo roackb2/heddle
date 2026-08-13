@@ -17,6 +17,14 @@ import {
   type McpCapabilityClaims,
 } from '../contracts/index.js';
 import {
+  HostedConversationAcceptedTurnSchema,
+  HostedConversationExpiredTurnReconciliationSchema,
+  HostedConversationRequestedTurnSchema,
+  HostedConversationTurnSettlementSchema,
+  projectHostedConversationTerminalEvent,
+  type HostedConversationTerminalProjection,
+} from '../conversation/index.js';
+import {
   DirectHttpExecutionHost,
   ExecutionHostProtocolError,
   ExecutionHostStreamInterruptedError,
@@ -145,7 +153,81 @@ describe('language-neutral golden fixtures', () => {
       swappedClaims,
     )).toBe(false);
   });
+
+  it('projects every durable lifecycle terminal from the shared fixture', async () => {
+    const fixture = await durableLifecycleFixture();
+
+    for (const testCase of fixture.terminalProjectionCases) {
+      const projection = projectHostedConversationTerminalEvent(
+        testCase.event,
+        { maxSummaryCharacters: testCase.maxSummaryCharacters },
+      );
+      expect(projection).toEqual({
+        event: testCase.expectedEvent,
+        settlement: testCase.expectedSettlement,
+      });
+    }
+  });
+
+  it('keeps durable lifecycle store vectors synchronized with runtime schemas', async () => {
+    const fixture = await durableLifecycleFixture();
+    const storeCases = fixture.storeCases;
+    const lifecycle = storeCases.lifecycleAndFencing;
+    const expiry = storeCases.expiry;
+
+    for (const requested of [
+      lifecycle.requested,
+      storeCases.preAcceptanceFailure.requested,
+      expiry.expiredRequested,
+      expiry.expiredRunning,
+      expiry.futureRequested,
+      expiry.terminalRequested,
+      expiry.otherScopeExpired,
+    ]) {
+      expect(HostedConversationRequestedTurnSchema.safeParse(requested).success)
+        .toBe(true);
+    }
+    for (const accepted of [
+      lifecycle.accepted,
+      lifecycle.wrongScopeAccepted,
+      lifecycle.conflictingAccepted,
+      lifecycle.conflictingAcceptedAt,
+      expiry.expiredRunningAcceptance,
+    ]) {
+      expect(HostedConversationAcceptedTurnSchema.safeParse(accepted).success)
+        .toBe(true);
+    }
+    for (const settlement of [
+      lifecycle.completed,
+      lifecycle.wrongScopeCompleted,
+      lifecycle.conflictingCompleted,
+      lifecycle.conflictingSettledAt,
+      storeCases.preAcceptanceFailure.settlement,
+      expiry.terminalSettlement,
+    ]) {
+      expect(HostedConversationTurnSettlementSchema.safeParse(settlement).success)
+        .toBe(true);
+    }
+    expect(HostedConversationExpiredTurnReconciliationSchema.safeParse(
+      expiry.reconciliation,
+    ).success).toBe(true);
+  });
 });
+
+type DurableLifecycleFixture = {
+  terminalProjectionCases: Array<{
+    id: string;
+    maxSummaryCharacters: number;
+    event: Parameters<typeof projectHostedConversationTerminalEvent>[0];
+    expectedEvent: HostedConversationTerminalProjection['event'];
+    expectedSettlement: HostedConversationTerminalProjection['settlement'];
+  }>;
+  storeCases: {
+    lifecycleAndFencing: Record<string, unknown>;
+    preAcceptanceFailure: Record<string, unknown>;
+    expiry: Record<string, unknown>;
+  };
+};
 
 type AuthorityFixture = {
   referenceTime: string;
@@ -167,6 +249,12 @@ type AuthorityFixture = {
 
 async function authorityFixture(): Promise<AuthorityFixture> {
   return await readJson('authority.json') as unknown as AuthorityFixture;
+}
+
+async function durableLifecycleFixture(): Promise<DurableLifecycleFixture> {
+  return await readJson(
+    'durable-conversation-lifecycle.json',
+  ) as unknown as DurableLifecycleFixture;
 }
 
 function createVerifier(
