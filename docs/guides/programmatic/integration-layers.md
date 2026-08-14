@@ -35,7 +35,7 @@ runtime.
 HOST-OWNED PRODUCT
   UI state and rendering
           |
-  @roackb2/heddle-remote consumer + optional HTTP/SSE client
+  @heddleagent/run-client consumer + optional HTTP/SSE client
           |
   host transport adapter + optional Node SSE helper
           |
@@ -85,8 +85,8 @@ disconnect as implicit cancellation.
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
 | A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
 | Express with REST + SSE | Core plus `@roackb2/heddle/hosted/http-sse` | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
-| A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
-| A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
+| A remote client over any transport | `@heddleagent/run-client` plus a host transport | [Remote conversation runs](remote-runs.md) |
+| A browser using the conventional REST/SSE contract | `@heddleagent/run-client/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
 | A backend invoking a separately deployed Execution Host | `@heddleagent/execution-host-client` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
 | That backend needs the generic lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` plus the lifecycle service | [Execution Host adopter backend](execution-host-adopters.md) |
@@ -134,7 +134,7 @@ visible. The root export remains available for compatibility.
 ### Remote run protocol
 
 Use `ConversationRunProtocolCodec` and `ConversationRunConsumerService` from
-`@roackb2/heddle-remote` when events cross an untrusted transport boundary or a
+`@heddleagent/run-client` when events cross an untrusted transport boundary or a
 client can reconnect. The independent package keeps the Node runtime, server,
 CLI, model providers, and control-plane dependencies out of remote clients.
 The host supplies public activity/result schemas; Heddle owns envelope
@@ -142,7 +142,7 @@ validation, JSON safety, cursor advancement, duplicate/gap handling, terminal
 detection, and retry calculation.
 
 This base layer does not own HTTP, SSE, tRPC, timers, auth, or UI state. Add
-`@roackb2/heddle-remote/http-sse` only when the host uses the conventional REST
+`@heddleagent/run-client/http-sse` only when the host uses the conventional REST
 run resource and authenticated streaming `fetch`. See
 [Remote conversation runs](remote-runs.md).
 
@@ -197,7 +197,7 @@ Host alone imports Heddle and receives no adopter database credential. See
 | Remote cursor/retry correctness | `ConversationRunConsumerService` |
 | Runtime run-envelope validation | `ConversationRunProtocolCodec` with host activity/result schemas |
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` plus host routes and policy |
-| Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` plus host schemas and headers |
+| Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` plus host schemas and headers |
 | tRPC, WebSocket, or IPC | Host transport adapter above the application service |
 | React or other UI state | Product client/application layer above the protocol client |
 | Multi-process live delivery | Host-selected shared routing/broker infrastructure |

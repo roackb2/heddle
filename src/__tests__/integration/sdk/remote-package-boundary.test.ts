@@ -2,21 +2,21 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const rootPackage = readPackage('package.json');
-const remotePackage = readPackage('packages/heddle-remote/package.json');
+const runClientPackage = readPackage('packages/run-client/package.json');
 
-describe('@roackb2/heddle-remote package boundary', () => {
-  it('is versioned with Heddle without remaining a root package subpath', () => {
-    expect(remotePackage.version).toBe(rootPackage.version);
+describe('@heddleagent/run-client package boundary', () => {
+  it('is independently versioned without becoming a root package subpath', () => {
+    expect(runClientPackage.version).toBe('6.0.0');
     expect(rootPackage.exports['./remote']).toBeUndefined();
   });
 
   it('installs only its browser-safe protocol dependencies', () => {
-    expect(remotePackage.dependencies).toEqual({
+    expect(runClientPackage.dependencies).toEqual({
       '@standard-schema/spec': rootPackage.dependencies['@standard-schema/spec'],
       'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
       zod: rootPackage.dependencies.zod,
     });
-    expect(remotePackage.exports['./http-sse']).toEqual({
+    expect(runClientPackage.exports['./http-sse']).toEqual({
       types: './dist/http-sse/index.d.ts',
       import: './dist/http-sse/index.js',
     });

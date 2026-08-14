@@ -188,6 +188,27 @@ jobs:
       - name: Verify npm release state
         run: node scripts/verify-execution-host-client-pack.mjs --verify-registry
 
+  test-run-client:
+    name: test-run-client
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify packed run client
+        run: yarn run-client:pack:verify
+
   test-python-adopter-conformance:
     name: test-python-adopter-conformance
     runs-on: ubuntu-latest

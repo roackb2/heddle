@@ -16,7 +16,7 @@ for the runnable reconnect/cancel flow.
 1. [`browser-client.ts`](browser-client.ts) — host-owned public schemas and
    protocol configured for `ConversationRunHttpSseClient`; URL, HTTP error,
    incremental SSE parsing, identity checks, cursor validation, and abort
-   cleanup come from `@roackb2/heddle-remote/http-sse`.
+   cleanup come from `@heddleagent/run-client/http-sse`.
 2. [`run.ts`](run.ts) — Heddle's public remote consumer composed with
    application-owned transport timers, terminal rendering, and cancel policy.
 

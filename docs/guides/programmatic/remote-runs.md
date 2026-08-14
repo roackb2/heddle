@@ -11,15 +11,15 @@ import { ConversationRunService } from '@roackb2/heddle/hosted'
 import {
   ConversationRunConsumerService,
   ConversationRunProtocolCodec,
-} from '@roackb2/heddle-remote'
-import { ConversationRunHttpSseClient } from '@roackb2/heddle-remote/http-sse'
+} from '@heddleagent/run-client'
+import { ConversationRunHttpSseClient } from '@heddleagent/run-client/http-sse'
 ```
 
 - `@roackb2/heddle` owns persisted conversation semantics.
 - `@roackb2/heddle/hosted` owns process-local active-run coordination.
-- `@roackb2/heddle-remote` is independently installable and owns client cursor
+- `@heddleagent/run-client` is independently installable and owns client cursor
   correctness plus runtime wire validation without choosing a transport.
-- `@roackb2/heddle-remote/http-sse` is an optional assumption layer for the
+- `@heddleagent/run-client/http-sse` is an optional assumption layer for the
   conventional REST run resource and streaming `fetch`; it still does not
   choose React or auth policy.
 
@@ -33,7 +33,7 @@ validators use the validator-neutral
 
 ```ts
 import { z } from 'zod'
-import { ConversationRunProtocolCodec } from '@roackb2/heddle-remote'
+import { ConversationRunProtocolCodec } from '@heddleagent/run-client'
 
 const PublicActivitySchema = z.object({
   type: z.string().min(1),
@@ -81,7 +81,7 @@ The consumer is a transport-neutral state machine. A reference may include any
 host fields as long as it has a stable `runId`:
 
 ```ts
-import { ConversationRunConsumerService } from '@roackb2/heddle-remote'
+import { ConversationRunConsumerService } from '@heddleagent/run-client'
 
 type ProductRunReference = {
   accountId: string
@@ -149,7 +149,7 @@ When the host exposes `POST /runs`, `GET /runs/:runId/events`, and
 incremental SSE parsing and transport validation:
 
 ```ts
-import { ConversationRunHttpSseClient } from '@roackb2/heddle-remote/http-sse'
+import { ConversationRunHttpSseClient } from '@heddleagent/run-client/http-sse'
 
 const client = new ConversationRunHttpSseClient({
   baseUrl: '/api/agent',

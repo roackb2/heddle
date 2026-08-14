@@ -32,7 +32,7 @@ Start here:
 | Shape | Mental model | Public entry point |
 | --- | --- | --- |
 | Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@roackb2/heddle` |
-| Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` |
+| Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@roackb2/heddle/hosted` and `@heddleagent/run-client` |
 | Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@heddleagent/execution-host-client` or its OpenAPI/JSON Schema contract |
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
 
@@ -180,7 +180,7 @@ Heddle is intentionally not a full application framework:
 YOUR PRODUCT
   UI state and result application
           |
-  @roackb2/heddle-remote + optional HTTP/SSE client
+  @heddleagent/run-client + optional HTTP/SSE client
           |
   your API, authentication, public schemas, and product state
 ========================= HEDDLE SDK =========================
@@ -218,8 +218,8 @@ that already owns the mechanics your host needs:
 | Custom output, tools, or session UX | `@roackb2/heddle` | Conversation engine, host extensions, tools, MCP, approvals, artifacts, and turn results |
 | A server, worker, or Electron backend | `@roackb2/heddle/hosted` | Addressable process-local runs, replay, cancellation, and approval resolution |
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
-| A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
-| Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
+| A remote browser or client | `@heddleagent/run-client` | Browser-safe protocol validation and transport-neutral run consumption |
+| Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
 | A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
 | Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
@@ -382,7 +382,7 @@ Heddle is designed to make assumptions and limitations visible:
   the host deliberately provides another integration path;
 - HTTP/SSE helpers own wire correctness, not route registration,
   authentication, authorization, CORS, limits, billing, or deployment;
-- `@roackb2/heddle-remote` validates the run protocol but does not own product
+- `@heddleagent/run-client` validates the run protocol but does not own product
   messages, UI state, authentication, or result rendering;
 - `@heddleagent/execution-host-client` helps a backend invoke a separately deployed
   Execution Host without importing Heddle, AWS, or product data

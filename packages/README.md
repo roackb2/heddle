@@ -1,11 +1,12 @@
 # Heddle Package Family
 
-Status: **three private v6 foundations and two stable packages**
+Status: **two private v6 foundations and three stable packages**
 
 This directory records the v6 package identities and responsibility boundaries.
 `@heddleagent/execution-host-client@6.0.0` contains its canonical
 implementation as a stable package. `@heddleagent/postgres@6.0.0` ships the
-first official v6 database adapter. The other three `@heddleagent/*`
+first official v6 database adapter. `@heddleagent/run-client@6.0.0` ships the
+existing browser-safe run client under its final coordinate. The other two `@heddleagent/*`
 directories remain private metadata-only foundations. Existing
 `@roackb2/*` packages remain supported until each replacement is independently
 verified and released.
@@ -16,7 +17,7 @@ verified and released.
 | --- | --- | --- |
 | `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Private foundation; implementation remains in `@roackb2/heddle` |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Private foundation; implementation remains in `@roackb2/heddle` |
-| `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Private foundation; implementation remains in `@roackb2/heddle-remote` |
+| `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.0.0`; first entrypoint implements the Execution Host conversation lifecycle; heartbeat remains in `@roackb2/heddle-postgres` until its separate migration |
 
@@ -87,26 +88,25 @@ flowchart LR
 
 ## Foundation and activation rules
 
-The runtime, CLI, and run-client directories contain only a manifest, boundary
+The runtime and CLI directories contain only a manifest, boundary
 README, and repository license. Their manifests have
 `private: true`, have no exports or dependencies, and cannot be published.
-The Execution Host client and PostgreSQL adapter family are activated
+The run client, Execution Host client, and PostgreSQL adapter family are activated
 exceptions with independent builds and guarded stable releases. PostgreSQL
 exports only its implemented Execution Host lifecycle entrypoint.
 
 Run `yarn package-family:verify` to enforce all of the following:
 
 - exactly the five selected package identities exist;
-- three foundations remain private at version `0.0.0` and implementation-free;
-- both activated packages have exact reviewed stable manifests, dependency
+- two foundations remain private at version `0.0.0` and implementation-free;
+- all three activated packages have exact reviewed stable manifests, dependency
   boundaries, exports, source ownership, and release tags;
 - package licenses and repository metadata remain consistent; and
-- the three remaining local v5 package identities stay present, while the
-  published `@roackb2/heddle-adopter@5.13.0` tarball remains installable during
-  migration.
+- the two remaining local v5 package identities stay present, while the
+  published former adopter and remote-client tarballs remain installable
+  during migration.
 
-Each further activation requires a separately reviewed migration that moves
-one canonical code path, adds real build and package tests, and removes the old
-source ownership. Do not create file dependencies, duplicate implementations,
-or introduce a workspace/build-tool migration merely to make an empty package
-installable.
+Each further activation preserves one canonical code path, the existing build,
+and one packed-consumer smoke. Do not create file dependencies, duplicate
+implementations, or introduce a workspace/build-tool migration merely to make
+an empty package installable.

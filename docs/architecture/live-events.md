@@ -295,7 +295,7 @@ The server keeps a bounded replay buffer for retained runs. A reconnecting
 client sends the last accepted `sequence` as `afterSequence`; the server replays
 only newer items and then resumes live delivery.
 
-`ConversationRunConsumerService` from `@roackb2/heddle-remote` is the
+`ConversationRunConsumerService` from `@heddleagent/run-client` is the
 mandatory CLI/web policy:
 
 - ignore duplicate sequence numbers;

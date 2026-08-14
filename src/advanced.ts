@@ -4,7 +4,7 @@
 // The deep core-customization surface: the curated SDK (rungs 1-5, re-exported
 // below) plus lower-level building blocks and specialized runtimes. Remote
 // hosting remains an orthogonal opt-in through `@roackb2/heddle/hosted` and
-// the independent `@roackb2/heddle-remote` and
+// the independent `@heddleagent/run-client` and
 // `@heddleagent/execution-host-client` packages.
 // Those surfaces are not re-exported here. Reach for this entry when
 // you need LLM adapters, individual

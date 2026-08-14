@@ -21,6 +21,6 @@ transport-neutral remote run protocol.
 - messages, tool rendering, optimistic state, React, or another UI framework;
 - a server implementation or deployment policy.
 
-Import this opt-in assumption layer from `@roackb2/heddle-remote/http-sse`.
-Use the root `@roackb2/heddle-remote` entrypoint when the host owns another
+Import this opt-in assumption layer from `@heddleagent/run-client/http-sse`.
+Use the root `@heddleagent/run-client` entrypoint when the host owns another
 transport such as tRPC, WebSocket, or a native bridge.
