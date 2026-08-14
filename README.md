@@ -36,6 +36,11 @@ Start here:
 | Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@roackb2/heddle-adopter` or its OpenAPI/JSON Schema contract |
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
 
+The stable separate-host package remains `@roackb2/heddle-adopter@5.13.0`.
+Its canonical source is moving to the unpublished v6 candidate
+`@heddleagent/execution-host-client@6.0.0-next.0`; do not install that new
+coordinate until a `next` release is confirmed on npm.
+
 The **runtime** is library code. The **hosted run layer** runs inside
 infrastructure you operate; it is not a Heddle cloud service. A compatible
 **Execution Host** is a separate deployment that embeds Heddle. Its adopter
@@ -215,7 +220,8 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | v1 contracts, authority/JWKS, hosted-turn orchestration, optional durable lifecycle/store conformance, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and shared language-neutral fixtures |
+| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | Stable v5 contracts, authority/JWKS, hosted-turn orchestration, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and wire fixtures |
+| Preview the durable separate-host lifecycle | `@heddleagent/execution-host-client@6.0.0-next.0` | Unpublished v6 candidate adding requested/accepted/terminal persistence semantics, store conformance, and shared TypeScript/Python lifecycle fixtures |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
@@ -384,6 +390,9 @@ Heddle is designed to make assumptions and limitations visible:
   adopter still owns identity, policy, production key operations, tools, and
   results; canonical OpenAPI/JSON Schema/golden fixtures and a clean-room
   Python proof keep this boundary language-neutral;
+- the same implementation is staged under the clearer unpublished v6
+  coordinate `@heddleagent/execution-host-client@6.0.0-next.0`; stable install
+  guidance remains on the v5 package until the `next` release exists;
 - `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
   but the adopter still owns PostgreSQL operations, migration rollout, trusted
   namespace resolution, delivery, and product-side idempotency;

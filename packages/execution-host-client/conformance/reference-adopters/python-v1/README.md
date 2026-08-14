@@ -1,6 +1,6 @@
 # Python adopter contract v1 conformance reference
 
-This is a small, clean-room Python implementation of the published Execution
+This is a small, clean-room Python implementation of the versioned Execution
 Host adopter contract. It proves that a non-TypeScript backend can integrate
 without importing Heddle or the private Execution Host implementation.
 

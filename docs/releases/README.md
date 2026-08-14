@@ -23,15 +23,14 @@ For a user-facing release:
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
 3. Update the package version in `package.json`,
    `packages/heddle-remote/package.json`, and
-   `packages/heddle-adopter/package.json`, and
    `packages/heddle-postgres/package.json`. The packages initially release in
    lockstep, and the build fails when their versions diverge.
-   The private `@heddleagent/*` directories documented in
-   [`packages/README.md`](../../packages/README.md) are v6 package-boundary
-   foundations, not release artifacts. Do not version, pack, or publish them
-   during a 5.x release. `yarn package-family:verify` keeps them private and
-   implementation-free until the coordinated migration replaces the current
-   package coordinates.
+   The legacy `@roackb2/heddle-adopter` package is frozen at `5.13.0`; its
+   source remains recoverable from that release tag and is not part of another
+   5.x release. Four private `@heddleagent/*` directories documented in
+   [`packages/README.md`](../../packages/README.md) remain non-releaseable.
+   The activated Execution Host client uses the independent prerelease lane
+   below and never inherits a root-package version implicitly.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
@@ -47,10 +46,54 @@ Before tagging a release, use the normal green checkpoint baseline:
 - `yarn test`
 - `npm pack --dry-run --cache /tmp/heddle-npm-cache`
 - `npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache`
-- `npm pack ./packages/heddle-adopter --dry-run --cache /tmp/heddle-npm-cache`
 - `npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache`
 
 Add more verification if the release changes a workflow that needs manual validation.
+
+## Execution Host Client Prerelease Lane
+
+`@heddleagent/execution-host-client` is independently versioned from the root
+runtime. Its first candidate is `6.0.0-next.0`, and its manifest pins
+`publishConfig.tag` to `next` while this candidate is a prerelease. A future
+stable-release PR must deliberately remove or change that tag. Do not bump the root,
+remote, PostgreSQL, or private-foundation manifests for this package-only
+release.
+
+Before review or publication, run:
+
+```bash
+npm whoami
+yarn package-family:verify
+yarn typecheck
+yarn lint
+yarn test
+yarn execution-host-client:conformance:python-v1
+yarn build
+yarn execution-host-client:pack:verify
+npm publish ./packages/execution-host-client --dry-run --access public --tag next
+git diff --check
+```
+
+`execution-host-client:pack:verify` packs the candidate, verifies every export
+and conformance fixture, installs the tarball in a fresh ESM consumer, imports
+all JavaScript subpaths, and typechecks all TypeScript subpaths. The mutation
+command `yarn execution-host-client:publish:next` publishes that exact verified
+tarball with explicit public access, npmjs registry, and `next` tag. It also
+fails if publication creates a `latest` tag.
+
+Publication remains a manual operator action after the lifecycle and package
+migration PRs are merged and the operator explicitly authorizes it. Before the
+first publish, `npm view @heddleagent/execution-host-client versions --json`
+should return `E404`; also verify that `@roackb2/heddle-adopter@5.13.0` remains
+installable. After publication, verify the exact version, integrity, and
+`next` dist-tag, then repeat fresh installation from both `@next` and the exact
+version. Do not deprecate the old package until a stable replacement and real
+consumer migration exist; never unpublish it.
+
+Create an annotated package-specific tag
+`execution-host-client-v6.0.0-next.0` on the release commit and, when a GitHub
+release is created, mark it as a prerelease. Never use a root
+`v6.0.0-next.0` tag for this package-only release.
 
 ## Fast Release Preflight
 
@@ -117,7 +160,6 @@ For the actual release pass:
 1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
 2. Confirm the intended next version matches in `package.json`,
    `packages/heddle-remote/package.json`, and
-   `packages/heddle-adopter/package.json`, and
    `packages/heddle-postgres/package.json`.
 3. Run the release verification baseline.
 4. Review the git range since the previous release tag.
@@ -145,7 +187,6 @@ yarn build
 yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
 npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache
-npm pack ./packages/heddle-adopter --dry-run --cache /tmp/heddle-npm-cache
 npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache
 yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
@@ -158,25 +199,21 @@ Before a package's first publication, its `npm view` command is expected to
 return `E404`; confirm the package name is genuinely unpublished rather than
 treating that first-release state as a failed preflight.
 
-After the GitHub release, the operator publishes all verified artifacts. The
-remote and adopter packages have no dependency on the Node package, so publish
-both independent packages first. Publish Heddle next, then the optional
+After the GitHub release, the operator publishes all verified 5.x artifacts.
+Publish the independent remote package first, Heddle next, then the optional
 PostgreSQL package whose peer dependency requires that Heddle version:
 
 ```bash
 yarn remote:publish
-yarn adopter:publish
 npm publish
 yarn postgres:publish
 ```
 
 `yarn remote:publish` cleans, verifies, and compiles the remote package before
 invoking npm, so the operator cannot accidentally publish stale `dist` output.
-`yarn adopter:publish` provides the same protection for the adopter package.
 `yarn postgres:publish` verifies and builds the optional adapter against the
 same Heddle version before publication. Pass normal npm publish flags through
-these scripts when needed, for example
-`yarn adopter:publish --dry-run`.
+these scripts when needed.
 
 This remains a manual operator step unless npm publication was explicitly
 delegated.

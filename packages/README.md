@@ -1,23 +1,23 @@
 # Heddle Package Family
 
-Status: **v6 package foundation; no `@heddleagent/*` package is published yet**
+Status: **four private v6 foundations and one unpublished prerelease candidate**
 
-This directory records the initial v6 package identities and responsibility
-boundaries before code moves between artifacts. The current `@roackb2/*`
-packages remain the only installable and supported packages until a coordinated
-migration is built, verified, and released. The adapter family is intentionally
-open-ended: owning the `@heddleagent` npm organization lets the project add a
-backend package later when a stable public port and real adopter need exist.
+This directory records the v6 package identities and responsibility boundaries.
+`@heddleagent/execution-host-client@6.0.0-next.0` now contains its canonical
+implementation as an unpublished prerelease candidate. The other four
+`@heddleagent/*` directories remain private metadata-only foundations. The
+current `@roackb2/*` packages remain the only installable supported packages
+until each replacement is independently verified and released.
 
 ## Initial v6 family
 
-| Package | Responsibility | Current source surface |
+| Package | Responsibility | Migration status |
 | --- | --- | --- |
-| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Runtime and SDK portions of `@roackb2/heddle` |
-| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | CLI, daemon, and browser control plane portions of `@roackb2/heddle` |
-| `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | `@roackb2/heddle-remote` |
-| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | `@roackb2/heddle-adopter` |
-| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | `@roackb2/heddle-postgres`; additional domains require released contracts and conformance |
+| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Private foundation; implementation remains in `@roackb2/heddle` |
+| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Private foundation; implementation remains in `@roackb2/heddle` |
+| `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Private foundation; implementation remains in `@roackb2/heddle-remote` |
+| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; `6.0.0-next.0` candidate is not published |
+| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Private foundation; current heartbeat adapter remains in `@roackb2/heddle-postgres` |
 
 The in-process run service will be exposed from
 `@heddleagent/runtime/runs`; it is not a sixth package. Its conventional Node
@@ -84,24 +84,28 @@ flowchart LR
 - Future adapter packages follow the same one-way dependency rule. They are not
   part of the initial release merely because their names appear in this design.
 
-## Foundation rules
+## Foundation and activation rules
 
-Each new package directory currently contains only a manifest, boundary
-README, and repository license. Its manifest has `private: true`, has no
-exports or dependencies, and cannot be published. This is deliberate: a
-package name must not imply that an implementation or support promise exists.
+The runtime, CLI, run-client, and PostgreSQL directories contain only a
+manifest, boundary README, and repository license. Their manifests have
+`private: true`, have no exports or dependencies, and cannot be published.
+The Execution Host client is the one activated exception: it owns the moved
+implementation, language-neutral artifacts, tests, build, and guarded
+`next`-channel release candidate.
 
 Run `yarn package-family:verify` to enforce all of the following:
 
-- exactly the five selected foundation identities for this PR exist;
-- all five remain private at version `0.0.0`;
-- no implementation, dependency, export, binary, or publish configuration has
-  entered a foundation package;
+- exactly the five selected package identities exist;
+- four foundations remain private at version `0.0.0` and implementation-free;
+- the activated Execution Host client has the exact reviewed prerelease
+  manifest, dependency boundary, exports, source ownership, and release tag;
 - package licenses and repository metadata remain consistent; and
-- the current `@roackb2/*` release packages remain present during migration.
+- the three remaining local v5 package identities stay present, while the
+  published `@roackb2/heddle-adopter@5.13.0` tarball remains installable during
+  migration.
 
-Adding implementation requires a separately reviewed migration that moves one
-canonical code path, adds real build and package tests, and removes the old
+Each further activation requires a separately reviewed migration that moves
+one canonical code path, adds real build and package tests, and removes the old
 source ownership. Do not create file dependencies, duplicate implementations,
 or introduce a workspace/build-tool migration merely to make an empty package
 installable.

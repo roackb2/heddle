@@ -23,7 +23,7 @@ if (drift.length > 0) {
   throw new Error([
     'Published adopter contract artifacts are stale:',
     ...drift.map((path) => `- ${path}`),
-    'Run yarn adopter:contract:generate.',
+    'Run yarn execution-host-client:contract:generate.',
   ].join('\n'));
 }
 

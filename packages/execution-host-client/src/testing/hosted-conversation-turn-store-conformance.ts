@@ -69,7 +69,7 @@ export type HostedConversationTurnStoreConformanceHarness = {
 
 /**
  * Certifies the atomic transition behavior required by the durable turn
- * service using the same published vectors as non-TypeScript implementations.
+ * service using the same versioned vectors as non-TypeScript implementations.
  */
 export class HostedConversationTurnStoreConformance {
   static async verify(

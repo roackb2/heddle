@@ -1,4 +1,4 @@
-"""Shared v1 validation primitives backed by the published JSON Schema."""
+"""Shared v1 validation primitives backed by the versioned JSON Schema."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class ExecutionScope:
 
 
 class ContractBundle:
-    """Loads one released schema bundle and validates named definitions."""
+    """Loads one versioned schema bundle and validates named definitions."""
 
     def __init__(self, bundle: Mapping[str, Any]) -> None:
         self._bundle = dict(bundle)

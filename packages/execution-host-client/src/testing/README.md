@@ -14,7 +14,7 @@ migrations.
 
 This test-only Node.js boundary lets an adopter exercise its integration
 through the real v1 HTTP/SSE contract without running a model, Heddle, Docker,
-or AWS. Import it explicitly from `@roackb2/heddle-adopter/testing`; it is not
+or AWS. Import it explicitly from `@heddleagent/execution-host-client/testing`; it is not
 re-exported from the package root.
 
 The fixture owns:
@@ -48,7 +48,7 @@ public contract rather than one product's scenario.
 ```ts
 import {
   LocalExecutionHostContractFixture,
-} from '@roackb2/heddle-adopter/testing'
+} from '@heddleagent/execution-host-client/testing'
 
 const fixture = await LocalExecutionHostContractFixture.start({
   execute: async (invocation) => {

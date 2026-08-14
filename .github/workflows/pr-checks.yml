@@ -127,6 +127,30 @@ jobs:
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
 
+  test-execution-host-client:
+    name: test-execution-host-client
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Test Execution Host client
+        run: yarn execution-host-client:test
+
+      - name: Verify packed Execution Host client
+        run: yarn execution-host-client:pack:verify
+
   test-python-adopter-conformance:
     name: test-python-adopter-conformance
     runs-on: ubuntu-latest
@@ -141,16 +165,16 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: packages/heddle-adopter/conformance/reference-adopters/python-v1/pyproject.toml
+          cache-dependency-path: packages/execution-host-client/conformance/reference-adopters/python-v1/pyproject.toml
 
       - name: Install Python adopter reference
-        run: python -m pip install -e 'packages/heddle-adopter/conformance/reference-adopters/python-v1[test]'
+        run: python -m pip install -e 'packages/execution-host-client/conformance/reference-adopters/python-v1[test]'
 
       - name: Check Python adopter reference
         run: |
-          python -m ruff check packages/heddle-adopter/conformance/reference-adopters/python-v1
-          python -m ruff format --check packages/heddle-adopter/conformance/reference-adopters/python-v1
-          python -m pytest packages/heddle-adopter/conformance/reference-adopters/python-v1
+          python -m ruff check packages/execution-host-client/conformance/reference-adopters/python-v1
+          python -m ruff format --check packages/execution-host-client/conformance/reference-adopters/python-v1
+          python -m pytest packages/execution-host-client/conformance/reference-adopters/python-v1
 
   test-browser-integration:
     name: test-browser-integration

@@ -73,10 +73,13 @@ At the distribution boundary:
 - `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` add adopter-operated
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@roackb2/heddle-adopter` defines the public, language-neutral boundary for
-  a backend invoking a separate compatible Execution Host. Its TypeScript
-  conversation surface owns the reusable durable-turn lifecycle over an
-  adopter-implemented atomic store; the v1 artifacts and fixtures define the
-  same optional profile for other languages;
+  a backend invoking a separate compatible Execution Host. Stable v5 owns the
+  authority, wire, transport, base turn, MCP, Node, and testing surfaces;
+- that implementation now has one canonical source under the unpublished v6
+  candidate `@heddleagent/execution-host-client@6.0.0-next.0`. The candidate
+  adds the reusable durable-turn lifecycle over an adopter-implemented atomic
+  store and shared TypeScript/Python lifecycle fixtures. Stable public
+  availability remains the v5 coordinate until a verified `next` publication;
 - the current compatible Execution Host and AgentCore deployment are private
   research. Public docs may describe the contract and evidence goal but must
   not imply that Heddle distributes or operates that service.

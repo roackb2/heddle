@@ -1,9 +1,10 @@
 # Execution Host adopter contract v1
 
 This directory is the language-neutral contract for an adopter backend which
-invokes a Heddle-compatible Execution Host. It is published inside
-`@roackb2/heddle-adopter`, but consuming it does not require JavaScript or
-TypeScript.
+invokes a Heddle-compatible Execution Host. It is included in
+the `@heddleagent/execution-host-client` candidate tarball, but consuming it
+does not require JavaScript or TypeScript. The candidate itself is not yet
+published on npm.
 
 ## Artifacts
 
@@ -22,16 +23,16 @@ TypeScript.
 Generate checked-in artifacts from Heddle's runtime schemas:
 
 ```bash
-yarn adopter:contract:generate
+yarn execution-host-client:contract:generate
 ```
 
 CI and package builds use the non-writing drift check:
 
 ```bash
-yarn adopter:contract:verify
+yarn execution-host-client:contract:verify
 ```
 
-The checked-in JSON files are the released interoperability artifacts. The
+The checked-in JSON files are the candidate interoperability artifacts. The
 TypeScript Zod schemas remain the reference implementation used to generate
 them. A non-TypeScript adopter should implement the JSON/SSE/JWT contract and
 run the golden fixtures; it should not port Heddle's agent loop.

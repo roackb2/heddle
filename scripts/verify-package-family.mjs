@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  EXECUTION_HOST_CLIENT_NAME,
+  verifyExecutionHostClientPackage,
+} from './verify-execution-host-client-package.mjs';
 
 const AUTHOR = 'Jay / Fienna Liang <roackb2@gmail.com>';
 const REPOSITORY_URL = 'git+https://github.com/roackb2/heddle.git';
@@ -33,14 +37,6 @@ export const PACKAGE_DEFINITIONS = [
     description:
       'Browser-safe JavaScript protocol and transport clients for consuming Heddle runs',
     node: false,
-    files: ['LICENSE', 'README.md', 'package.json'],
-  },
-  {
-    directory: 'execution-host-client',
-    name: '@heddleagent/execution-host-client',
-    description:
-      'Product-backend contracts and helpers for invoking compatible Heddle Execution Hosts',
-    node: true,
     files: ['LICENSE', 'README.md', 'package.json'],
   },
   {
@@ -133,8 +129,11 @@ export function verifyPackageFamily(
     );
   }
 
-  const expectedFoundationNames = PACKAGE_DEFINITIONS
+  verifyExecutionHostClientPackage(repositoryUrl, { writeOutput: false });
+
+  const expectedPackageNames = PACKAGE_DEFINITIONS
     .map(({ name }) => name)
+    .concat(EXECUTION_HOST_CLIENT_NAME)
     .sort();
   const actualFoundationNames = readdirSync(
     new URL('packages/', repositoryUrl),
@@ -155,8 +154,8 @@ export function verifyPackageFamily(
 
   assert.deepEqual(
     actualFoundationNames,
-    expectedFoundationNames,
-    'The @heddleagent scope must contain exactly the approved private package foundations.',
+    expectedPackageNames,
+    'The @heddleagent scope must contain exactly four private foundations and the activated Execution Host client.',
   );
 
   const legacyPackages = new Map([
@@ -164,10 +163,6 @@ export function verifyPackageFamily(
     [
       new URL('packages/heddle-remote/package.json', repositoryUrl),
       '@roackb2/heddle-remote',
-    ],
-    [
-      new URL('packages/heddle-adopter/package.json', repositoryUrl),
-      '@roackb2/heddle-adopter',
     ],
     [
       new URL('packages/heddle-postgres/package.json', repositoryUrl),
@@ -184,7 +179,7 @@ export function verifyPackageFamily(
   }
 
   process.stdout.write(
-    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations and ${legacyPackages.size} legacy package identities.\n`,
+    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, one activated package, and ${legacyPackages.size} local v5 package identities.\n`,
   );
 }
 
