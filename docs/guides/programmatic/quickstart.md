@@ -13,7 +13,7 @@ Start with the headless service when your product owns its input/output but not
 the agent lifecycle yet:
 
 ```ts
-import { ConversationAgentService } from '@roackb2/heddle'
+import { ConversationAgentService } from '@heddleagent/runtime'
 
 const agent = new ConversationAgentService()
 try {
@@ -101,7 +101,7 @@ Use `runQuickstartConversationCli` when you want a working interactive conversat
 before building a custom UI:
 
 ```ts
-import { runQuickstartConversationCli } from '@roackb2/heddle'
+import { runQuickstartConversationCli } from '@heddleagent/runtime'
 
 await runQuickstartConversationCli()
 ```
@@ -130,7 +130,7 @@ Customize the starter loop when your product needs a little domain behavior but
 not a full custom UI:
 
 ```ts
-import { runQuickstartConversationCli } from '@roackb2/heddle'
+import { runQuickstartConversationCli } from '@heddleagent/runtime'
 
 await runQuickstartConversationCli({
   model: process.env.MY_PRODUCT_MODEL,
@@ -164,7 +164,7 @@ default resolver instead of rebuilding path and model fallbacks:
 import {
   resolveQuickstartConversationCliDefaults,
   runQuickstartConversationCli,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const runtime = resolveQuickstartConversationCliDefaults({
   model: process.env.MY_PRODUCT_MODEL,
@@ -196,7 +196,7 @@ commands, approvals, or custom rendering:
 import {
   createConversationEngine,
   createConversationTextHost,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const workspaceRoot = process.cwd()
 const stateRoot = `${workspaceRoot}/.heddle`

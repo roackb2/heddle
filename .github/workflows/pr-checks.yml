@@ -209,6 +209,27 @@ jobs:
       - name: Verify packed run client
         run: yarn run-client:pack:verify
 
+  test-runtime-package:
+    name: test-runtime-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify packed runtime
+        run: yarn runtime:pack:verify
+
   test-python-adopter-conformance:
     name: test-python-adopter-conformance
     runs-on: ubuntu-latest

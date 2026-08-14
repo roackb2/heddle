@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseNpmPackResult } from './execution-host-client-pack-result.mjs';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const packageDirectory = join(repositoryRoot, 'packages/run-client');
@@ -30,7 +31,10 @@ try {
     '--cache',
     npmCache,
   ], repositoryRoot);
-  const packResult = JSON.parse(packed.stdout)[0];
+  const packResult = parseNpmPackResult(
+    packed.stdout,
+    '@heddleagent/run-client',
+  );
 
   assert.equal(packResult.name, '@heddleagent/run-client');
   assert.equal(packResult.version, '6.0.0');

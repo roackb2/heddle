@@ -17,15 +17,18 @@ import {
   assertRunClientManifest,
   createRunClientManifest,
 } from '../../../../scripts/verify-run-client-package.mjs';
+import {
+  assertRuntimeManifest,
+  createRuntimeManifest,
+} from '../../../../scripts/verify-runtime-package.mjs';
 
 const rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
 
 const NODE_VERSION = '>=20';
 
 describe('v6 package-family foundation', () => {
-  it('keeps exactly two packages as private foundations', () => {
+  it('keeps only the CLI as a private foundation', () => {
     expect(PACKAGE_DEFINITIONS.map(({ name }) => name)).toEqual([
-      '@heddleagent/runtime',
       '@heddleagent/cli',
     ]);
   });
@@ -56,6 +59,34 @@ describe('v6 package-family foundation', () => {
     expect(() =>
       assertFoundationManifest(manifest, definition, NODE_VERSION),
     ).toThrow();
+  });
+});
+
+describe('@heddleagent/runtime activation', () => {
+  it('accepts the exact embeddable runtime manifest', () => {
+    const manifest = createRuntimeManifest(rootPackage);
+
+    expect(() => assertRuntimeManifest(manifest, rootPackage)).not.toThrow();
+  });
+
+  it.each([
+    ['old coordinate', { name: '@roackb2/heddle' }],
+    ['private package', { private: true }],
+    ['wrong version', { version: rootPackage.version }],
+    ['product binary', { bin: { heddle: './dist/src/cli-v2/main.js' } }],
+    ['CLI dependency', {
+      dependencies: {
+        ...createRuntimeManifest(rootPackage).dependencies,
+        '@heddleagent/cli': '^6.0.0',
+      },
+    }],
+  ])('rejects an unsafe %s mutation', (_label, mutation) => {
+    const manifest = {
+      ...createRuntimeManifest(rootPackage),
+      ...mutation,
+    };
+
+    expect(() => assertRuntimeManifest(manifest, rootPackage)).toThrow();
   });
 });
 

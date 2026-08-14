@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "inlineSources": true
+  },
+  "include": [
+    "../../src/index.ts",
+    "../../src/advanced.ts",
+    "../../src/hosted.ts",
+    "../../src/hosted/**/*.ts",
+    "../../src/heartbeat-testing.ts"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../src/__tests__",
+    "../../src/cli-v2",
+    "../../src/web-v2",
+    "./dist"
+  ]
+}

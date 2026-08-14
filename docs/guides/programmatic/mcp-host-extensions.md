@@ -5,7 +5,7 @@ you want Heddle to expose that server as host tools without copying MCP schemas
 into hand-written `ToolDefinition` objects.
 
 ```ts
-import { prepareMcpHostExtension } from '@roackb2/heddle'
+import { prepareMcpHostExtension } from '@heddleagent/runtime'
 
 const prepared = await prepareMcpHostExtension({
   id: 'document-workspace',
@@ -62,7 +62,7 @@ Use request-scoped preparation when a trusted product backend gives one agent
 invocation a short-lived capability for a fixed remote MCP server:
 
 ```ts
-import { prepareMcpHostExtension } from '@roackb2/heddle'
+import { prepareMcpHostExtension } from '@heddleagent/runtime'
 
 const prepared = await prepareMcpHostExtension({
   mode: 'request-scoped',

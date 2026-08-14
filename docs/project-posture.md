@@ -69,8 +69,10 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 
 At the distribution boundary:
 
-- `@roackb2/heddle` ships the in-process TypeScript runtime and SDK;
-- `@roackb2/heddle/hosted` and `@heddleagent/run-client` add adopter-operated
+- `@heddleagent/runtime` ships the in-process TypeScript runtime and SDK. The
+  former `@roackb2/heddle@5.13.0` coordinate remains installable during the
+  CLI migration;
+- `@heddleagent/runtime/runs` and `@heddleagent/run-client` add adopter-operated
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@heddleagent/execution-host-client` defines the public, language-neutral
   boundary for a backend invoking a separate compatible Execution Host. It

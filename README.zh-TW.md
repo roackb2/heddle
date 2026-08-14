@@ -29,8 +29,8 @@ conversation 與 run 基礎之上。
 
 | 形態 | 心智模型 | Public entry point |
 | --- | --- | --- |
-| Heddle SDK 與 runtime | 把 model、tool 與 conversation runtime 匯入 TypeScript 或 Node backend | `@roackb2/heddle` |
-| Hosted run layer | Heddle 仍在你的 server 或 worker 內，額外提供可定址 run、replay、cancellation 與 remote client | `@roackb2/heddle/hosted` 與 `@heddleagent/run-client` |
+| Heddle SDK 與 runtime | 把 model、tool 與 conversation runtime 匯入 TypeScript 或 Node backend | `@heddleagent/runtime` |
+| Hosted run layer | Heddle 仍在你的 server 或 worker 內，額外提供可定址 run、replay、cancellation 與 remote client | `@heddleagent/runtime/runs` 與 `@heddleagent/run-client` |
 | 獨立 Execution Host | 任何語言的 backend 都能呼叫另外部署的 compatible host，並透過 invocation-bound MCP 暴露產品能力 | `@heddleagent/execution-host-client` 或 OpenAPI／JSON Schema contract |
 | Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `heddle` |
 
@@ -84,13 +84,13 @@ chat endpoint 的情境。
 安裝 Node runtime package：
 
 ```bash
-npm install @roackb2/heddle
+npm install @heddleagent/runtime
 ```
 
 接著透過可持久化對話送出一個 structured turn：
 
 ```ts
-import { ConversationAgentService } from '@roackb2/heddle'
+import { ConversationAgentService } from '@heddleagent/runtime'
 
 const agent = new ConversationAgentService()
 try {
@@ -131,7 +131,7 @@ import { join } from 'node:path'
 import {
   createConversationEngine,
   createConversationTextHost,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const workspaceRoot = process.cwd()
 
@@ -206,15 +206,15 @@ mechanics 的最低層即可：
 | --- | --- | --- |
 | Structured 本機對話 | `ConversationAgentService` | Runtime defaults、stable session ensure、structured activities 與 turn result |
 | Terminal SDK 評估 | `runQuickstartConversationCli` | Prompt loop、persisted session、credential 與 text output |
-| 自訂 output、tool 或 session UX | `@roackb2/heddle` | Conversation engine、host extension、tool、MCP、approval、artifact 與 turn result |
-| Server、worker 或 Electron backend | `@roackb2/heddle/hosted` | 可定址的 process-local run、replay、cancellation 與 approval resolution |
-| 一般 Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
+| 自訂 output、tool 或 session UX | `@heddleagent/runtime` | Conversation engine、host extension、tool、MCP、approval、artifact 與 turn result |
+| Server、worker 或 Electron backend | `@heddleagent/runtime/runs` | 可定址的 process-local run、replay、cancellation 與 approval resolution |
+| 一般 Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
 | Remote browser 或 client | `@heddleagent/run-client` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
 | Backend 呼叫獨立 Execution Host | `@heddleagent/execution-host-client` | Contract、authority/JWKS、hosted-turn orchestration、durable requested/accepted/terminal persistence、product-MCP verification、provider-neutral client port、store conformance 與 TypeScript/Python fixture |
 | 以 PostgreSQL 保存 Execution Host lifecycle | `@heddleagent/postgres/execution-host/conversations` | Atomic scope fencing、由 adopter 執行的 ordered migration、SQL constraint、expiry 與 real-PostgreSQL conformance |
 | PostgreSQL heartbeat worker | `@roackb2/heddle-postgres` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
-| 更底層的 runtime 組裝 | `@roackb2/heddle/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
+| 更底層的 runtime 組裝 | `@heddleagent/runtime/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 
 既有的 tRPC、Fastify、Hono、Nest、WebSocket、IPC、queue、React 或其他技術棧，
 通常應保留原本的選擇，再銜接最接近的 transport-neutral Heddle layer。不要

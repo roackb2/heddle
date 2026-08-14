@@ -8,7 +8,7 @@ import {
   createConversationEngine,
   defineHostExtension,
   type ToolDefinition,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const createBrief: ToolDefinition = {
   name: 'create_project_brief',

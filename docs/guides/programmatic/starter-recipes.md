@@ -19,7 +19,7 @@ reference uses it.
 ## Recipe 1: headless and in process
 
 ```ts
-import { ConversationAgentService } from '@roackb2/heddle'
+import { ConversationAgentService } from '@heddleagent/runtime'
 
 const agent = new ConversationAgentService({
   session: {

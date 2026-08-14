@@ -1,7 +1,7 @@
 // ===========================================================================
 // Heddle — Public SDK (curated entry)
 // ===========================================================================
-// This is the default `@roackb2/heddle` import: the curated surface a product
+// This is the default `@heddleagent/runtime` import: the curated surface a product
 // host needs to build an agentic experience, organized as a progressive-
 // disclosure ladder. Start at the top and go deeper only when you need to.
 // Full guide: docs/guides/programmatic/quickstart.md
@@ -14,12 +14,12 @@
 //   5. Advanced: storage     — back sessions/archives/artifacts with your store
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
-// `@roackb2/heddle/hosted`, the lightweight `@heddleagent/run-client` client,
+// `@heddleagent/runtime/runs`, the lightweight `@heddleagent/run-client` client,
 // and the independent backend-side
 // `@heddleagent/execution-host-client` package.
 // Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,
 // models, awareness, the agent loop, heartbeat, integrations, utilities) lives
-// behind the `@roackb2/heddle/advanced` subpath — see src/advanced.ts.
+// behind the `@heddleagent/runtime/advanced` subpath — see src/advanced.ts.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ export type {
 // ---------------------------------------------------------------------------
 // Author a tool with the `ToolDefinition` type above; wire an MCP server with
 // `prepareMcpHostExtension`; compose host tools/context with
-// `defineHostExtension`. Ready-made tools live in `@roackb2/heddle/advanced`.
+// `defineHostExtension`. Ready-made tools live in `@heddleagent/runtime/advanced`.
 export {
   defineMcpHostExtension,
   McpHostExtensionService,

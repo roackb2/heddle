@@ -6,8 +6,8 @@ a transport and may disconnect or reconnect while the run continues.
 The public layers are intentionally separate:
 
 ```ts
-import { createConversationEngine } from '@roackb2/heddle'
-import { ConversationRunService } from '@roackb2/heddle/hosted'
+import { createConversationEngine } from '@heddleagent/runtime'
+import { ConversationRunService } from '@heddleagent/runtime/runs'
 import {
   ConversationRunConsumerService,
   ConversationRunProtocolCodec,
@@ -15,8 +15,8 @@ import {
 import { ConversationRunHttpSseClient } from '@heddleagent/run-client/http-sse'
 ```
 
-- `@roackb2/heddle` owns persisted conversation semantics.
-- `@roackb2/heddle/hosted` owns process-local active-run coordination.
+- `@heddleagent/runtime` owns persisted conversation semantics.
+- `@heddleagent/runtime/runs` owns process-local active-run coordination.
 - `@heddleagent/run-client` is independently installable and owns client cursor
   correctness plus runtime wire validation without choosing a transport.
 - `@heddleagent/run-client/http-sse` is an optional assumption layer for the
@@ -181,7 +181,7 @@ UX, and product event handling.
 Use one host-long-lived `ConversationRunService` from the hosted entrypoint:
 
 ```ts
-import { ConversationRunService } from '@roackb2/heddle/hosted'
+import { ConversationRunService } from '@heddleagent/runtime/runs'
 
 const runs = new ConversationRunService<ProductRunAddress>({
   addressKey: ({ accountId, sessionId }) => JSON.stringify([accountId, sessionId]),
@@ -198,7 +198,7 @@ assumption layer.
 
 For the same conventional Node HTTP/SSE transport, import
 `parseConversationRunSseReplayCursor` and `streamConversationRunSse` from
-`@roackb2/heddle/hosted/http-sse`. They own cursor precedence, SSE headers and
+`@heddleagent/runtime/runs/http-sse`. They own cursor precedence, SSE headers and
 frames, backpressure, and subscriber-only disconnect cleanup. They intentionally
 do not register routes or choose authentication, authorization, CORS, rate
 limits, request validation, or public error responses.

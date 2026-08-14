@@ -31,8 +31,8 @@ Start here:
 
 | Shape | Mental model | Public entry point |
 | --- | --- | --- |
-| Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@roackb2/heddle` |
-| Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@roackb2/heddle/hosted` and `@heddleagent/run-client` |
+| Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@heddleagent/runtime` |
+| Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@heddleagent/runtime/runs` and `@heddleagent/run-client` |
 | Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@heddleagent/execution-host-client` or its OpenAPI/JSON Schema contract |
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
 
@@ -93,13 +93,13 @@ endpoint.
 Install the Node runtime package:
 
 ```bash
-npm install @roackb2/heddle
+npm install @heddleagent/runtime
 ```
 
 Then send a structured turn through a persisted conversation:
 
 ```ts
-import { ConversationAgentService } from '@roackb2/heddle'
+import { ConversationAgentService } from '@heddleagent/runtime'
 
 const agent = new ConversationAgentService()
 try {
@@ -140,7 +140,7 @@ import { join } from 'node:path'
 import {
   createConversationEngine,
   createConversationTextHost,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const workspaceRoot = process.cwd()
 
@@ -215,15 +215,15 @@ that already owns the mechanics your host needs:
 | --- | --- | --- |
 | A structured local conversation | `ConversationAgentService` | Runtime defaults, stable session ensure, structured activities, and turn result |
 | A terminal SDK evaluation | `runQuickstartConversationCli` | Prompt loop, persisted session, credentials, and text output |
-| Custom output, tools, or session UX | `@roackb2/heddle` | Conversation engine, host extensions, tools, MCP, approvals, artifacts, and turn results |
-| A server, worker, or Electron backend | `@roackb2/heddle/hosted` | Addressable process-local runs, replay, cancellation, and approval resolution |
-| Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
+| Custom output, tools, or session UX | `@heddleagent/runtime` | Conversation engine, host extensions, tools, MCP, approvals, artifacts, and turn results |
+| A server, worker, or Electron backend | `@heddleagent/runtime/runs` | Addressable process-local runs, replay, cancellation, and approval resolution |
+| Conventional Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@heddleagent/run-client` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
 | A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
 | Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
-| Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
+| Lower-level runtime assembly | `@heddleagent/runtime/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks
 should normally keep those choices and adapt the closest neutral Heddle layer.
@@ -392,6 +392,8 @@ Heddle is designed to make assumptions and limitations visible:
   Python proof keep this boundary language-neutral;
 - the legacy `@roackb2/heddle-adopter@5.13.0` package remains installable for
   migration but is no longer the canonical implementation;
+- the legacy `@roackb2/heddle@5.13.0` package remains installable for SDK
+  migration and remains the current home of the `heddle` executable;
 - `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
   but the adopter still owns PostgreSQL operations, migration rollout, trusted
   namespace resolution, delivery, and product-side idempotency;
