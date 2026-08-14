@@ -105,7 +105,7 @@ adopter database credential.
 | `@roackb2/heddle-remote` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
 | `@roackb2/heddle-postgres` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is heartbeat-specific, not a general product DB or conversation-history adapter |
 | `@roackb2/heddle-adopter` | A product invokes a separate compatible Execution Host | Stable v5 provides authority, transport, base turn orchestration, Node, and wire-testing helpers |
-| `@heddleagent/execution-host-client` | Preview the renamed integration kit and durable lifecycle | Canonical source adds store-backed lifecycle semantics and cross-language conformance, but `6.0.0-next.0` remains unpublished until its package release gate passes |
+| `@heddleagent/execution-host-client@next` | Preview the renamed integration kit and durable lifecycle | Published prerelease with store-backed lifecycle semantics and cross-language conformance |
 | v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |
 
 The embedded runtime promise and the separate-host portability promise are
@@ -122,7 +122,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 | `@roackb2/heddle` and `/hosted` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@roackb2/heddle-remote` | Public | Browser-safe run protocol and optional HTTP/SSE client |
 | `@roackb2/heddle-adopter` | Public, experimental | Stable v5 TypeScript adopter helpers plus canonical OpenAPI, JSON Schema, wire fixtures, and an independent Python wire-contract proof |
-| `@heddleagent/execution-host-client` | Unpublished v6 candidate | The renamed canonical implementation plus the new durable lifecycle, store conformance, and shared TypeScript/Python lifecycle fixtures; not installable until `next` is verified |
+| `@heddleagent/execution-host-client@next` | Public v6 prerelease | The renamed canonical implementation plus the durable lifecycle, store conformance, and shared TypeScript/Python lifecycle fixtures; opt in explicitly while v5 remains stable |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |
 

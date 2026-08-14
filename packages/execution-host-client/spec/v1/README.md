@@ -2,7 +2,7 @@
 
 This directory is the language-neutral contract for an adopter backend which
 invokes a Heddle-compatible Execution Host. It is included in
-the `@heddleagent/execution-host-client` candidate tarball, but consuming it
+the published `@heddleagent/execution-host-client@next` tarball, but consuming it
 does not require JavaScript or TypeScript. The candidate itself is not yet
 published on npm.
 

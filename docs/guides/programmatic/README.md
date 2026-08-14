@@ -28,9 +28,9 @@ hosting assumptions.
   client port, optional Node HTTP/key conveniences, and canonical
   OpenAPI/JSON Schema/golden artifacts for other languages.
 - `@heddleagent/execution-host-client` — the clearer v6 coordinate for that
-  integration kit. Its canonical source is active, but `6.0.0-next.0` remains
-  an unpublished candidate; use the stable v5 coordinate until npm confirms
-  the `next` release.
+  integration kit. Its canonical source is active and `6.0.0-next.0` is
+  published on `next`; use the stable v5 coordinate unless you explicitly opt
+  into the prerelease durable lifecycle.
 - `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,

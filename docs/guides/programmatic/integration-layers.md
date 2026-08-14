@@ -90,9 +90,8 @@ disconnect as implicit cancellation.
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
 | A backend invoking a separately deployed Execution Host | `@roackb2/heddle-adopter` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
 
-The table uses the stable v5 coordinate. Its canonical source is moving to the
-unpublished `@heddleagent/execution-host-client@6.0.0-next.0` candidate; switch
-only after the `next` package is verified on npm.
+The table uses the stable v5 coordinate. Its canonical source is also available
+as the opt-in `@heddleagent/execution-host-client@next` prerelease.
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -175,8 +174,8 @@ rather than inside the product backend. The package owns v1 validation, short-
 lived execution authority, independent MCP capability verification, and the
 `ExecutionHost` outbound port. Its optional conversation and Node surfaces also
 own generic turn orchestration, JWKS/conversation HTTP mechanics, and safe
-local key-file loading. The unpublished
-`@heddleagent/execution-host-client@6.0.0-next.0` candidate adds durable
+local key-file loading. The published
+`@heddleagent/execution-host-client@next` prerelease adds durable
 lifecycle ordering over an injected store. The adopter retains product
 authentication, tenant mapping, production key
 storage/rotation, invocation-ID selection, product MCP behavior, the database

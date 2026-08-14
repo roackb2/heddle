@@ -36,7 +36,9 @@ For a user-facing release:
 6. Write curated release notes from that real scope.
 7. Create an annotated git tag on the shipped commit.
 8. Push the commit and tag, then create the GitHub release from the curated release note.
-9. Leave npm publishing as the final manual operator step unless the operator explicitly asks the agent to publish to npm.
+9. Keep root v5 npm publishing as a final manual operator step. The activated
+   Execution Host client follows its independently versioned, OIDC-backed
+   release-PR lane below.
 
 ## Verification Baseline
 
@@ -53,9 +55,9 @@ Add more verification if the release changes a workflow that needs manual valida
 ## Execution Host Client Prerelease Lane
 
 `@heddleagent/execution-host-client` is independently versioned from the root
-runtime. Its first candidate is `6.0.0-next.0`, and its manifest pins
-`publishConfig.tag` to `next` while this candidate is a prerelease. A future
-stable-release PR must deliberately remove or change that tag. Do not bump the root,
+runtime. Its first candidate, `6.0.0-next.0`, is published. The manifest pins
+`publishConfig.tag` to `next` while a version is a prerelease. A future stable
+release PR must deliberately change that tag to `latest`. Do not bump the root,
 remote, PostgreSQL, or private-foundation manifests for this package-only
 release.
 
@@ -70,29 +72,56 @@ yarn test
 yarn execution-host-client:conformance:python-v1
 yarn build
 yarn execution-host-client:pack:verify
+yarn execution-host-client:release:verify
 npm publish ./packages/execution-host-client --dry-run --access public --tag next
 git diff --check
 ```
 
 `execution-host-client:pack:verify` packs the candidate, verifies every export
 and conformance fixture, installs the tarball in a fresh ESM consumer, imports
-all JavaScript subpaths, and typechecks all TypeScript subpaths. The mutation
-command `yarn execution-host-client:publish:next` publishes that exact verified
-tarball with explicit public access, npmjs registry, and `next` tag. It also
-fails if publication creates a `latest` tag.
+all JavaScript subpaths, and typechecks all TypeScript subpaths.
+`execution-host-client:release:verify` additionally checks npm: an existing
+immutable version must have the same tarball integrity, while an absent version
+must have a matching release note. Changed bytes under an already published
+version fail closed and require a version bump.
 
-Publication remains a manual operator action after the lifecycle and package
-migration PRs are merged and the operator explicitly authorizes it. Before the
-first publish, `npm view @heddleagent/execution-host-client versions --json`
-should return `E404`; also verify that `@roackb2/heddle-adopter@5.13.0` remains
-installable. After publication, verify the exact version, integrity, and
-`next` dist-tag, then repeat fresh installation from both `@next` and the exact
-version. Do not deprecate the old package until a stable replacement and real
-consumer migration exist; never unpublish it.
+The default publication path is `.github/workflows/publish-packages.yml`. A
+release PR explicitly changes the Execution Host client version, maintains the
+matching `docs/releases/execution-host-client-v<version>.md`, and passes normal
+PR checks. Merging that PR to `main` makes the workflow:
 
-Create an annotated package-specific tag
-`execution-host-client-v6.0.0-next.0` on the release commit and, when a GitHub
-release is created, mark it as a prerelease. Never use a root
+1. run the TypeScript and Python package gates on a GitHub-hosted runner;
+2. create or verify the annotated package-specific tag at the merge commit;
+3. pack and re-run fresh-consumer verification;
+4. publish only when the exact immutable version returns a registry `E404`;
+5. verify registry integrity, dist-tag movement, exact-version installation,
+   and channel installation; and
+6. create or verify the package-specific GitHub release.
+
+An ordinary relevant merge whose package bytes equal the already published
+version is a no-op. An ordinary merge that changes package bytes without a
+version bump fails. The workflow is serialized and may be rerun on the same
+`main` commit after an infrastructure failure; it never retries an ambiguous
+publish until it first checks the immutable version and integrity.
+
+npm trusted publishing authorizes only repository `roackb2/heddle`, workflow
+`publish-packages.yml`, and GitHub environment `npm-release`. The workflow uses
+`id-token: write`, Node 24, and a pinned npm CLI that supports OIDC. It stores
+no npm write token; trusted publishing automatically supplies provenance for
+future releases. The GitHub environment must allow deployments only from
+`main`. Do not broaden the workflow to pull requests or unprotected branches.
+
+npm requires every package to have a `latest` tag. The first prerelease
+therefore created both `next` and the unavoidable initial `latest`, each at
+`6.0.0-next.0`. Later prerelease publication advances `next` without moving an
+existing `latest`; the first stable release deliberately moves `latest`.
+
+For manual recovery on the exact tagged commit, use
+`yarn execution-host-client:publish:if-missing`. It requires a clean worktree,
+an annotated package tag on `HEAD`, the owning npm account, and interactive
+2FA. It is idempotent: a matching published artifact is verified and skipped.
+Do not deprecate `@roackb2/heddle-adopter@5.13.0` until a stable replacement
+and real consumer migration exist; never unpublish it. Never use a root
 `v6.0.0-next.0` tag for this package-only release.
 
 ## Fast Release Preflight

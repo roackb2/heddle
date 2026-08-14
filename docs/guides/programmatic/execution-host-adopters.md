@@ -10,10 +10,10 @@ surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
 The stable coordinate is `@roackb2/heddle-adopter@5.13.0`. Its canonical
-source is moving to the unpublished v6 candidate
-`@heddleagent/execution-host-client@6.0.0-next.0`. Stable v5 provides the base
+source now ships as the opt-in v6 prerelease
+`@heddleagent/execution-host-client@next`. Stable v5 provides the base
 wire, authority, transport, orchestration, MCP, and Node surfaces. The durable
-lifecycle paragraphs below describe the unpublished v6 candidate and cannot be
+lifecycle paragraphs below describe the published v6 prerelease and cannot be
 used from v5.13.0.
 
 ```text
@@ -22,7 +22,7 @@ ADOPTER BACKEND
   tenant / subject / product-session mapping
   durable invocation identity + database adapter + result application
           |
-  @heddleagent/execution-host-client (unpublished v6 candidate)
+  @heddleagent/execution-host-client@next (published v6 prerelease)
   authority + v1 contracts + durable turn lifecycle + ExecutionHost port
           |
   HEDDLE EXECUTION HOST
@@ -47,7 +47,7 @@ For each invocation, the adopter backend must:
    ID plus a product deadline;
 4. issue a short-lived execution assertion and, only when needed, an MCP
    capability with the exact product tools allowed for that invocation;
-5. after the v6 preview is published, use its durable lifecycle over an atomic
+5. when opting into the v6 preview, use its durable lifecycle over an atomic
    store adapter so `requested`, accepted, and terminal checkpoints commit
    before their corresponding work or public events;
 6. invoke an `ExecutionHost` implementation and consume one ordered stream to a
@@ -69,7 +69,7 @@ Install the stable base integration today:
 npm install @roackb2/heddle-adopter
 ```
 
-After npm confirms the prerelease, opt into the durable lifecycle explicitly:
+Opt into the published durable-lifecycle prerelease explicitly:
 
 ```bash
 npm install @heddleagent/execution-host-client@next
@@ -102,7 +102,7 @@ Backends outside TypeScript can use the versioned
 as the canonical v1 contract. The
 [clean-room Python v1 conformance reference](../../../packages/execution-host-client/conformance/reference-adopters/python-v1/README.md)
 shows the same ES256 authority, independent MCP verification, and strict SSE
-rules. Its lifecycle cases belong to the unpublished v6 candidate and import
+rules. Its lifecycle cases belong to the published v6 prerelease and import
 no Heddle or private host. It is an executable conformance proof, not a
 published or supported Python SDK.
 
@@ -155,8 +155,8 @@ two generic inbound routes, bounded JSON, authorization-header scrubbing, safe
 errors, SSE framing/backpressure, disconnect cancellation, and shutdown. Pass
 it the authority, product authenticator, and a product admission service. The
 admission service is the small intentional product seam: it decides the
-authorized scope and durable invocation identity. In the unpublished v6
-candidate, it can delegate to
+authorized scope and durable invocation identity. In the published v6
+prerelease, it can delegate to
 `DurableHostedConversationTurnService` wrapping
 `HostedConversationTurnService`. The durable wrapper owns the generic
 requested/accepted/terminal state machine and requires only the adopter's

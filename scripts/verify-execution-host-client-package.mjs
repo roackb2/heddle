@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const EXECUTION_HOST_CLIENT_NAME =
   '@heddleagent/execution-host-client';
-export const EXECUTION_HOST_CLIENT_VERSION = '6.0.0-next.0';
+export const EXECUTION_HOST_CLIENT_VERSION = '6.0.0-next.1';
 
 const EXPORTS = {
   '.': {
@@ -152,7 +152,7 @@ export function verifyExecutionHostClientPackage(
 
   if (writeOutput) {
     process.stdout.write(
-      `Verified ${EXECUTION_HOST_CLIENT_NAME}@${EXECUTION_HOST_CLIENT_VERSION} as a next-channel candidate.\n`,
+      `Verified ${EXECUTION_HOST_CLIENT_NAME}@${EXECUTION_HOST_CLIENT_VERSION} as the next-channel package.\n`,
     );
   }
 }

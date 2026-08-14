@@ -1,0 +1,112 @@
+name: Publish packages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-packages.yml
+      - docs/releases/execution-host-client-v*.md
+      - package.json
+      - packages/execution-host-client/**
+      - scripts/execution-host-client-release-state.mjs
+      - scripts/finalize-execution-host-client-release.mjs
+      - scripts/verify-execution-host-client-package.mjs
+      - scripts/verify-execution-host-client-pack.mjs
+      - yarn.lock
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish-packages
+  cancel-in-progress: false
+
+jobs:
+  execution-host-client:
+    name: execution-host-client
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm-release
+
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/execution-host-client/conformance/reference-adopters/python-v1/pyproject.toml
+
+      - name: Pin release tooling
+        run: npm install --global npm@12.0.2 yarn@1.22.22
+
+      - name: Verify release tooling
+        run: |
+          node --version
+          npm --version
+          yarn --version
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify package family
+        run: yarn package-family:verify
+
+      - name: Test Execution Host client
+        run: yarn execution-host-client:test
+
+      - name: Install Python conformance reference
+        run: python -m pip install -e 'packages/execution-host-client/conformance/reference-adopters/python-v1[test]'
+
+      - name: Verify Python conformance reference
+        run: |
+          python -m ruff check packages/execution-host-client/conformance/reference-adopters/python-v1
+          python -m ruff format --check packages/execution-host-client/conformance/reference-adopters/python-v1
+          python -m pytest packages/execution-host-client/conformance/reference-adopters/python-v1
+
+      - name: Build Execution Host client
+        run: yarn execution-host-client:build
+
+      - name: Select release state
+        id: release
+        run: node scripts/execution-host-client-release-state.mjs
+
+      - name: Create immutable release tag
+        if: steps.release.outputs.publication_needed == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            test "$(git rev-list -n 1 "${RELEASE_TAG}")" = "${GITHUB_SHA}"
+            test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "${RELEASE_TAG}" -m "Execution Host Client v${RELEASE_VERSION}"
+            git push origin "refs/tags/${RELEASE_TAG}"
+          fi
+
+      - name: Publish or verify immutable npm artifact
+        run: node scripts/verify-execution-host-client-pack.mjs --publish-if-missing
+
+      - name: Create or verify GitHub release
+        if: steps.release.outputs.release_selected == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/finalize-execution-host-client-release.mjs

@@ -11,7 +11,7 @@ describe('@heddleagent/execution-host-client package boundary', () => {
     expect(executionHostClientPackage.name).toBe(
       '@heddleagent/execution-host-client',
     );
-    expect(executionHostClientPackage.version).toBe('6.0.0-next.0');
+    expect(executionHostClientPackage.version).toBe('6.0.0-next.1');
     expect(executionHostClientPackage.private).toBeUndefined();
     expect(executionHostClientPackage.publishConfig).toEqual({
       access: 'public',

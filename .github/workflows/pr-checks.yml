@@ -151,6 +151,9 @@ jobs:
       - name: Verify packed Execution Host client
         run: yarn execution-host-client:pack:verify
 
+      - name: Verify npm release state
+        run: node scripts/verify-execution-host-client-pack.mjs --verify-registry
+
   test-python-adopter-conformance:
     name: test-python-adopter-conformance
     runs-on: ubuntu-latest

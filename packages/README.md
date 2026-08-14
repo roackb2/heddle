@@ -1,13 +1,13 @@
 # Heddle Package Family
 
-Status: **four private v6 foundations and one unpublished prerelease candidate**
+Status: **four private v6 foundations and one published prerelease**
 
 This directory records the v6 package identities and responsibility boundaries.
-`@heddleagent/execution-host-client@6.0.0-next.0` now contains its canonical
-implementation as an unpublished prerelease candidate. The other four
+`@heddleagent/execution-host-client@6.0.0-next.1` now contains its canonical
+implementation as the published `6.0.0-next.1` prerelease. The other four
 `@heddleagent/*` directories remain private metadata-only foundations. The
-current `@roackb2/*` packages remain the only installable supported packages
-until each replacement is independently verified and released.
+current `@roackb2/*` packages remain the stable supported packages until each
+replacement is independently verified and released.
 
 ## Initial v6 family
 
@@ -16,7 +16,7 @@ until each replacement is independently verified and released.
 | `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Private foundation; implementation remains in `@roackb2/heddle` |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Private foundation; implementation remains in `@roackb2/heddle` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Private foundation; implementation remains in `@roackb2/heddle-remote` |
-| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; `6.0.0-next.0` candidate is not published |
+| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; `6.0.0-next.1` is published on `next` |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Private foundation; current heartbeat adapter remains in `@roackb2/heddle-postgres` |
 
 The in-process run service will be exposed from
