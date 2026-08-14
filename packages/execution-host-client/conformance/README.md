@@ -1,6 +1,6 @@
 # Heddle adopter conformance
 
-This directory proves that the published Execution Host contract can be
+This directory proves that the versioned Execution Host contract can be
 implemented independently of the supported TypeScript adopter SDK.
 
 The ownership order is:

@@ -15,7 +15,9 @@
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
 // `@roackb2/heddle/hosted`, the lightweight `@roackb2/heddle-remote` client,
-// and the independent backend-side `@roackb2/heddle-adopter` package.
+// and the independent backend-side Execution Host client package (stable v5:
+// `@roackb2/heddle-adopter`; unpublished v6 candidate:
+// `@heddleagent/execution-host-client`).
 // Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,
 // models, awareness, the agent loop, heartbeat, integrations, utilities) lives
 // behind the `@roackb2/heddle/advanced` subpath — see src/advanced.ts.

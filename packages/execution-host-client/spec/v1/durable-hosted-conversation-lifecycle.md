@@ -3,7 +3,7 @@
 This optional profile defines the adopter-side state machine around one
 `conversation-turn` invocation. It is language-neutral even though the
 supported TypeScript SDK supplies the ready-made service. Other languages can
-implement the same behavior against their own database by using the published
+implement the same behavior against their own database by using the versioned
 schemas and `fixtures/durable-conversation-lifecycle.json`.
 
 The profile does not move product data into Heddle. The adopter remains the
@@ -63,7 +63,7 @@ field, including `settledAt`, is identical.
   supplied scope whose `deadlineAt` is earlier than `expiredBefore`. It records
   `interrupted/deadline_elapsed` and never overwrites a terminal row.
 
-The published TypeScript conformance helper and Python reference tests execute
+The candidate TypeScript conformance helper and Python reference tests execute
 these rules. A real adapter must run them against its actual transactional
 store, not only an in-memory substitute.
 
@@ -94,7 +94,7 @@ success.
 ## Terminal projection
 
 The durable projection uses the closed statuses and failure codes in the
-published schema bundle and golden fixture. Important distinctions are:
+versioned schema bundle and golden fixture. Important distinctions are:
 
 - only an explicit `cancelled` terminal becomes `cancelled`;
 - request abort, client disconnect, server shutdown, task cancellation, and

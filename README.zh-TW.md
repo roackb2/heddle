@@ -34,6 +34,11 @@ conversation 與 run 基礎之上。
 | 獨立 Execution Host | 任何語言的 backend 都能呼叫另外部署的 compatible host，並透過 invocation-bound MCP 暴露產品能力 | `@roackb2/heddle-adopter` 或 OpenAPI／JSON Schema contract |
 | Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `heddle` |
 
+獨立 Execution Host 的穩定套件仍是 `@roackb2/heddle-adopter@5.13.0`。
+Canonical source 正移至尚未發布的 v6 candidate
+`@heddleagent/execution-host-client@6.0.0-next.0`；npm 尚未確認 `next`
+release 前，不要安裝新 coordinate。
+
 **Runtime** 是 library code。**Hosted run layer** 在你營運的 infrastructure
 內執行，並不是 Heddle cloud service。Compatible **Execution Host** 則是另一個
 嵌入 Heddle 的部署邊界。目前公開的是 experimental adopter contract；compatible
@@ -207,7 +212,8 @@ mechanics 的最低層即可：
 | 一般 Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
 | Remote browser 或 client | `@roackb2/heddle-remote` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
-| Backend 呼叫獨立 Execution Host | `@roackb2/heddle-adopter` | v1 contract、authority/JWKS、hosted-turn orchestration、選用的 durable lifecycle/store conformance、product-MCP verification、provider-neutral client port 與共用 language-neutral fixture |
+| Backend 呼叫獨立 Execution Host | `@roackb2/heddle-adopter` | 穩定 v5 contract、authority/JWKS、hosted-turn orchestration、product-MCP verification、provider-neutral client port 與 wire fixture |
+| 預覽 durable separate-host lifecycle | `@heddleagent/execution-host-client@6.0.0-next.0` | 尚未發布的 v6 candidate，加入 requested/accepted/terminal persistence、store conformance 與 TypeScript/Python lifecycle fixture |
 | PostgreSQL heartbeat worker | `@roackb2/heddle-postgres` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
 | 更底層的 runtime 組裝 | `@roackb2/heddle/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 

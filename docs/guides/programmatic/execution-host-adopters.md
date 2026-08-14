@@ -1,13 +1,20 @@
 # Build an Execution Host adopter backend
 
-Use `@roackb2/heddle-adopter` when your product backend does not embed Heddle
-and instead invokes a separately deployed Heddle Execution Host. The package is
-small on purpose: it provides the security-sensitive contract machinery while
-your product keeps its language stack and domain ownership.
+Use the Execution Host integration contract when your product backend does not
+embed Heddle and instead invokes a separately deployed Heddle Execution Host.
+The package is small on purpose: it provides the security-sensitive contract
+machinery while your product keeps its language stack and domain ownership.
 
 The package is currently an experimental public contract and local proving
 surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
+
+The stable coordinate is `@roackb2/heddle-adopter@5.13.0`. Its canonical
+source is moving to the unpublished v6 candidate
+`@heddleagent/execution-host-client@6.0.0-next.0`. Stable v5 provides the base
+wire, authority, transport, orchestration, MCP, and Node surfaces. The durable
+lifecycle paragraphs below describe the unpublished v6 candidate and cannot be
+used from v5.13.0.
 
 ```text
 ADOPTER BACKEND
@@ -15,7 +22,7 @@ ADOPTER BACKEND
   tenant / subject / product-session mapping
   durable invocation identity + database adapter + result application
           |
-  @roackb2/heddle-adopter
+  @heddleagent/execution-host-client (unpublished v6 candidate)
   authority + v1 contracts + durable turn lifecycle + ExecutionHost port
           |
   HEDDLE EXECUTION HOST
@@ -40,9 +47,9 @@ For each invocation, the adopter backend must:
    ID plus a product deadline;
 4. issue a short-lived execution assertion and, only when needed, an MCP
    capability with the exact product tools allowed for that invocation;
-5. use the durable lifecycle over its atomic store adapter so `requested`,
-   accepted, and terminal checkpoints commit before their corresponding work
-   or public events;
+5. after the v6 preview is published, use its durable lifecycle over an atomic
+   store adapter so `requested`, accepted, and terminal checkpoints commit
+   before their corresponding work or public events;
 6. invoke an `ExecutionHost` implementation and consume one ordered stream to a
    truthful terminal event;
 7. apply the terminal result to product state idempotently; and
@@ -56,10 +63,16 @@ result lookup before deciding whether another invocation is safe.
 
 ## Package boundary
 
-Install only the adopter package in the backend:
+Install the stable base integration today:
 
 ```bash
 npm install @roackb2/heddle-adopter
+```
+
+After npm confirms the prerelease, opt into the durable lifecycle explicitly:
+
+```bash
+npm install @heddleagent/execution-host-client@next
 ```
 
 Its subpaths separate responsibility:
@@ -67,8 +80,8 @@ Its subpaths separate responsibility:
 - `/contracts` provides executable TypeScript/Zod v1 claim and wire contracts;
 - `/authority` issues ES256 assertions/capabilities and projects public JWKS;
 - `/conversation` composes assertion/capability issuance, model credentials,
-  fixed tool policy, one `ExecutionHost` turn, and an optional durable lifecycle
-  over an adopter-implemented store;
+  fixed tool policy, and one `ExecutionHost` turn. The v6 candidate adds the
+  optional durable lifecycle over an adopter-implemented store;
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
 - `/mcp/node` owns a stateless official-SDK Streamable HTTP lifecycle around
@@ -76,22 +89,22 @@ Its subpaths separate responsibility:
 - `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
   direct-development transport;
 - `/testing` provides a Node-only loopback v1 fixture for local product/MCP
-  integration tests without a model or AWS plus real-store lifecycle
-  conformance.
+  integration tests without a model or AWS. The v6 candidate adds real-store
+  lifecycle conformance.
 - `/node` provides an optional standard Node JWKS/conversation HTTP edge and
   owner-only local signing-key file helpers.
 
-See the [package README](../../../packages/heddle-adopter/README.md) for
+See the [package README](../../../packages/execution-host-client/README.md) for
 copyable code.
 
-Backends outside TypeScript can use the published
-[OpenAPI, JSON Schema, and golden fixtures](../../../packages/heddle-adopter/spec/v1/README.md)
+Backends outside TypeScript can use the versioned
+[OpenAPI, JSON Schema, and golden fixtures](../../../packages/execution-host-client/spec/v1/README.md)
 as the canonical v1 contract. The
-[clean-room Python v1 conformance reference](../../../packages/heddle-adopter/conformance/reference-adopters/python-v1/README.md)
+[clean-room Python v1 conformance reference](../../../packages/execution-host-client/conformance/reference-adopters/python-v1/README.md)
 shows the same ES256 authority, independent MCP verification, and strict SSE
-rules plus the optional durable lifecycle with no Heddle or private-host
-import. It is an executable conformance proof, not a published or supported
-Python SDK.
+rules. Its lifecycle cases belong to the unpublished v6 candidate and import
+no Heddle or private host. It is an executable conformance proof, not a
+published or supported Python SDK.
 
 The package deliberately excludes:
 
@@ -142,12 +155,13 @@ two generic inbound routes, bounded JSON, authorization-header scrubbing, safe
 errors, SSE framing/backpressure, disconnect cancellation, and shutdown. Pass
 it the authority, product authenticator, and a product admission service. The
 admission service is the small intentional product seam: it decides the
-authorized scope and durable invocation identity, then delegates to
+authorized scope and durable invocation identity. In the unpublished v6
+candidate, it can delegate to
 `DurableHostedConversationTurnService` wrapping
 `HostedConversationTurnService`. The durable wrapper owns the generic
 requested/accepted/terminal state machine and requires only the adopter's
 database adapter. The normative lifecycle profile and shared scenarios live in
-the [v1 durable lifecycle specification](../../../packages/heddle-adopter/spec/v1/durable-hosted-conversation-lifecycle.md).
+the [v1 durable lifecycle specification](../../../packages/execution-host-client/spec/v1/durable-hosted-conversation-lifecycle.md).
 
 Teams with an existing router that exposes Node `IncomingMessage` and
 `ServerResponse`—including raw Node, Express, or a framework's raw adapter—can

@@ -48,7 +48,7 @@ implementation must:
 - update only open, expired turns during reconciliation.
 
 Use `HostedConversationTurnStoreConformance` from
-`@roackb2/heddle-adopter/testing` to certify those requirements against the
+`@heddleagent/execution-host-client/testing` to certify those requirements against the
 real adapter. Heddle does not open a database connection, own a product schema,
 or run migrations.
 
@@ -56,7 +56,7 @@ or run migrations.
 import {
   DurableHostedConversationTurnService,
   HostedConversationTurnService,
-} from '@roackb2/heddle-adopter/conversation'
+} from '@heddleagent/execution-host-client/conversation'
 
 const executionTurns = new HostedConversationTurnService({
   authority,

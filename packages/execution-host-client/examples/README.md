@@ -8,7 +8,7 @@ Heddle runtime or private host implementation.
 Run it from the repository root:
 
 ```bash
-yarn adopter:example:node-control-plane
+yarn execution-host-client:example:node-control-plane
 ```
 
 The example uses an ephemeral signing key, a fake user, a placeholder model

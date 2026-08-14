@@ -4,7 +4,7 @@ import { createContractArtifacts } from '../../scripts/contract-artifacts.js';
 
 const specRoot = new URL('../../spec/v1/', import.meta.url);
 
-describe('published language-neutral contract artifacts', () => {
+describe('versioned language-neutral contract artifacts', () => {
   it('stay byte-for-byte synchronized with runtime schemas', async () => {
     for (const [relativePath, expected] of createContractArtifacts()) {
       await expect(readFile(new URL(relativePath, specRoot), 'utf8'))

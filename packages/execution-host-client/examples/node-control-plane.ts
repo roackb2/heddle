@@ -2,17 +2,17 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   JoseExecutionAuthority,
-} from '@roackb2/heddle-adopter/authority';
+} from '@heddleagent/execution-host-client/authority';
 import {
   HostedConversationTurnService,
-} from '@roackb2/heddle-adopter/conversation';
+} from '@heddleagent/execution-host-client/conversation';
 import {
   generateEphemeralExecutionAuthorityKeyPair,
   NodeExecutionAdopterHttpService,
-} from '@roackb2/heddle-adopter/node';
+} from '@heddleagent/execution-host-client/node';
 import {
   LocalExecutionHostContractFixture,
-} from '@roackb2/heddle-adopter/testing';
+} from '@heddleagent/execution-host-client/testing';
 
 const keyPair = await generateEphemeralExecutionAuthorityKeyPair();
 const authority = await JoseExecutionAuthority.create({
