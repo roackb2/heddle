@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "ports": [
+    {
+      "id": "conversation-sessions",
+      "contract": "ChatSessionRepository",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/chat/engine/sessions/repository/types.ts",
+      "publicSurface": "@roackb2/heddle",
+      "currentAdapter": "FileChatSessionRepository",
+      "consistency": "Asynchronous scope-bound repository with atomic revision compare-and-set, stable ordering, and cursor pagination.",
+      "conformance": "src/core/chat/engine/sessions/repository/chat-session-repository-conformance.ts",
+      "v6Status": "launch-required",
+      "implementationGate": "Implement and pass real-PostgreSQL repository conformance together with the archive adapter before publishing the v6 package.",
+      "migrationOwner": "@heddleagent/postgres conversation capability"
+    },
+    {
+      "id": "conversation-archives",
+      "contract": "ChatArchiveRepository",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/chat/engine/sessions/archives/types.ts",
+      "publicSurface": "@roackb2/heddle",
+      "currentAdapter": "FileChatArchiveRepository",
+      "consistency": "Asynchronous append that makes exact messages, rolling summary, and manifest visible as one durable operation.",
+      "conformance": "src/core/chat/engine/sessions/archives/chat-archive-repository-conformance.ts",
+      "v6Status": "launch-required",
+      "implementationGate": "Implement and pass real-PostgreSQL archive conformance under the same authenticated scope as sessions before publishing the v6 package.",
+      "migrationOwner": "@heddleagent/postgres conversation capability"
+    },
+    {
+      "id": "heartbeat-task-authority",
+      "contract": "HeartbeatTaskStore and HeartbeatTargetedTaskStore",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/heartbeat/tasks/types.ts",
+      "publicSurface": "@roackb2/heddle/advanced and heartbeat testing exports",
+      "currentAdapter": "FileHeartbeatTaskService and @roackb2/heddle-postgres",
+      "consistency": "Asynchronous task authority with atomic claim, execution fencing, terminal settlement, interruption recovery, checkpoints, and optional run history.",
+      "conformance": "src/core/heartbeat/tasks/heartbeat-task-store-conformance.ts",
+      "v6Status": "launch-required",
+      "implementationGate": "Move the existing official PostgreSQL adapter once, preserve every fencing and recovery guarantee, and pass real-PostgreSQL conformance before publishing v6.",
+      "migrationOwner": "@heddleagent/postgres heartbeat capability"
+    },
+    {
+      "id": "execution-host-conversation-lifecycle",
+      "contract": "HostedConversationTurnLifecycleStore",
+      "ownerPackage": "@heddleagent/execution-host-client",
+      "currentEvidence": "Heddle draft PR #340 durable hosted-conversation lifecycle profile",
+      "publicSurface": "planned @heddleagent/execution-host-client conversation and testing entrypoints",
+      "currentAdapter": "Adopter-supplied atomic store; no official PostgreSQL adapter yet",
+      "consistency": "Invocation- and full-scope-fenced requested, accepted, terminal, exact-repeat, interruption, and expiry transitions with persistence before public events.",
+      "conformance": "Heddle draft PR #340 TypeScript store conformance and shared TypeScript/Python lifecycle fixtures",
+      "v6Status": "launch-required",
+      "implementationGate": "Merge the public lifecycle port first, then implement its official PostgreSQL adapter and pass real-store conformance before Lucid or v6 consumes it.",
+      "migrationOwner": "@heddleagent/postgres execution-host conversation lifecycle capability"
+    },
+    {
+      "id": "result-artifacts",
+      "contract": "ArtifactRepository",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/artifacts/types.ts",
+      "publicSurface": "@roackb2/heddle",
+      "currentAdapter": "FileArtifactRepository",
+      "consistency": "Synchronous catalog and content operations without one atomic metadata/content commit, deletion, retention, garbage collection, or remote conformance.",
+      "v6Status": "excluded",
+      "exclusionRationale": "The current local-biased contract must be redesigned by the artifacts domain before an official remote PostgreSQL adapter can make a truthful durability claim.",
+      "migrationOwner": "Future separately selected artifacts persistence work"
+    },
+    {
+      "id": "standalone-heartbeat-checkpoint",
+      "contract": "HeartbeatCheckpointStore",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/heartbeat/checkpoint/types.ts",
+      "publicSurface": "@roackb2/heddle/advanced",
+      "currentAdapter": "FileHeartbeatCheckpointRepository",
+      "consistency": "Adapter-instance-scoped asynchronous load and save without identity, fencing, or conformance semantics.",
+      "v6Status": "excluded",
+      "exclusionRationale": "Scheduled durable heartbeat state belongs to HeartbeatTaskStore; do not invent global checkpoint identity merely to add a second adapter in the v6 launch.",
+      "migrationOwner": "Future separately selected one-off checkpoint requirement"
+    },
+    {
+      "id": "agent-skill-activation",
+      "contract": "AgentSkillActivationStorePort",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/skills/types.ts",
+      "publicSurface": "@roackb2/heddle",
+      "currentAdapter": "FileAgentSkillActivationRepository",
+      "consistency": "Synchronous consent metadata that refers to project, user, or built-in source paths.",
+      "v6Status": "excluded",
+      "exclusionRationale": "The records are workspace-local and their referenced skill sources are not portable; a generic database adapter would overstate the durability boundary.",
+      "migrationOwner": "Runtime skill activation domain"
+    },
+    {
+      "id": "mcp-workspace-stores",
+      "contract": "McpConfigStorePort, McpActivationStorePort, and McpCatalogStorePort",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "src/core/mcp/types.ts",
+      "publicSurface": "Injectable runtime internals; not a curated package-level persistence capability",
+      "currentAdapter": "FileMcpConfigRepository, FileMcpActivationRepository, and FileMcpCatalogRepository",
+      "consistency": "Three synchronous whole-document stores with different authority: user config, consent state, and rebuildable discovery cache.",
+      "v6Status": "excluded",
+      "exclusionRationale": "These stores are not one remote MCP database contract and may refer to local configuration or sources; review each owning domain separately if a real adopter needs portability.",
+      "migrationOwner": "Runtime MCP domain"
+    },
+    {
+      "id": "active-run-coordination",
+      "contract": "No durable storage port",
+      "ownerPackage": "@heddleagent/runtime",
+      "currentEvidence": "docs/guides/programmatic/durability-support.md",
+      "publicSurface": "ConversationRunService process-local API",
+      "currentAdapter": "In-memory active runs, replay buffers, subscribers, cancellation, and pending approvals",
+      "consistency": "Process-local coordination is lost on executor restart and must be reported as interruption.",
+      "v6Status": "excluded",
+      "exclusionRationale": "A PostgreSQL table cannot create durable execution semantics without a separately selected queue, recovery, idempotency, approval, and side-effect design.",
+      "migrationOwner": "Future separately selected durable-execution work"
+    },
+    {
+      "id": "local-machine-sensitive-state",
+      "contract": "No general remote durability port",
+      "ownerPackage": "@heddleagent/runtime and @heddleagent/cli",
+      "currentEvidence": "docs/architecture/durable-state.md",
+      "publicSurface": "Credentials, memory, approvals, project config, browser profiles, workspaces, daemon registry, traces, and diagnostics",
+      "currentAdapter": "Domain-specific workspace, machine, secret, and diagnostic files",
+      "consistency": "State meaning is bound to a workspace, machine, security context, local process, or diagnostic destination.",
+      "v6Status": "excluded",
+      "exclusionRationale": "Moving these records through a generic PostgreSQL adapter would leak secrets, copy machine facts, or erase domain-specific policy and retention semantics.",
+      "migrationOwner": "Each owning runtime or CLI domain"
+    }
+  ]
+}
