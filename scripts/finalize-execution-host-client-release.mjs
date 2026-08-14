@@ -90,7 +90,6 @@ function finalizeExecutionHostClientRelease() {
     release.releaseNote,
     '--verify-tag',
   ];
-  if (release.prerelease) createArgs.push('--prerelease');
   run('gh', createArgs, repositoryDirectory);
 
   const created = JSON.parse(
@@ -115,7 +114,7 @@ function finalizeExecutionHostClientRelease() {
 function assertRelease(actual, expected) {
   assert.equal(actual.tagName, expected.releaseTag);
   assert.equal(actual.name, expected.releaseTitle);
-  assert.equal(actual.isPrerelease, expected.prerelease);
+  assert.equal(actual.isPrerelease, false);
   assert.match(actual.url, /^https:\/\/github\.com\/roackb2\/heddle\/releases\//);
 }
 

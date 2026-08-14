@@ -26,23 +26,14 @@ export function createExecutionHostClientReleaseMetadata(packageJson) {
   assert.equal(packageJson.version, EXECUTION_HOST_CLIENT_VERSION);
   assert.equal(packageJson.publishConfig?.registry, NPM_REGISTRY);
   assert.equal(packageJson.publishConfig?.access, 'public');
-  assert.ok(
-    ['latest', 'next'].includes(packageJson.publishConfig?.tag),
-    'Execution Host client releases support only the latest and next npm channels.',
-  );
-
-  const prerelease = packageJson.version.includes('-');
   assert.equal(
-    packageJson.publishConfig.tag,
-    prerelease ? 'next' : 'latest',
-    'Prereleases must use next and stable releases must use latest.',
+    packageJson.publishConfig?.tag,
+    'latest',
+    'Execution Host client releases must use the stable latest channel.',
   );
-
   return {
     name: packageJson.name,
     version: packageJson.version,
-    publishTag: packageJson.publishConfig.tag,
-    prerelease,
     releaseTag: `execution-host-client-v${packageJson.version}`,
     releaseNote:
       `docs/releases/execution-host-client-v${packageJson.version}.md`,
@@ -103,28 +94,20 @@ export function assertRegistryArtifactMatches(
 export function assertDistTagTransition({
   before,
   after,
-  publishTag,
   version,
 }) {
   assert.equal(
-    after[publishTag],
+    after.latest,
     version,
-    `The ${publishTag} dist-tag must point to ${version}.`,
+    `The latest dist-tag must point to ${version}.`,
   );
 
   for (const [tag, previousVersion] of Object.entries(before)) {
-    if (tag === publishTag) continue;
+    if (tag === 'latest') continue;
     assert.equal(
       after[tag],
       previousVersion,
-      `Publishing ${publishTag} must not move the existing ${tag} dist-tag.`,
-    );
-  }
-
-  if (publishTag === 'next' && before.latest === undefined) {
-    assert.ok(
-      after.latest === undefined || after.latest === version,
-      'A first prerelease may seed npm\'s required latest tag only to the same immutable version.',
+      `Publishing latest must not move the existing ${tag} dist-tag.`,
     );
   }
 }
@@ -222,7 +205,6 @@ function writeGitHubOutputs(state) {
     outputPath,
     [
       `version=${state.version}`,
-      `publish_tag=${state.publishTag}`,
       `release_tag=${state.releaseTag}`,
       `release_note=${state.releaseNote}`,
       `publication_needed=${state.publicationNeeded}`,

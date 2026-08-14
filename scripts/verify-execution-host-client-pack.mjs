@@ -273,9 +273,9 @@ async function verifyRegistryRelease({
       integrity: packed.integrity,
     });
     assert.equal(
-      readDistTags(releaseMetadata.name)[releaseMetadata.publishTag],
+      readDistTags(releaseMetadata.name).latest,
       releaseMetadata.version,
-      `The ${releaseMetadata.publishTag} dist-tag must identify the repository version.`,
+      'The latest dist-tag must identify the repository version.',
     );
     verifyRegistryConsumers(releaseMetadata);
     return 'already-published';
@@ -286,11 +286,11 @@ async function verifyRegistryRelease({
     true,
     `Release ${releaseMetadata.version} requires ${releaseMetadata.releaseNote}.`,
   );
-  if (!publishIfMissing) return 'release-candidate';
+  if (!publishIfMissing) return 'release-ready';
 
   assertPublicationContext(releaseMetadata);
   const distTagsBefore = readDistTagsIfPresent(releaseMetadata.name);
-  const publishResult = publishTarball(tarball, releaseMetadata);
+  const publishResult = publishTarball(tarball);
   artifact = await waitForRegistryArtifact(target);
 
   if (artifact.kind === 'missing') {
@@ -306,7 +306,6 @@ async function verifyRegistryRelease({
   assertDistTagTransition({
     before: distTagsBefore,
     after: readDistTags(releaseMetadata.name),
-    publishTag: releaseMetadata.publishTag,
     version: releaseMetadata.version,
   });
   verifyRegistryConsumers(releaseMetadata);
@@ -364,14 +363,14 @@ function assertPublicationContext(releaseMetadata) {
   );
 }
 
-function publishTarball(tarball, releaseMetadata) {
+function publishTarball(tarball) {
   const args = [
     'publish',
     tarball,
     '--access',
     'public',
     '--tag',
-    releaseMetadata.publishTag,
+    'latest',
     '--registry',
     NPM_REGISTRY,
   ];
@@ -463,7 +462,7 @@ function verifyRegistryConsumers(releaseMetadata) {
     'registry-exact-consumer',
   );
   verifyFreshConsumer(
-    `${releaseMetadata.name}@${releaseMetadata.publishTag}`,
+    `${releaseMetadata.name}@latest`,
     'registry-channel-consumer',
   );
 }
@@ -471,7 +470,7 @@ function verifyRegistryConsumers(releaseMetadata) {
 function describeOutcome(outcome) {
   const descriptions = {
     packed: 'Verified packed',
-    'release-candidate': 'Verified unpublished release candidate',
+    'release-ready': 'Verified release-ready',
     'already-published': 'Verified existing registry artifact',
     published: 'Published and verified',
   };

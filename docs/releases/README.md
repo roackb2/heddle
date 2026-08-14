@@ -29,7 +29,7 @@ For a user-facing release:
    source remains recoverable from that release tag and is not part of another
    5.x release. Four private `@heddleagent/*` directories documented in
    [`packages/README.md`](../../packages/README.md) remain non-releaseable.
-   The activated Execution Host client uses the independent prerelease lane
+   The activated Execution Host client uses the independent release lane
    below and never inherits a root-package version implicitly.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
@@ -52,12 +52,10 @@ Before tagging a release, use the normal green checkpoint baseline:
 
 Add more verification if the release changes a workflow that needs manual validation.
 
-## Execution Host Client Prerelease Lane
+## Execution Host Client Release Lane
 
 `@heddleagent/execution-host-client` is independently versioned from the root
-runtime. Its first candidate, `6.0.0-next.0`, is published. The manifest pins
-`publishConfig.tag` to `next` while a version is a prerelease. A future stable
-release PR must deliberately change that tag to `latest`. Do not bump the root,
+runtime. Stable releases use the normal npm `latest` tag. Do not bump the root,
 remote, PostgreSQL, or private-foundation manifests for this package-only
 release.
 
@@ -73,11 +71,11 @@ yarn execution-host-client:conformance:python-v1
 yarn build
 yarn execution-host-client:pack:verify
 yarn execution-host-client:release:verify
-npm publish ./packages/execution-host-client --dry-run --access public --tag next
+npm publish ./packages/execution-host-client --dry-run --access public --tag latest
 git diff --check
 ```
 
-`execution-host-client:pack:verify` packs the candidate, verifies every export
+`execution-host-client:pack:verify` packs the release, verifies every export
 and conformance fixture, installs the tarball in a fresh ESM consumer, imports
 all JavaScript subpaths, and typechecks all TypeScript subpaths.
 `execution-host-client:release:verify` additionally checks npm: an existing
@@ -111,18 +109,18 @@ no npm write token; trusted publishing automatically supplies provenance for
 future releases. The GitHub environment must allow deployments only from
 `main`. Do not broaden the workflow to pull requests or unprotected branches.
 
-npm requires every package to have a `latest` tag. The first prerelease
-therefore created both `next` and the unavoidable initial `latest`, each at
-`6.0.0-next.0`. Later prerelease publication advances `next` without moving an
-existing `latest`; the first stable release deliberately moves `latest`.
+Stable publication moves `latest` to the released version and preserves any
+other existing dist-tags. The historical `next` tag remains at
+`6.0.0-next.0`; it is not part of the normal release or installation path.
 
 For manual recovery on the exact tagged commit, use
 `yarn execution-host-client:publish:if-missing`. It requires a clean worktree,
 an annotated package tag on `HEAD`, the owning npm account, and interactive
 2FA. It is idempotent: a matching published artifact is verified and skipped.
-Do not deprecate `@roackb2/heddle-adopter@5.13.0` until a stable replacement
-and real consumer migration exist; never unpublish it. Never use a root
-`v6.0.0-next.0` tag for this package-only release.
+Do not unpublish `@roackb2/heddle-adopter@5.13.0`; keep it available while
+consumers migrate. Use a package-specific
+`execution-host-client-v<version>` tag rather than a root `v<version>` tag for
+this independently versioned package.
 
 ## Fast Release Preflight
 
@@ -225,7 +223,7 @@ gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y
 ```
 
 Before a package's first publication, its `npm view` command is expected to
-return `E404`; confirm the package name is genuinely unpublished rather than
+return `E404`; confirm the package name is genuinely unregistered rather than
 treating that first-release state as a failed preflight.
 
 After the GitHub release, the operator publishes all verified 5.x artifacts.

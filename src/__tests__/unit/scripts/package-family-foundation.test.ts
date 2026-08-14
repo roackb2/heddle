@@ -54,7 +54,7 @@ describe('v6 package-family foundation', () => {
 });
 
 describe('@heddleagent/execution-host-client activation', () => {
-  it('accepts the exact independently versioned next-channel manifest', () => {
+  it('accepts the exact independently versioned stable manifest', () => {
     const manifest = createExecutionHostClientManifest(rootPackage);
 
     expect(() =>
@@ -66,17 +66,17 @@ describe('@heddleagent/execution-host-client activation', () => {
     ['old coordinate', { name: '@roackb2/heddle-adopter' }],
     ['wrong version', { version: rootPackage.version }],
     ['private package', { private: true }],
-    ['latest tag', {
+    ['non-stable tag', {
       publishConfig: {
         access: 'public',
-        tag: 'latest',
+        tag: 'next',
         registry: 'https://registry.npmjs.org/',
       },
     }],
     ['wrong registry', {
       publishConfig: {
         access: 'public',
-        tag: 'next',
+        tag: 'latest',
         registry: 'https://registry.example.com/',
       },
     }],
@@ -89,7 +89,7 @@ describe('@heddleagent/execution-host-client activation', () => {
     ['runtime dependency', {
       dependencies: {
         ...createExecutionHostClientManifest(rootPackage).dependencies,
-        '@heddleagent/runtime': '^6.0.0-next.0',
+        '@heddleagent/runtime': '^6.0.0',
       },
     }],
     ['extra export', {

@@ -33,12 +33,13 @@ Start here:
 | --- | --- | --- |
 | Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@roackb2/heddle` |
 | Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@roackb2/heddle/hosted` and `@roackb2/heddle-remote` |
-| Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@roackb2/heddle-adopter` or its OpenAPI/JSON Schema contract |
+| Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@heddleagent/execution-host-client` or its OpenAPI/JSON Schema contract |
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
 
-The stable separate-host package remains `@roackb2/heddle-adopter@5.13.0`.
-Its canonical source now ships as the opt-in v6 prerelease
-`@heddleagent/execution-host-client@next` on npm's prerelease channel.
+The stable separate-host package is
+`@heddleagent/execution-host-client@6.0.0`. The former
+`@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
+migration.
 
 The **runtime** is library code. The **hosted run layer** runs inside
 infrastructure you operate; it is not a Heddle cloud service. A compatible
@@ -219,8 +220,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@roackb2/heddle-adopter` | Stable v5 contracts, authority/JWKS, hosted-turn orchestration, product-MCP verification, an `ExecutionHost` client port, Node conveniences, and wire fixtures |
-| Preview the durable separate-host lifecycle | `@heddleagent/execution-host-client@next` | Published v6 prerelease adding requested/accepted/terminal persistence semantics, store conformance, and shared TypeScript/Python lifecycle fixtures |
+| A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
@@ -383,15 +383,14 @@ Heddle is designed to make assumptions and limitations visible:
   authentication, authorization, CORS, limits, billing, or deployment;
 - `@roackb2/heddle-remote` validates the run protocol but does not own product
   messages, UI state, authentication, or result rendering;
-- `@roackb2/heddle-adopter` helps a backend invoke a separately deployed
+- `@heddleagent/execution-host-client` helps a backend invoke a separately deployed
   Execution Host without importing Heddle, AWS, or product data
   adapters; optional Node helpers own generic HTTP/key mechanics, while the
   adopter still owns identity, policy, production key operations, tools, and
   results; canonical OpenAPI/JSON Schema/golden fixtures and a clean-room
   Python proof keep this boundary language-neutral;
-- the same implementation is available under the clearer v6 prerelease
-  coordinate `@heddleagent/execution-host-client@next`; stable install guidance
-  remains on the v5 package until the replacement reaches a stable release;
+- the legacy `@roackb2/heddle-adopter@5.13.0` package remains installable for
+  migration but is no longer the canonical implementation;
 - `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
   but the adopter still owns PostgreSQL operations, migration rollout, trusted
   namespace resolution, delivery, and product-side idempotency;

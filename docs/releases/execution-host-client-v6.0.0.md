@@ -1,13 +1,22 @@
-# Execution Host Client v6.0.0-next.1
+# Execution Host Client v6.0.0
 
-This prerelease validates the automated release lane for
-`@heddleagent/execution-host-client`. It does not change the package's runtime
-API from `6.0.0-next.0`.
+This is the first stable release of
+`@heddleagent/execution-host-client`. It provides the reusable product-backend
+contracts and lifecycle services for invoking a separately deployed compatible
+Heddle Execution Host.
+
+Install it normally:
+
+```bash
+npm install @heddleagent/execution-host-client
+```
 
 ## What changed
 
-- correct the package and current guides now that the v6 preview is publicly
-  installable through npm's `next` channel;
+- publish the package as the supported stable coordinate;
+- include the v1 contracts, ES256 authority, hosted conversation lifecycle,
+  MCP verification, Node and HTTP/SSE helpers, store conformance, and shared
+  TypeScript/Python contract fixtures;
 - add a fail-closed release-state check that rejects changed package bytes
   under an already published version;
 - publish an absent immutable version from a GitHub-hosted runner through npm
@@ -21,13 +30,12 @@ records provenance for the public package. Publication remains restricted to
 repository `roackb2/heddle`, workflow `publish-packages.yml`, environment
 `npm-release`, and the protected `main` branch.
 
-## Expected registry transition
+## Publication
 
-Before this release, npm's required `latest` tag and the explicit `next` tag
-both point to the first prerelease, `6.0.0-next.0`. Publishing this version must
-advance only `next` to `6.0.0-next.1`; `latest` must remain at
-`6.0.0-next.0`. The legacy `@roackb2/heddle-adopter@5.13.0` package remains
-available and unchanged.
+Publishing this version moves npm's `latest` tag to `6.0.0`. The historical
+`next` tag remains at `6.0.0-next.0`; it is not part of the normal installation
+path. The legacy `@roackb2/heddle-adopter@5.13.0` package remains available and
+unchanged during migration.
 
 The release is selected by the version and this matching release note. Merging
 the reviewed release PR to `main` is the publication action; no manual npm

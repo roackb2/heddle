@@ -1,10 +1,9 @@
 # Execution Host adopter contract v1
 
 This directory is the language-neutral contract for an adopter backend which
-invokes a Heddle-compatible Execution Host. It is included in
-the published `@heddleagent/execution-host-client@next` tarball, but consuming it
-does not require JavaScript or TypeScript. The candidate itself is not yet
-published on npm.
+invokes a Heddle-compatible Execution Host. It is included in the published
+`@heddleagent/execution-host-client` package, but consuming it does not require
+JavaScript or TypeScript.
 
 ## Artifacts
 
@@ -32,7 +31,7 @@ CI and package builds use the non-writing drift check:
 yarn execution-host-client:contract:verify
 ```
 
-The checked-in JSON files are the candidate interoperability artifacts. The
+The checked-in JSON files are the versioned interoperability artifacts. The
 TypeScript Zod schemas remain the reference implementation used to generate
 them. A non-TypeScript adopter should implement the JSON/SSE/JWT contract and
 run the golden fixtures; it should not port Heddle's agent loop.

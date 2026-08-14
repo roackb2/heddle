@@ -1,13 +1,13 @@
 # Heddle Package Family
 
-Status: **four private v6 foundations and one published prerelease**
+Status: **four private v6 foundations and one stable package**
 
 This directory records the v6 package identities and responsibility boundaries.
-`@heddleagent/execution-host-client@6.0.0-next.1` now contains its canonical
-implementation as the published `6.0.0-next.1` prerelease. The other four
-`@heddleagent/*` directories remain private metadata-only foundations. The
-current `@roackb2/*` packages remain the stable supported packages until each
-replacement is independently verified and released.
+`@heddleagent/execution-host-client@6.0.0` contains its canonical
+implementation as a stable package. The other four `@heddleagent/*`
+directories remain private metadata-only foundations. Existing
+`@roackb2/*` packages remain supported until each replacement is independently
+verified and released.
 
 ## Initial v6 family
 
@@ -16,7 +16,7 @@ replacement is independently verified and released.
 | `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Private foundation; implementation remains in `@roackb2/heddle` |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Private foundation; implementation remains in `@roackb2/heddle` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Private foundation; implementation remains in `@roackb2/heddle-remote` |
-| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; `6.0.0-next.1` is published on `next` |
+| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Private foundation; current heartbeat adapter remains in `@roackb2/heddle-postgres` |
 
 The in-process run service will be exposed from
@@ -90,14 +90,14 @@ The runtime, CLI, run-client, and PostgreSQL directories contain only a
 manifest, boundary README, and repository license. Their manifests have
 `private: true`, have no exports or dependencies, and cannot be published.
 The Execution Host client is the one activated exception: it owns the moved
-implementation, language-neutral artifacts, tests, build, and guarded
-`next`-channel release candidate.
+implementation, language-neutral artifacts, tests, build, and guarded stable
+release.
 
 Run `yarn package-family:verify` to enforce all of the following:
 
 - exactly the five selected package identities exist;
 - four foundations remain private at version `0.0.0` and implementation-free;
-- the activated Execution Host client has the exact reviewed prerelease
+- the activated Execution Host client has the exact reviewed stable
   manifest, dependency boundary, exports, source ownership, and release tag;
 - package licenses and repository metadata remain consistent; and
 - the three remaining local v5 package identities stay present, while the
