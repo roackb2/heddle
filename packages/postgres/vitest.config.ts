@@ -5,6 +5,13 @@ export default defineConfig({
   root: import.meta.dirname,
   resolve: {
     alias: {
+      '@': fileURLToPath(new URL('../../src', import.meta.url)),
+      '@heddleagent/runtime/advanced': fileURLToPath(
+        new URL('../../src/advanced.ts', import.meta.url),
+      ),
+      '@heddleagent/runtime/heartbeat/testing': fileURLToPath(
+        new URL('../../src/heartbeat-testing.ts', import.meta.url),
+      ),
       '@heddleagent/execution-host-client/conversation': fileURLToPath(
         new URL('../execution-host-client/src/conversation/index.ts', import.meta.url),
       ),

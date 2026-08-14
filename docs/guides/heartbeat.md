@@ -115,7 +115,7 @@ rebuilding the scheduler controllers around `runLoop()`:
 import {
   HeartbeatSchedulerService,
   type HeartbeatTaskStore,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 
 declare const postgresHeartbeatTasks: HeartbeatTaskStore;
 
@@ -151,12 +151,12 @@ Cron, launchd, systemd, hosted queues, and Lucid-style services should be treate
 
 ### Use the optional PostgreSQL authority
 
-Install `@roackb2/heddle-postgres` when the host needs multiple processes or
+Install `@heddleagent/postgres` when the host needs multiple processes or
 short-lived workers to share one durable heartbeat authority without
 reimplementing Heddle's task transitions:
 
 ```ts
-import { createPostgresHeartbeatTaskAuthority } from '@roackb2/heddle-postgres';
+import { createPostgresHeartbeatTaskAuthority } from '@heddleagent/postgres/heartbeat';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
@@ -179,7 +179,7 @@ atomic administration policy; it does not open a connection, run migrations,
 authenticate a namespace, deliver tasks, or start a scheduler. Adopt the
 bundled baseline SQL into exactly one application migration history, and choose
 an execution lease longer than the maximum duration of one bounded attempt.
-See the [`@roackb2/heddle-postgres` boundary](../../packages/heddle-postgres/README.md)
+See the [`@heddleagent/postgres` boundary](../../packages/postgres/README.md)
 for the full operational contract.
 
 ### Targeted one-shot workers
@@ -196,7 +196,7 @@ import {
   HeartbeatTaskStateProjector,
   type HeartbeatTaskHandler,
   type HeartbeatTargetedTaskStore,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 
 declare const heartbeatTasks: HeartbeatTargetedTaskStore;
 declare const taskId: string;
@@ -268,7 +268,7 @@ pause/resume, cancellation, and periodic interrupted-owner recovery:
 import {
   HeartbeatTargetedTaskHost,
   HeartbeatTargetedTaskWorker,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 
 const host = new HeartbeatTargetedTaskHost({
   store: heartbeatTasks,
@@ -309,7 +309,7 @@ the same backend namespace:
 import {
   HeartbeatTaskStoreConformance,
   type HeartbeatTaskStoreConformanceHarness,
-} from '@roackb2/heddle/heartbeat/testing';
+} from '@heddleagent/runtime/heartbeat/testing';
 
 const harness: HeartbeatTaskStoreConformanceHarness = {
   createStore: async (namespace) => createRemoteHeartbeatStore({ namespace }),
@@ -352,7 +352,7 @@ hosted state.
 ```ts
 import type {
   HeartbeatTaskAdministrationService,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 
 declare const heartbeatTasks: HeartbeatTaskAdministrationService;
 
@@ -384,7 +384,7 @@ Product hosts should request prompt work through the task service instead of
 editing `schedule.nextRunAt` or polling a running task:
 
 ```ts
-import { FileHeartbeatTaskService } from '@roackb2/heddle/advanced';
+import { FileHeartbeatTaskService } from '@heddleagent/runtime/advanced';
 
 const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot });
 const request = await heartbeatTasks.requestTaskRun('mailbox-consumer', {
@@ -422,7 +422,7 @@ checkpoint, execution record, and framework events:
 import {
   HeartbeatSchedulerService,
   type HeartbeatTaskHandler,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 
 const handler: HeartbeatTaskHandler = async (context) => {
   const claim = await domainQueue.claimNext({ signal: context.signal });

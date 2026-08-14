@@ -1,24 +1,61 @@
 # `@heddleagent/postgres`
 
 Official PostgreSQL implementations for selected, public Heddle-owned durable
-ports. Version `6.0.0` intentionally ships one adapter:
+ports. Version `6.1.0` ships two independent adapter families:
 
 | Entrypoint | Domain contract | Status |
 | --- | --- | --- |
+| `@heddleagent/postgres/heartbeat` | Heartbeat task-store and administration contracts from `@heddleagent/runtime/advanced` | Supported |
 | `@heddleagent/postgres/execution-host/conversations` | `HostedConversationTurnLifecycleStore` from `@heddleagent/execution-host-client/conversation` | Supported |
 
-There is no generic root storage provider. Conversation sessions, heartbeat,
-artifacts, memory, telemetry, product history, and active execution are not
-silently covered by this release.
+There is no generic root storage provider. Conversation sessions, artifacts,
+memory, telemetry, product history, and active execution are covered only when
+an explicit entrypoint says so.
 
 ## Install
 
 Install the adapter with its domain contract, Drizzle, and one supported
-Drizzle PostgreSQL driver. For example, with `pg`:
+Drizzle PostgreSQL driver. Domain peers are optional at the package level so a
+heartbeat consumer does not install the Execution Host client and vice versa.
+For example, with `pg`:
 
 ```bash
 npm install @heddleagent/postgres @heddleagent/execution-host-client drizzle-orm pg
 ```
+
+For heartbeat task authority:
+
+```bash
+npm install @heddleagent/postgres @heddleagent/runtime drizzle-orm pg
+```
+
+## Heartbeat task authority
+
+```ts
+import {
+  createPostgresHeartbeatTaskAuthority,
+  heartbeatPostgresMigrationSqlUrl,
+} from '@heddleagent/postgres/heartbeat';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const database = drizzle(pool);
+const heartbeat = createPostgresHeartbeatTaskAuthority({
+  database,
+  namespace: authenticatedTenant.id,
+  executionLeaseMs: 20 * 60_000,
+});
+
+void heartbeatPostgresMigrationSqlUrl;
+```
+
+The adapter owns row locking, due-task claims, execution fencing,
+lease-backed recovery, checkpoints, run history, and atomic operator controls.
+Workers receive `heartbeat.store`; trusted operator routes receive
+`heartbeat.administration`. The adopter owns its pool, migration execution,
+trusted namespace derivation, worker lifecycle, backups, and side-effect
+idempotency.
 
 ## Execution Host conversation lifecycle
 
@@ -70,17 +107,18 @@ reasoning, raw errors, credentials, assertions, traces, or workspace content.
 
 ## Migrations
 
-The entrypoint exports `executionHostConversationPostgresMigrationSqlUrls` in
-strict application order. The same SQL files ship under:
+Each entrypoint exports its ordered migration URL or URL list. The SQL files
+ship under:
 
 ```text
 migrations/execution-host/conversations/
+migrations/heartbeat/
 ```
 
-Adopt those files into the application's reviewed migration process and apply
-them before constructing the store. Runtime startup deliberately performs no
-schema mutation. The first migration owns only
-`heddle.execution_host_conversation_turns` and its constraints/index.
+Adopt the relevant files into the application's reviewed migration process and
+apply them before constructing an adapter. Runtime startup deliberately
+performs no schema mutation. Each domain migration owns only its documented
+`heddle` tables, constraints, and indexes.
 
 ### Copy the migration into your application
 

@@ -6,7 +6,7 @@ import {
   type HeartbeatTask,
   type HeartbeatTaskRunRecord,
   type HeartbeatTargetedTaskStore,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import {
   and,
   asc,

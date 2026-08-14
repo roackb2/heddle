@@ -11,10 +11,6 @@ const OUTPUT_DIRECTORIES = new Map([
     new URL('../packages/execution-host-client/dist/', import.meta.url),
   ],
   ['postgres', new URL('../packages/postgres/dist/', import.meta.url)],
-  [
-    'legacy-postgres',
-    new URL('../packages/heddle-postgres/dist/', import.meta.url),
-  ],
 ]);
 
 const requestedTargets = process.argv.slice(2);

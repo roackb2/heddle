@@ -9,7 +9,7 @@ import type {
   AgentLoopCheckpoint,
   HeartbeatTask,
   HeartbeatTaskRunRecord,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import { sql } from 'drizzle-orm';
 import {
   bigint,

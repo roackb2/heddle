@@ -5,11 +5,11 @@ import {
   type HeartbeatTask,
   type HeartbeatTaskExecution,
   type HeartbeatTargetedTaskStore,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import {
   HeartbeatTaskStoreConformance,
   type HeartbeatTaskStoreConformanceHarness,
-} from '@roackb2/heddle/heartbeat/testing';
+} from '@heddleagent/runtime/heartbeat/testing';
 import dayjs from 'dayjs';
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -130,7 +130,7 @@ describePostgres('packaged PostgreSQL heartbeat authority', () => {
     const [{ tasks, runs }] = result.rows;
     if (!tasks || !runs) {
       throw new Error(
-        'Apply migrations/0000_heartbeat_authority.sql before running PostgreSQL certification.',
+        'Apply migrations/heartbeat/0000_heartbeat_authority.sql before running PostgreSQL certification.',
       );
     }
   });

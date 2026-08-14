@@ -4,6 +4,15 @@
     "baseUrl": "../..",
     "outDir": "./dist",
     "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@heddleagent/runtime/advanced": [
+        "src/advanced.ts"
+      ],
+      "@heddleagent/runtime/heartbeat/testing": [
+        "src/heartbeat-testing.ts"
+      ],
       "@heddleagent/execution-host-client/conversation": [
         "packages/execution-host-client/src/conversation/index.ts"
       ],
