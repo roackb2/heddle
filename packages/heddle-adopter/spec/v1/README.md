@@ -10,10 +10,14 @@ TypeScript.
 - `openapi.json` describes the current HTTP/SSE invocation binding.
 - `schema-bundle.json` contains standalone JSON Schema Draft 2020-12
   definitions for requests, events, JWT claims, protected JWT headers, results,
-  and safe API errors.
+  safe API errors, and the optional durable conversation-lifecycle profile.
 - `fixtures/` contains executable examples for valid and invalid requests,
   complete and interrupted streams, cancellation, sequence validation, and
-  execution/MCP authority.
+  execution/MCP authority. `durable-conversation-lifecycle.json` supplies the
+  shared TypeScript/Python terminal and store-transition vectors.
+- `durable-hosted-conversation-lifecycle.md` defines persistence ordering,
+  transition fencing, safe projection, interruption, and reconciliation for a
+  product-owned lifecycle store.
 
 Generate checked-in artifacts from Heddle's runtime schemas:
 
@@ -59,6 +63,11 @@ also enforce these relationships:
    before each operation.
 10. `allowedTools` is unique, contains at most 16 collision-free names, and the
     aggregate tool-name length is at most 512 characters.
+
+The optional durable profile adds control-plane semantics around this stream.
+It does not add a database endpoint to the Execution Host or make product
+records part of the execution plane. See
+[Durable hosted-conversation lifecycle](durable-hosted-conversation-lifecycle.md).
 
 ## Deployment bindings
 

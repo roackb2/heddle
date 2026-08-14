@@ -16,5 +16,10 @@ def authority_fixture() -> dict[str, Any]:
     return read_json(FIXTURE_ROOT / "authority.json")
 
 
+@pytest.fixture
+def lifecycle_fixture() -> dict[str, Any]:
+    return read_json(FIXTURE_ROOT / "durable-conversation-lifecycle.json")
+
+
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))

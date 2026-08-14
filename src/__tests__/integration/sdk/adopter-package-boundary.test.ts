@@ -10,10 +10,11 @@ describe('@roackb2/heddle-adopter package boundary', () => {
     expect(rootPackage.exports['./adopter']).toBeUndefined();
   });
 
-  it('keeps a bounded contract, JOSE, SSE, and official MCP boundary', () => {
+  it('keeps a bounded contract, lifecycle, JOSE, SSE, and official MCP boundary', () => {
     expect(adopterPackage.dependencies).toEqual({
       '@modelcontextprotocol/sdk':
         rootPackage.dependencies['@modelcontextprotocol/sdk'],
+      dayjs: rootPackage.dependencies.dayjs,
       'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
       jose: rootPackage.devDependencies.jose,
       zod: rootPackage.dependencies.zod,

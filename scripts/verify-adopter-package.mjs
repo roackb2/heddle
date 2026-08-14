@@ -20,6 +20,7 @@ assert.deepEqual(
   adopterPackage.dependencies,
   {
     '@modelcontextprotocol/sdk': rootPackage.dependencies['@modelcontextprotocol/sdk'],
+    dayjs: rootPackage.dependencies.dayjs,
     'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
     jose: rootPackage.devDependencies.jose,
     zod: rootPackage.dependencies.zod,

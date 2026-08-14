@@ -182,11 +182,23 @@ export type RuntimePublicResult = z.infer<typeof RuntimePublicResultSchema>;
 export type ExecutionHostStreamEvent = z.infer<
   typeof ExecutionHostStreamEventSchema
 >;
+export type ExecutionHostTerminalEvent = Extract<
+  ExecutionHostStreamEvent,
+  { kind: 'result' | 'cancelled' | 'error' }
+>;
 export type ExecutionAssertionClaims = z.infer<
   typeof ExecutionAssertionClaimsSchema
 >;
 export type McpCapabilityClaims = z.infer<typeof McpCapabilityClaimsSchema>;
 export type HostedExecutionWorkflow = typeof CONVERSATION_TURN_WORKFLOW;
+
+export function isExecutionHostTerminalEvent(
+  event: ExecutionHostStreamEvent,
+): event is ExecutionHostTerminalEvent {
+  return event.kind === 'result'
+    || event.kind === 'cancelled'
+    || event.kind === 'error';
+}
 
 export function isSafeWebUrl(url: URL): boolean {
   const loopback = ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname);

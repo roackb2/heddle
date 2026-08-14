@@ -17,7 +17,8 @@ npm install @roackb2/heddle-adopter
 
 The package does **not** contain Heddle's agent loop, AgentCore deployment,
 Terraform, product MCP tools, or product logic. It uses the official MCP SDK,
-plus `jose`, `zod`, and `eventsource-parser`, for its optional reference edges.
+plus `jose`, `zod`, `dayjs`, and `eventsource-parser`, for its optional
+reference edges.
 
 ## What it owns
 
@@ -25,11 +26,11 @@ plus `jose`, `zod`, and `eventsource-parser`, for its optional reference edges.
 | --- | --- |
 | `@roackb2/heddle-adopter/contracts` | Runtime-validated v1 request, stream, identity, capability, and header contracts |
 | `@roackb2/heddle-adopter/authority` | ES256 execution assertion and optional MCP capability issuance plus public JWKS projection |
-| `@roackb2/heddle-adopter/conversation` | Turn orchestration across authority, model credentials, optional MCP policy, and an `ExecutionHost` |
+| `@roackb2/heddle-adopter/conversation` | Turn orchestration across authority, model credentials, optional MCP policy, an `ExecutionHost`, and an optional adopter-implemented durable lifecycle store |
 | `@roackb2/heddle-adopter/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@roackb2/heddle-adopter/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@roackb2/heddle-adopter/http-sse` | Transport-neutral `ExecutionHost` port and strict direct-development HTTP/SSE client |
-| `@roackb2/heddle-adopter/testing` | Node-only loopback v1 fixture for local product/MCP integration tests |
+| `@roackb2/heddle-adopter/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@roackb2/heddle-adopter/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
 Non-TypeScript adopters can consume the published
@@ -45,8 +46,9 @@ The adopter still owns:
 - authenticating its users and mapping them to tenant, subject, and product
   session IDs;
 - deciding which product capabilities that identity may use;
-- production signing-key storage and rotation, route placement, and durable
-  invocation/replay records;
+- production signing-key storage and rotation, route placement, invocation-ID
+  allocation, the lifecycle-store implementation/schema/migrations, retention,
+  and history queries;
 - implementing and hosting product MCP tools against its own APIs and data;
 - choosing an AgentCore/SigV4 transport, applying results, and rendering UI.
 
@@ -105,7 +107,10 @@ taking product decisions away from the adopter:
 
 ```ts
 import { JoseExecutionAuthority } from '@roackb2/heddle-adopter/authority'
-import { HostedConversationTurnService } from '@roackb2/heddle-adopter/conversation'
+import {
+  DurableHostedConversationTurnService,
+  HostedConversationTurnService,
+} from '@roackb2/heddle-adopter/conversation'
 import {
   loadExecutionAuthorityKeyPairFromFile,
   NodeExecutionAdopterHttpService,
@@ -115,11 +120,15 @@ const authority = await JoseExecutionAuthority.create(
   authorityConfig,
   await loadExecutionAuthorityKeyPairFromFile(signingJwkPath),
 )
-const turns = new HostedConversationTurnService({
+const executionTurns = new HostedConversationTurnService({
   authority,
   executionHost,
   modelCredentials,
   mcp: { allowedTools: ['read_workspace_snapshot'] },
+})
+const turns = new DurableHostedConversationTurnService({
+  turns: executionTurns,
+  store: productPostgresTurnStore,
 })
 const hostedHttp = new NodeExecutionAdopterHttpService({
   authority,
@@ -134,6 +143,12 @@ if (hostedHttp.handle(request, response)) return
 `productAdmissionService` is intentionally product-owned: it maps an
 authenticated principal to authorized tenant, subject, product-session,
 Runtime-session, and invocation IDs before calling `turns.streamTurn(...)`.
+The durable wrapper owns persistence-before-event ordering, safe terminal
+projection, interruption semantics, and expiry reconciliation. The supplied
+store owns atomic database transitions and is certifiable through
+`HostedConversationTurnStoreConformance`.
+The normative behavior and cross-language scenarios are published in the
+[durable v1 lifecycle profile](spec/v1/durable-hosted-conversation-lifecycle.md).
 The Node service owns bounded JSON parsing, `Authorization` redaction, JWKS,
 SSE framing/backpressure, disconnect cancellation, safe failures, and graceful
 shutdown. Its individual `handleJwks` and `handleConversationTurn` methods are

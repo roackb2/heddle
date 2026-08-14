@@ -4,13 +4,49 @@ Heddle can run inside a product backend or behind a separate Execution Host.
 The agent loop is the same kind of runtime in both shapes; the deployment and
 trust boundaries are different.
 
+## Start with the workshop model
+
+Imagine that your product operates a workshop:
+
+- your **product backend is the front desk**: it knows the customer, decides
+  what they may request, owns the ledger, and presents the result;
+- the **Heddle adopter layer is the secure order and tracking system**: it
+  carries signed scope, submits work, enforces the durable lifecycle, and
+  reports one truthful terminal outcome;
+- the **Execution Host is the workshop building**: an isolated place where the
+  work runs without receiving keys to the product database;
+- the **Heddle runtime is the machinery and workers** inside that building:
+  models, tools, conversations, approvals, traces, artifacts, and workspace;
+  and
+- the product's **MCP endpoint is a controlled service window**: the workshop
+  can request only the product capabilities authorized for that invocation.
+
+```mermaid
+flowchart LR
+  user["Product user"] --> front["Front desk<br/>product auth, policy, IDs, UI"]
+  front --> order["Order and tracking<br/>adopter contract + durable lifecycle"]
+  order --> workshop["Workshop building<br/>compatible Execution Host"]
+  workshop --> machinery["Machinery and workers<br/>Heddle runtime"]
+  machinery --> window["Controlled service window<br/>scoped product MCP"]
+  window --> ledger["Product ledger<br/>APIs and database"]
+  ledger --> front
+```
+
+This model answers the most important ownership question. The product owns its
+record and database, but it should not reimplement a generic lifecycle state
+machine. Heddle defines **what** `requested`, `running`, terminal,
+interruption, and expiry mean and **when** each checkpoint must commit. The
+product supplies the atomic database adapter and decides **which** records a
+user may query and **how** the UI presents them.
+
 This distinction matters because three similar terms describe different
 things:
 
 - the **Heddle runtime** is the model, tool, conversation, approval, trace, and
   artifact machinery shipped by `@roackb2/heddle`;
 - **hosted runs** are public lifecycle utilities for addressable, reconnectable
-  runs inside an adopter-owned long-lived process;
+  runs inside an adopter-owned long-lived Node process, shipped at
+  `@roackb2/heddle/hosted`; and
 - a **Heddle Execution Host** is a separately deployed application that embeds
   the Heddle runtime and is invoked through a language-neutral network
   contract.
@@ -53,10 +89,30 @@ flowchart LR
 In the separate-host shape, only the Execution Host imports Heddle. The adopter
 backend can use any language that implements the published contract. It owns
 end-user authentication, authorization, tenant mapping, durable invocation
-identity, signing-key operations, product MCP behavior, result application,
-and product data. The Execution Host receives short-lived authority and the
-exact MCP capability selected for one invocation; it should not receive an
+identity, signing-key operations, product MCP behavior, the atomic lifecycle-
+store adapter/schema/migrations, history queries, retention, result
+application, and product data. The adopter lifecycle owns the generic state
+machine over that store. The Execution Host receives short-lived authority and
+the exact MCP capability selected for one invocation; it should not receive an
 adopter database credential.
+
+## Package relationships
+
+| Surface | Use it when | Important boundary |
+| --- | --- | --- |
+| `@roackb2/heddle` | Heddle runs inside a TypeScript/Node process | This is the supported runtime and SDK |
+| `@roackb2/heddle/hosted` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
+| `@roackb2/heddle-remote` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
+| `@roackb2/heddle-postgres` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is heartbeat-specific, not a general product DB or conversation-history adapter |
+| `@roackb2/heddle-adopter` | A product invokes a separate compatible Execution Host | TypeScript gets supported authority, transport, lifecycle, Node, and testing helpers; every backend can use the v1 artifacts |
+| v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |
+
+The embedded runtime promise and the separate-host portability promise are
+different. Heddle's maintained embedded runtime is TypeScript/Node. The
+separate-host v1 network and durable-lifecycle profiles are language-neutral.
+The checked-in Python implementation proves that a second language can conform;
+it is version-pinned reference material, not a published or supported Python
+SDK and not a promise to mirror every TypeScript convenience.
 
 ## Public availability
 
@@ -64,7 +120,7 @@ adopter database credential.
 | --- | --- | --- |
 | `@roackb2/heddle` and `/hosted` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@roackb2/heddle-remote` | Public | Browser-safe run protocol and optional HTTP/SSE client |
-| `@roackb2/heddle-adopter` | Public, experimental | TypeScript reference SDK plus canonical OpenAPI, JSON Schema, fixtures, and an independent Python v1 conformance proof |
+| `@roackb2/heddle-adopter` | Public, experimental | Supported TypeScript adopter helpers plus canonical OpenAPI, JSON Schema, wire/lifecycle fixtures, store conformance, and an independent Python v1 conformance proof |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |
 
@@ -83,4 +139,3 @@ not claim that a managed Heddle hosting product is available.
   [Execution Host adopter backend](execution-host-adopters.md).
 - Implement the network contract outside TypeScript:
   [v1 language-neutral specification](../../../packages/heddle-adopter/spec/v1/README.md).
-

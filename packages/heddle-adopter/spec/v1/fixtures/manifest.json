@@ -42,6 +42,12 @@
       "file": "authority.json",
       "kind": "authority",
       "expected": "valid"
+    },
+    {
+      "id": "durable-conversation-lifecycle",
+      "file": "durable-conversation-lifecycle.json",
+      "kind": "lifecycle",
+      "expected": "conformant"
     }
   ]
 }
