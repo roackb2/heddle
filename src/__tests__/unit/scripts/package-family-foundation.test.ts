@@ -9,18 +9,21 @@ import {
   assertExecutionHostClientManifest,
   createExecutionHostClientManifest,
 } from '../../../../scripts/verify-execution-host-client-package.mjs';
+import {
+  assertPostgresManifest,
+  createPostgresManifest,
+} from '../../../../scripts/verify-postgres-package.mjs';
 
 const rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
 
 const NODE_VERSION = '>=20';
 
 describe('v6 package-family foundation', () => {
-  it('keeps exactly four packages as private foundations', () => {
+  it('keeps exactly three packages as private foundations', () => {
     expect(PACKAGE_DEFINITIONS.map(({ name }) => name)).toEqual([
       '@heddleagent/runtime',
       '@heddleagent/cli',
       '@heddleagent/run-client',
-      '@heddleagent/postgres',
     ]);
   });
 
@@ -50,6 +53,58 @@ describe('v6 package-family foundation', () => {
     expect(() =>
       assertFoundationManifest(manifest, definition, NODE_VERSION),
     ).toThrow();
+  });
+});
+
+describe('@heddleagent/postgres activation', () => {
+  it('accepts the exact independently versioned stable manifest', () => {
+    const manifest = createPostgresManifest(rootPackage);
+
+    expect(() => assertPostgresManifest(manifest, rootPackage)).not.toThrow();
+  });
+
+  it.each([
+    ['wrong coordinate', { name: '@heddleagent/storage' }],
+    ['wrong version', { version: '0.0.0' }],
+    ['private package', { private: true }],
+    ['non-stable tag', {
+      publishConfig: {
+        access: 'public',
+        tag: 'next',
+        registry: 'https://registry.npmjs.org/',
+      },
+    }],
+    ['wrong repository', {
+      repository: {
+        ...createPostgresManifest(rootPackage).repository,
+        directory: 'packages/heddle-postgres',
+      },
+    }],
+    ['generic root export', {
+      exports: {
+        ...createPostgresManifest(rootPackage).exports,
+        '.': './dist/index.js',
+      },
+    }],
+    ['runtime dependency', {
+      dependencies: {
+        ...createPostgresManifest(rootPackage).dependencies,
+        '@heddleagent/runtime': '^6.0.0',
+      },
+    }],
+    ['unsupported adapter export', {
+      exports: {
+        ...createPostgresManifest(rootPackage).exports,
+        './heartbeat': './dist/heartbeat/index.js',
+      },
+    }],
+  ])('rejects an unsafe %s mutation', (_label, mutation) => {
+    const manifest = {
+      ...createPostgresManifest(rootPackage),
+      ...mutation,
+    };
+
+    expect(() => assertPostgresManifest(manifest, rootPackage)).toThrow();
   });
 });
 

@@ -31,6 +31,7 @@ from the last completed durable state.
 | Compaction archives | Locked, atomic local manifest append with immutable content | Async `ChatArchiveRepository`; one append owns exact messages, rolling summary, and manifest | Yes, with persistent `stateRoot` | Yes, with a scope-bound remote repository paired with the session repository | **Remote-ready** |
 | Normalized LLM usage | Stored with the owning session/turn metadata | Follows the conversation persistence capability | Yes | Yes with its conversation; product billing remains separate | **Conversation-owned metadata** |
 | Product catalog, transcript, and canonical result | Outside Heddle ownership | The host persists its user-facing view and domain result | Host-defined | Host-defined | **Host responsibility** for a truthful product success promise |
+| Execution Host invocation lifecycle | No implicit product table | `HostedConversationTurnLifecycleStore`; official PostgreSQL implementation at `@heddleagent/postgres/execution-host/conversations` | Yes with a durable adapter | Yes with the same scoped durable adapter | **Remote-ready generic lifecycle**, distinct from product history and result truth |
 | Result artifacts | Local catalog, text content, and current pointers | Synchronous `ArtifactRepository` | Yes, with the same artifact root | Not guaranteed; a custom synchronous store is not a remote-ready contract | **Host-replaceable, local-biased** |
 | Raw turn traces | Local files referenced by a local path | No general persistence port | Files survive on the same storage | No | **Local diagnostic evidence** |
 | Memory notes and maintenance | Workspace files and JSONL under the state root | No general persistence port | Yes | Only when the workspace itself is copied or mounted | **Workspace-local by design** |
@@ -54,9 +55,10 @@ write-back working copy, not the sole source of truth.
 
 “Repository” describes the domain contract, not a mandatory database choice.
 A transactional adapter commonly stores revisioned sessions and heartbeat
-authority in PostgreSQL. Products persist their invocation lifecycle in
-product-owned storage today; Heddle does not currently expose a public lifecycle
-repository. An object adapter can store immutable archive content, artifacts,
+authority in PostgreSQL. Heddle now exposes the generic Execution Host turn
+lifecycle port and its official PostgreSQL adapter; products retain their own
+history projection, canonical result, retention, and authenticated database
+composition. An object adapter can store immutable archive content, artifacts,
 uploads, or a selected domain checkpoint in S3 or another object store. A
 reviewed hybrid writes immutable content first and then commits the authoritative
 manifest/reference, so interruption can leave an orphan object but cannot

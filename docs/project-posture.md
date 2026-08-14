@@ -79,6 +79,11 @@ At the distribution boundary:
   with shared TypeScript/Python lifecycle fixtures. The former
   `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
   migration;
+- `@heddleagent/postgres/execution-host/conversations` is the official
+  PostgreSQL implementation of that lifecycle store port. It owns atomic SQL
+  fencing, constraints, ordered migrations, and real-database conformance;
+  adopters still own their pool, migration execution, authenticated scope,
+  retention, and product history/query model;
 - the current compatible Execution Host and AgentCore deployment are private
   research. Public docs may describe the contract and evidence goal but must
   not imply that Heddle distributes or operates that service.

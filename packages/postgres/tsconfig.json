@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "outDir": "./dist",
+    "paths": {
+      "@heddleagent/execution-host-client/conversation": [
+        "packages/execution-host-client/src/conversation/index.ts"
+      ],
+      "@heddleagent/execution-host-client/testing": [
+        "packages/execution-host-client/src/testing/index.ts"
+      ]
+    }
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "exclude": ["dist", "node_modules"]
+}

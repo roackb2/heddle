@@ -89,6 +89,7 @@ disconnect as implicit cancellation.
 | A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
 | A backend invoking a separately deployed Execution Host | `@heddleagent/execution-host-client` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
+| That backend needs the generic lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` plus the lifecycle service | [Execution Host adopter backend](execution-host-adopters.md) |
 
 The former `@roackb2/heddle-adopter@5.13.0` coordinate remains installable
 during migration.

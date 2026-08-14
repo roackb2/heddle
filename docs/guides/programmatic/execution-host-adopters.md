@@ -17,7 +17,7 @@ migration, but it does not include the durable lifecycle described below.
 ADOPTER BACKEND
   product authentication and authorization
   tenant / subject / product-session mapping
-  durable invocation identity + database adapter + result application
+  durable invocation identity + database/result application
           |
   @heddleagent/execution-host-client
   authority + v1 contracts + durable turn lifecycle + ExecutionHost port
@@ -87,6 +87,19 @@ Its subpaths separate responsibility:
 
 See the [package README](../../../packages/execution-host-client/README.md) for
 copyable code.
+
+TypeScript products using PostgreSQL can install the official atomic store
+instead of recreating its transition SQL:
+
+```bash
+npm install @heddleagent/postgres @heddleagent/execution-host-client drizzle-orm pg
+```
+
+Use `@heddleagent/postgres/execution-host/conversations`, apply its ordered SQL
+migrations through the product's normal migration system, and inject the
+resulting store into `DurableHostedConversationTurnService`. The product still
+owns its pool, authenticated scope, history queries, retention, and product
+result transaction.
 
 Backends outside TypeScript can use the versioned
 [OpenAPI, JSON Schema, and golden fixtures](../../../packages/execution-host-client/spec/v1/README.md)

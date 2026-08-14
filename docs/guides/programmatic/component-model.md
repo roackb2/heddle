@@ -36,8 +36,9 @@ This model answers the most important ownership question. The product owns its
 record and database, but it should not reimplement a generic lifecycle state
 machine. Heddle defines **what** `requested`, `running`, terminal,
 interruption, and expiry mean and **when** each checkpoint must commit. The
-product supplies the atomic database adapter and decides **which** records a
-user may query and **how** the UI presents them.
+product supplies the database and may use Heddle's official PostgreSQL adapter;
+it still decides **which** records a user may query and **how** the UI presents
+them.
 
 This distinction matters because three similar terms describe different
 things:
@@ -105,6 +106,7 @@ adopter database credential.
 | `@roackb2/heddle-remote` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
 | `@roackb2/heddle-postgres` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is heartbeat-specific, not a general product DB or conversation-history adapter |
 | `@heddleagent/execution-host-client` | A product invokes a separate compatible Execution Host | Authority, transport, turn orchestration, durable lifecycle semantics, Node helpers, and cross-language conformance |
+| `@heddleagent/postgres/execution-host/conversations` | That product stores the generic lifecycle in PostgreSQL | Official atomic store and ordered migrations; no product history/query policy or pool ownership |
 | v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |
 
 The embedded runtime promise and the separate-host portability promise are
@@ -121,6 +123,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 | `@roackb2/heddle` and `/hosted` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@roackb2/heddle-remote` | Public | Browser-safe run protocol and optional HTTP/SSE client |
 | `@heddleagent/execution-host-client` | Public | The canonical product-backend integration kit, including durable lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
+| `@heddleagent/postgres/execution-host/conversations` | Public | Official PostgreSQL lifecycle adapter over an adopter-managed database and migration process |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |
 
