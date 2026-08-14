@@ -1,0 +1,18 @@
+{
+  "name": "@heddleagent/run-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser-safe JavaScript protocol and transport clients for consuming Heddle runs",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/run-client"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  }
+}

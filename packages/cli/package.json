@@ -1,0 +1,21 @@
+{
+  "name": "@heddleagent/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Heddle coding-agent CLI, daemon, and local browser control-plane product",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

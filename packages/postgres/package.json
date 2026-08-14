@@ -1,0 +1,21 @@
+{
+  "name": "@heddleagent/postgres",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Official PostgreSQL adapters for selected Heddle-owned domain persistence ports",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/postgres"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
