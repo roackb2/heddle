@@ -191,7 +191,7 @@ Heddle 刻意不是一個完整 application framework：
 | Approvals | Request/resolution lifecycle 與 run integration | 誰能批准、approval policy 與 approval UI |
 | Active runs | Run ID、ordered sequence、bounded replay、cancellation 與 terminal settlement | Process lifetime、routing、draining 與 multi-process delivery |
 | Remote clients | Runtime envelope validation、cursor/duplicate/gap rule、terminal detection 與 reconnect calculation | Public payload schema、timer、UI state、retry UX 與 result presentation |
-| Persistence | File-backed 預設值與可注入的 session/artifact repository boundary | Production adapter、retention、encryption、backup、tenancy 與 product record |
+| Persistence | File-backed 預設值、可注入的 domain repository，以及 selected public port 的官方 adapter | Adapter 選擇與 wiring、retention、encryption、backup、tenancy 與 product record |
 | API 與 UI | 選用的 Node HTTP/SSE 與 browser transport mechanics | Server framework、route、auth、CORS、limit、error 與所有視覺決策 |
 
 完整的責任邊界請參考
@@ -212,6 +212,7 @@ mechanics 的最低層即可：
 | Remote browser 或 client | `@roackb2/heddle-remote` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
 | Backend 呼叫獨立 Execution Host | `@heddleagent/execution-host-client` | Contract、authority/JWKS、hosted-turn orchestration、durable requested/accepted/terminal persistence、product-MCP verification、provider-neutral client port、store conformance 與 TypeScript/Python fixture |
+| 以 PostgreSQL 保存 Execution Host lifecycle | `@heddleagent/postgres/execution-host/conversations` | Atomic scope fencing、由 adopter 執行的 ordered migration、SQL constraint、expiry 與 real-PostgreSQL conformance |
 | PostgreSQL heartbeat worker | `@roackb2/heddle-postgres` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
 | 更底層的 runtime 組裝 | `@roackb2/heddle/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 

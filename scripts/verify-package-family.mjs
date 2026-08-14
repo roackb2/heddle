@@ -6,6 +6,10 @@ import {
   EXECUTION_HOST_CLIENT_NAME,
   verifyExecutionHostClientPackage,
 } from './verify-execution-host-client-package.mjs';
+import {
+  POSTGRES_PACKAGE_NAME,
+  verifyPostgresPackage,
+} from './verify-postgres-package.mjs';
 
 const AUTHOR = 'Jay / Fienna Liang <roackb2@gmail.com>';
 const REPOSITORY_URL = 'git+https://github.com/roackb2/heddle.git';
@@ -37,14 +41,6 @@ export const PACKAGE_DEFINITIONS = [
     description:
       'Browser-safe JavaScript protocol and transport clients for consuming Heddle runs',
     node: false,
-    files: ['LICENSE', 'README.md', 'package.json'],
-  },
-  {
-    directory: 'postgres',
-    name: '@heddleagent/postgres',
-    description:
-      'Official PostgreSQL adapters for selected Heddle-owned domain persistence ports',
-    node: true,
     files: ['LICENSE', 'README.md', 'package.json'],
   },
 ];
@@ -130,10 +126,11 @@ export function verifyPackageFamily(
   }
 
   verifyExecutionHostClientPackage(repositoryUrl, { writeOutput: false });
+  verifyPostgresPackage(repositoryUrl, { writeOutput: false });
 
   const expectedPackageNames = PACKAGE_DEFINITIONS
     .map(({ name }) => name)
-    .concat(EXECUTION_HOST_CLIENT_NAME)
+    .concat(EXECUTION_HOST_CLIENT_NAME, POSTGRES_PACKAGE_NAME)
     .sort();
   const actualFoundationNames = readdirSync(
     new URL('packages/', repositoryUrl),
@@ -155,7 +152,7 @@ export function verifyPackageFamily(
   assert.deepEqual(
     actualFoundationNames,
     expectedPackageNames,
-    'The @heddleagent scope must contain exactly four private foundations and the activated Execution Host client.',
+    'The @heddleagent scope must contain exactly three private foundations and two activated packages.',
   );
 
   const legacyPackages = new Map([
@@ -179,7 +176,7 @@ export function verifyPackageFamily(
   }
 
   process.stdout.write(
-    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, one activated package, and ${legacyPackages.size} local v5 package identities.\n`,
+    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, two activated packages, and ${legacyPackages.size} local v5 package identities.\n`,
   );
 }
 

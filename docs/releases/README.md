@@ -27,10 +27,11 @@ For a user-facing release:
    lockstep, and the build fails when their versions diverge.
    The legacy `@roackb2/heddle-adopter` package is frozen at `5.13.0`; its
    source remains recoverable from that release tag and is not part of another
-   5.x release. Four private `@heddleagent/*` directories documented in
+   5.x release. Three private `@heddleagent/*` directories documented in
    [`packages/README.md`](../../packages/README.md) remain non-releaseable.
-   The activated Execution Host client uses the independent release lane
-   below and never inherits a root-package version implicitly.
+   The activated Execution Host client and PostgreSQL adapter family use
+   independent release lanes below and never inherit a root-package version
+   implicitly.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
@@ -121,6 +122,43 @@ Do not unpublish `@roackb2/heddle-adopter@5.13.0`; keep it available while
 consumers migrate. Use a package-specific
 `execution-host-client-v<version>` tag rather than a root `v<version>` tag for
 this independently versioned package.
+
+## PostgreSQL Adapter Release Lane
+
+`@heddleagent/postgres` is independently versioned and exports only adapters
+that have migrations and real-database conformance. Its stable releases use
+`latest` and package-specific `postgres-v<version>` tags. Do not bump the root,
+remote, legacy PostgreSQL, or private-foundation manifests for this package.
+
+Before review or publication, run:
+
+```bash
+npm whoami
+yarn package-family:verify
+yarn typecheck
+yarn lint
+HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test
+yarn postgres:pack:verify
+yarn postgres:release:verify
+npm publish ./packages/postgres --dry-run --access public --tag latest
+git diff --check
+```
+
+Apply the package's ordered migration to the explicit test database before the
+real-PostgreSQL test. The PR and publication workflows do this against a fresh
+PostgreSQL 17 service. The pack verifier allowlists the tarball, verifies every
+export and migration, and consumes the exact artifact from fresh JavaScript
+and strict TypeScript projects.
+
+The main-only publication job follows the Execution Host client's immutable
+version, annotated tag, exact-integrity, fresh-consumer, and GitHub release
+rules. For the first coordinate only, npm may require an operator-authenticated
+bootstrap from the exact verified tarball because trusted-publisher settings
+cannot be attached before the package exists. Afterward, configure repository
+`roackb2/heddle`, workflow `publish-packages.yml`, environment `npm-release`,
+then rerun the same main commit. Manual recovery uses
+`yarn postgres:publish:if-missing`; it fails unless the worktree is clean and
+the annotated package tag identifies `HEAD`.
 
 ## Fast Release Preflight
 
@@ -233,14 +271,14 @@ PostgreSQL package whose peer dependency requires that Heddle version:
 ```bash
 yarn remote:publish
 npm publish
-yarn postgres:publish
+yarn legacy-postgres:publish
 ```
 
 `yarn remote:publish` cleans, verifies, and compiles the remote package before
 invoking npm, so the operator cannot accidentally publish stale `dist` output.
-`yarn postgres:publish` verifies and builds the optional adapter against the
-same Heddle version before publication. Pass normal npm publish flags through
-these scripts when needed.
+`yarn legacy-postgres:publish` verifies and builds the v5 optional adapter
+against the same Heddle version before publication. Pass normal npm publish
+flags through these scripts when needed.
 
 This remains a manual operator step unless npm publication was explicitly
 delegated.

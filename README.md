@@ -200,7 +200,7 @@ YOUR PRODUCT
 | Approvals | Request/resolution lifecycle and run integration | Who may approve, approval policy, and approval UI |
 | Active runs | Run IDs, ordered sequences, bounded replay, cancellation, and terminal settlement | Process lifetime, routing, draining, and multi-process delivery |
 | Remote clients | Runtime envelope validation, cursor/duplicate/gap rules, terminal detection, and reconnect calculation | Public payload schemas, timers, UI state, retry UX, and result presentation |
-| Persistence | File-backed defaults and injectable session/archive/artifact repository boundaries | Production adapters, retention, encryption, backup, tenancy, and product records |
+| Persistence | File-backed defaults, injectable domain repositories, and official adapters for selected public ports | Adapter selection/wiring, retention, encryption, backup, tenancy, and product records |
 | API and UI | Optional Node HTTP/SSE and browser transport mechanics | Server framework, routes, auth, CORS, limits, errors, and every visual decision |
 
 The full ownership model lives in
@@ -221,6 +221,7 @@ that already owns the mechanics your host needs:
 | A remote browser or client | `@roackb2/heddle-remote` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
 | A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
+| Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
 | Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@roackb2/heddle/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 

@@ -112,7 +112,7 @@ coverage. To run the real database suite against a disposable database whose
 baseline migration is already applied:
 
 ```bash
-HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test
+HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn legacy-postgres:test
 ```
 
 The suite creates only random namespaces and removes their rows afterward. It

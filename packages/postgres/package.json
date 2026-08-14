@@ -1,11 +1,16 @@
 {
   "name": "@heddleagent/postgres",
-  "version": "0.0.0",
-  "private": true,
+  "version": "6.0.0",
   "description": "Official PostgreSQL adapters for selected Heddle-owned domain persistence ports",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/roackb2/heddle.git",
@@ -17,5 +22,32 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "exports": {
+    "./execution-host/conversations": {
+      "types": "./dist/execution-host/conversations/index.d.ts",
+      "import": "./dist/execution-host/conversations/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "execution-host",
+    "postgresql",
+    "drizzle",
+    "durability"
+  ],
+  "peerDependencies": {
+    "@heddleagent/execution-host-client": ">=6.0.0 <7",
+    "drizzle-orm": ">=0.45.2 <1"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.20"
   }
 }

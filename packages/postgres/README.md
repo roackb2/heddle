@@ -1,75 +1,101 @@
 # `@heddleagent/postgres`
 
-Status: **private package foundation; not published or installable**
+Official PostgreSQL implementations for selected, public Heddle-owned durable
+ports. Version `6.0.0` intentionally ships one adapter:
 
-This package will provide official PostgreSQL implementations for selected,
-public, Heddle-owned domain persistence ports. It replaces the heartbeat-only
-product description of `@roackb2/heddle-postgres`; it is not Heddle's universal
-persistence package, a product database, or a key-value abstraction.
+| Entrypoint | Domain contract | Status |
+| --- | --- | --- |
+| `@heddleagent/postgres/execution-host/conversations` | `HostedConversationTurnLifecycleStore` from `@heddleagent/execution-host-client/conversation` | Supported |
+
+There is no generic root storage provider. Conversation sessions, heartbeat,
+artifacts, memory, telemetry, product history, and active execution are not
+silently covered by this release.
+
+## Install
+
+Install the adapter with its domain contract, Drizzle, and one supported
+Drizzle PostgreSQL driver. For example, with `pg`:
+
+```bash
+npm install @heddleagent/postgres @heddleagent/execution-host-client drizzle-orm pg
+```
+
+## Execution Host conversation lifecycle
+
+```ts
+import { DurableHostedConversationTurnService } from
+  '@heddleagent/execution-host-client/conversation';
+import {
+  createPostgresHostedConversationTurnLifecycleStore,
+} from '@heddleagent/postgres/execution-host/conversations';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const database = drizzle(pool);
+const store = createPostgresHostedConversationTurnLifecycleStore({ database });
+
+const turns = new DurableHostedConversationTurnService({
+  turns: executionHostTurnRunner,
+  store,
+});
+```
+
+The example omits application composition. The product authenticates callers,
+derives tenant/subject/session scope on the server, owns its history queries
+and retention, and closes the pool during application shutdown.
 
 ## Ownership
 
-Each domain package owns its purpose-named, technology-neutral port, state
-machine, invariants, persistence codec, and adapter-agnostic conformance.
-`@heddleagent/postgres` owns concrete PostgreSQL implementations, their SQL
-schema and ordered migrations, transaction/isolation/fencing behavior, and
-real-PostgreSQL conformance. The adopter owns its PostgreSQL service and
-credentials, pool lifecycle, production migration execution, tenant
-derivation, backups, encryption, availability, retention choices, and
-product-specific tables and queries.
+The domain package owns lifecycle validation, requested/accepted/terminal
+ordering, safe terminal projection, expiry semantics, and the adapter-neutral
+conformance suite. This package owns the concrete SQL table, atomic row
+transitions, complete-scope fencing, database constraints, ordered migrations,
+and real-PostgreSQL certification.
 
-Adapters will accept a supported adopter-managed pool or database handle. They
-will never start a database, automatically run migrations at application
-startup, or infer trusted identity from caller input.
+The adopter owns:
 
-Planned entrypoints are purpose-qualified beneath the technology package:
+- its PostgreSQL service, credentials, pool lifecycle, backups, encryption,
+  availability, monitoring, and disaster recovery;
+- production migration execution through its normal migration system;
+- authenticated scope derivation and database access policy;
+- product tables, relationships, history queries, retention, billing, and UI;
+  and
+- reconciliation scheduling for expired open turns when its product promise
+  requires crash convergence.
 
-- `@heddleagent/postgres/conversations`;
-- `@heddleagent/postgres/heartbeat`; and
-- `@heddleagent/postgres/execution-host/conversations`.
+The adapter never starts a pool, runs migrations at runtime, accepts an
+adopter-selected table name, or persists activity, tool inputs/results, hidden
+reasoning, raw errors, credentials, assertions, traces, or workspace content.
 
-The exact exports remain unimplemented in this foundation. Domain packages do
-not depend on PostgreSQL; this adapter package depends one-way on the contracts
-it implements.
+## Migrations
 
-## What PostgreSQL does not cover
+The entrypoint exports `executionHostConversationPostgresMigrationSqlUrls` in
+strict application order. The same SQL files ship under:
 
-Heddle durability also includes immutable content, workspace continuity,
-memory, telemetry, secrets, and process coordination. They do not become
-PostgreSQL responsibilities merely because a database can retain bytes:
+```text
+migrations/execution-host/conversations/
+```
 
-- large archive content, artifacts, uploads, or selected checkpoints may use an
-  object-store adapter after their domains expose stable ports;
-- an ephemeral Execution Host may use a provider-managed session filesystem as
-  a continuity working copy, while canonical records and selected portable
-  checkpoints survive provider expiry separately;
-- logs, traces, metrics, and audit events belong in observability/audit sinks;
-- credentials and machine facts remain outside generic persistence; and
-- active execution needs a workflow/queue design, not another table adapter.
+Adopt those files into the application's reviewed migration process and apply
+them before constructing the store. Runtime startup deliberately performs no
+schema mutation. The first migration owns only
+`heddle.execution_host_conversation_turns` and its constraints/index.
 
-For a hybrid archive, immutable content is written before the authoritative SQL
-manifest/reference commits. A failed SQL commit may leave an orphan object, but
-the database must never publish a reference to missing content. The PostgreSQL
-package may coordinate that domain operation through an injected purpose-named
-content port; it must not import an S3 implementation or make S3 part of the
-conversation contract.
+## Correctness promise
 
-## Activation boundary
+- `invocation_id` is globally unique, so a duplicate request cannot execute
+  twice under another scope.
+- Accepted and terminal writes lock the invocation row and fence by tenant,
+  subject, and product-session scope.
+- Exact repeats are idempotent; conflicting, wrong-scope, pre-acceptance, or
+  late transitions fail atomically.
+- Scoped expiry can interrupt only expired `requested` or `running` rows and
+  cannot overwrite a terminal result.
+- SQL constraints independently enforce identifier, status, failure-code,
+  payload-size, acceptance, and terminal-shape invariants.
+- The package runs the canonical lifecycle conformance suite against a real
+  PostgreSQL service and independent pools.
 
-The live [durable-state inventory](../../docs/architecture/durable-state.md)
-and [adopter support matrix](../../docs/guides/programmatic/durability-support.md)
-describe Heddle's released persistence behavior. This private foundation does
-not change those support claims.
-
-The first public version must expose only implemented domain-specific
-entrypoints. Each exported adapter requires reviewed migrations, isolation and
-fencing tests, real-PostgreSQL conformance, restart/recovery evidence, and a
-README support table that matches the shipped exports. Mentioning a possible
-domain here does not make its adapter available.
-
-The current official implementation remains in
-`@roackb2/heddle-postgres` and covers heartbeat only. Activate this package
-only after its domain-specific entrypoints, dependency direction, migrations,
-and real-store conformance exist for every exported domain; do not expose a
-generic root provider first. See the [package-family boundary](../README.md)
-before changing this status.
+This adapter makes the generic lifecycle durable. It does not turn that table
+into a user-facing transcript or provide active-run replay/recovery.

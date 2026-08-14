@@ -110,6 +110,7 @@ jobs:
           --health-retries 20
     env:
       HEDDLE_POSTGRES_DATABASE_URL: postgresql://heddle:heddle@127.0.0.1:5432/heddle_reference
+      HEDDLE_POSTGRES_TEST_URL: postgresql://heddle:heddle@127.0.0.1:5432/heddle_reference
 
     steps:
       - name: Check out repository
@@ -124,8 +125,32 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Apply PostgreSQL lifecycle migration
+        run: >-
+          psql "$HEDDLE_POSTGRES_TEST_URL"
+          --set ON_ERROR_STOP=1
+          --file packages/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql
+
+      - name: Test PostgreSQL package
+        run: yarn postgres:test
+
+      - name: Verify packed PostgreSQL package
+        run: yarn postgres:pack:verify
+
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
+
+      - name: Set up release Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Pin release npm
+        run: npm install --global npm@12.0.2
+
+      - name: Verify PostgreSQL npm release state
+        run: node scripts/verify-postgres-pack.mjs --verify-registry
 
   test-execution-host-client:
     name: test-execution-host-client

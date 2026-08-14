@@ -99,6 +99,7 @@ storage contract. The current extension surface is:
 | Domain | Injected surface | I/O and consistency shape | Current remote posture |
 | --- | --- | --- | --- |
 | Conversations | `persistence.conversations`, containing `ChatSessionRepository` plus `ChatArchiveRepository` | Revisioned session CRUD/pagination plus atomic archive content/summary/manifest append | **Remote-ready as one capability** when the host binds both ports to the same authenticated scope and completes the readiness checks |
+| Execution Host conversation lifecycle | `HostedConversationTurnLifecycleStore` from `@heddleagent/execution-host-client/conversation` | Async requested/accepted/terminal transitions, full-scope fencing, exact-repeat idempotency, and scoped expiry | **Remote-ready lifecycle authority**; `@heddleagent/postgres/execution-host/conversations` is the official PostgreSQL adapter |
 | Artifacts | `ArtifactRepository` on the conversation engine | Synchronous catalog and text-content calls; no atomic catalog/content commit | **Host-replaceable**, not remote-ready |
 | Heartbeat | `HeartbeatTaskStore` passed to `runDueTasks` or `runLoop` | Async tasks/checkpoints/runs plus atomic execution claim, fenced completion/failure, and explicit interrupted-execution recovery; no distributed lease or multi-record transaction; built-in `start` constructs the file service | **Single-process recovery with the file adapter; host-replaceable scheduler primitive**, not a distributed durability promise |
 | MCP | `McpConfigStorePort`, `McpActivationStorePort`, and `McpCatalogStorePort` | Synchronous whole-document stores; activation/config authority differs from rebuildable discovery cache | **Host-replaceable for an in-process host**, not remote-ready |
@@ -114,9 +115,10 @@ serialized runtime directory:
    archives, heartbeat authority, and any future correctness-critical Heddle
    domain use their purpose-named repositories. A repository describes required
    scope, atomicity, fencing, and recovery; its concrete adapter may use
-   PostgreSQL, object storage, or a reviewed hybrid. Product-owned invocation
-   lifecycle truth must also commit before terminal success; Heddle does not
-   currently expose a public lifecycle repository for it.
+   PostgreSQL, object storage, or a reviewed hybrid. Execution Host invocation
+   lifecycle truth commits through Heddle's public lifecycle port before
+   terminal success; products may use the official PostgreSQL adapter while
+   retaining their database, authenticated scope, retention, and history view.
 2. **A session filesystem provides continuity, not authority.** A managed
    per-session filesystem can preserve source files, installed dependencies,
    local caches, and selected Heddle files across microVM stop/resume. If it can
@@ -150,7 +152,7 @@ files.
 | --- | --- |
 | Conversation session and compaction metadata | The paired conversation repositories; commonly a transactional database, with archive content optionally offloaded behind the archive contract |
 | Heartbeat authority | Its injected task store; an official PostgreSQL adapter exists today |
-| Hosted invocation lifecycle | Product-owned persistence today; Heddle has no public lifecycle repository yet |
+| Hosted invocation lifecycle | `HostedConversationTurnLifecycleStore`; officially implemented by `@heddleagent/postgres/execution-host/conversations` over the adopter's database |
 | Large immutable archive content, artifacts, uploads, and evidence | Object storage once the owning domain has a remote-ready content contract |
 | Heddle memory notes and maintenance records | The memory domain's workspace locally; for cross-version hosted recovery, a future memory-specific repository or portable memory checkpoint, commonly backed by object storage |
 | Workspace source files and build state | Per-session filesystem for continuity; an explicit workspace checkpoint only when cross-version recovery is a selected product promise |
@@ -173,9 +175,10 @@ the entire state root.
 Domain contracts use purpose names and remain with the package that owns their
 semantics. Concrete adapter packages use technology names because they ship
 technology-specific dependencies, migrations, limits, and operations. For
-example, `@heddleagent/postgres/conversations` may implement the purpose-named
-conversation capability, while a future `@heddleagent/s3/artifacts` may
-implement an artifact-content contract. See the
+example, `@heddleagent/postgres/execution-host/conversations` implements the
+hosted lifecycle port, a future `@heddleagent/postgres/conversations` may
+implement the paired runtime conversation capability, and a future
+`@heddleagent/s3/artifacts` may implement an artifact-content contract. See the
 [package-family naming rule](../../packages/README.md#naming-rule-purpose-for-contracts-technology-for-adapters).
 
 Do not introduce a universal `StorageProvider`. A database, object store,
