@@ -23,6 +23,7 @@ import {
   createExecutionHostClientReleaseMetadata,
   parseRegistryArtifactResult,
 } from './execution-host-client-release-state.mjs';
+import { parseNpmPackResult } from './execution-host-client-pack-result.mjs';
 
 const repositoryDirectory = fileURLToPath(new URL('../', import.meta.url));
 const packageDirectory = fileURLToPath(
@@ -69,7 +70,7 @@ try {
     ],
     repositoryDirectory,
   );
-  const [packed] = JSON.parse(pack.stdout);
+  const packed = parseNpmPackResult(pack.stdout, EXECUTION_HOST_CLIENT_NAME);
 
   assert.equal(packed.name, EXECUTION_HOST_CLIENT_NAME);
   assert.equal(packed.version, EXECUTION_HOST_CLIENT_VERSION);
