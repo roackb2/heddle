@@ -2,7 +2,7 @@
   "name": "@heddleagent/postgres",
   "version": "0.0.0",
   "private": true,
-  "description": "Official PostgreSQL adapters for supported Heddle-owned durable storage ports",
+  "description": "Official PostgreSQL adapters for selected Heddle-owned domain persistence ports",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
   "type": "module",

@@ -2,12 +2,14 @@
 
 Status: **v6 package foundation; no `@heddleagent/*` package is published yet**
 
-This directory records the approved v6 package identities and responsibility
+This directory records the initial v6 package identities and responsibility
 boundaries before code moves between artifacts. The current `@roackb2/*`
 packages remain the only installable and supported packages until a coordinated
-migration is built, verified, and released.
+migration is built, verified, and released. The adapter family is intentionally
+open-ended: owning the `@heddleagent` npm organization lets the project add a
+backend package later when a stable public port and real adopter need exist.
 
-## Planned v6 family
+## Initial v6 family
 
 | Package | Responsibility | Current source surface |
 | --- | --- | --- |
@@ -23,6 +25,37 @@ transport helpers will live under `@heddleagent/runtime/runs/http-sse`.
 Likewise, `@heddleagent/run-client/http-sse` is a subpath of the browser-safe
 client package.
 
+## Naming rule: purpose for contracts, technology for adapters
+
+Heddle names a domain contract after the behavior it guarantees and names a
+concrete adapter package after the technology it actually operates:
+
+| Layer | Naming style | Examples |
+| --- | --- | --- |
+| Domain capability or port | Purpose and semantics | `ConversationPersistence`, `ChatSessionRepository`, `HeartbeatTaskStore`, hosted conversation lifecycle |
+| Adapter package | Concrete backend or standard | `@heddleagent/postgres`; possible future `@heddleagent/s3` or `@heddleagent/opentelemetry` packages |
+| Adapter subpath | Domain purpose implemented with that backend | `@heddleagent/postgres/conversations`, `/heartbeat`, or `/execution-host/conversations` |
+
+Concrete implementation symbols are technology-qualified as well: for
+example, `ChatSessionRepository` can be implemented by
+`FileChatSessionRepository` or a future `PostgresChatSessionRepository`, while
+`HeartbeatTaskStore` is currently implemented by file and PostgreSQL task
+authorities. The port does not change when the backend changes.
+
+A package named `transactional-storage` would hide the database, driver,
+migration, and operational compatibility that adopters must choose. PostgreSQL,
+MySQL, SQLite, and a workflow engine do not become interchangeable merely
+because they can all store records. Conversely, a provider-neutral interface
+named `PostgresStore` would incorrectly leak one implementation into the
+domain. Purpose belongs at the port; technology belongs at the leaf adapter.
+
+Do not add a universal `@heddleagent/storage`, `@heddleagent/persistence`, or
+`@heddleagent/aws` implementation package. Runtime and Execution Host packages
+own their domain ports and conformance. Concrete leaf packages may implement
+selected ports without becoming the authority for unrelated state. A future
+adapter package is created only after its first supported entrypoints and
+acceptance tests are selected; speculative package skeletons are unnecessary.
+
 ## Dependency direction
 
 ```mermaid
@@ -36,6 +69,8 @@ flowchart LR
   host --> runtime
   postgres["@heddleagent/postgres"] -. "implements selected runtime ports" .-> runtime
   postgres -. "implements selected backend lifecycle ports" .-> hostClient
+  s3["possible future @heddleagent/s3"] -. "implements selected content/checkpoint ports" .-> runtime
+  otel["possible future @heddleagent/opentelemetry"] -. "exports telemetry signals" .-> runtime
 ```
 
 - `@heddleagent/cli` may depend on `@heddleagent/runtime`; the runtime never
@@ -46,6 +81,8 @@ flowchart LR
   contain the compatible Execution Host or import the runtime.
 - `@heddleagent/postgres` implements ports owned by their domain packages. No
   runtime or client package depends on PostgreSQL.
+- Future adapter packages follow the same one-way dependency rule. They are not
+  part of the initial release merely because their names appear in this design.
 
 ## Foundation rules
 
@@ -56,7 +93,7 @@ package name must not imply that an implementation or support promise exists.
 
 Run `yarn package-family:verify` to enforce all of the following:
 
-- exactly the five approved `@heddleagent/*` package identities exist;
+- exactly the five selected foundation identities for this PR exist;
 - all five remain private at version `0.0.0`;
 - no implementation, dependency, export, binary, or publish configuration has
   entered a foundation package;

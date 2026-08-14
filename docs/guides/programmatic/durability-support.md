@@ -7,6 +7,8 @@ the state required to keep that promise truthful.
 This guide is the adopter-facing support matrix. For implementation ownership,
 file behavior, corruption handling, and known atomicity/retention gaps, read the
 contributor-facing [durable-state inventory](../../architecture/durable-state.md).
+The [implementation tracker](../../architecture/durable-state-tracker.md)
+records which contracts and official adapters actually exist today.
 
 ## Promise Levels
 
@@ -27,6 +29,7 @@ from the last completed durable state.
 | --- | --- | --- | --- | --- | --- |
 | Conversation sessions | Atomic local catalog with immutable revision bodies | Async `ChatSessionRepository` with revisions, stable pagination, strict records, and conformance scenarios | Yes, with persistent `stateRoot` | Yes, with a scope-bound remote repository | **Remote-ready** |
 | Compaction archives | Locked, atomic local manifest append with immutable content | Async `ChatArchiveRepository`; one append owns exact messages, rolling summary, and manifest | Yes, with persistent `stateRoot` | Yes, with a scope-bound remote repository paired with the session repository | **Remote-ready** |
+| Normalized LLM usage | Stored with the owning session/turn metadata | Follows the conversation persistence capability | Yes | Yes with its conversation; product billing remains separate | **Conversation-owned metadata** |
 | Product catalog, transcript, and canonical result | Outside Heddle ownership | The host persists its user-facing view and domain result | Host-defined | Host-defined | **Host responsibility** for a truthful product success promise |
 | Result artifacts | Local catalog, text content, and current pointers | Synchronous `ArtifactRepository` | Yes, with the same artifact root | Not guaranteed; a custom synchronous store is not a remote-ready contract | **Host-replaceable, local-biased** |
 | Raw turn traces | Local files referenced by a local path | No general persistence port | Files survive on the same storage | No | **Local diagnostic evidence** |
@@ -39,7 +42,31 @@ from the last completed durable state.
 | Provider credentials and browser profiles | Protected machine files and browser user-data directories | Explicit credentials may be supplied per run | Yes, on the same machine | No; re-provision credentials and browser state deliberately | **Machine-local secret/session state** |
 | Runtime workspace and daemon catalogs | Absolute paths, local endpoint, PID, and liveness facts | No general persistence port | Yes, but liveness is re-evaluated | No; these records describe one machine | **Machine-local discovery** |
 | Logs, layout snapshots, browser evidence, and eval output | Local diagnostic files | Host-selected logging/diagnostic infrastructure | Files survive on the same storage | No Heddle portability promise | **Diagnostic** |
+| Privileged control-plane audit events | Structured local log plus optional hosted callback | Host-selected audit/SIEM sink | Host-defined | Host-defined | **Host operational responsibility** |
 | Active runs, SSE replay, cancellation, pending approvals, browser windows, and scheduler handles | In-memory coordination | No durable execution port | No | No | **Process-local** |
+
+## Execution Host continuity and canonical recovery
+
+An ephemeral Execution Host should use a per-session filesystem for convenient
+workspace continuity and domain repositories for long-lived correctness. A
+provider-managed filesystem that expires or resets on a runtime update is a
+write-back working copy, not the sole source of truth.
+
+“Repository” describes the domain contract, not a mandatory database choice.
+A transactional adapter commonly stores revisioned sessions, lifecycle, and
+heartbeat authority in PostgreSQL. An object adapter can store immutable
+archive content, artifacts, uploads, or a selected domain checkpoint in S3 or
+another object store. A reviewed hybrid writes immutable content first and then
+commits the authoritative manifest/reference, so interruption can leave an
+orphan object but cannot publish a pointer to missing content.
+
+Heddle memory is durable workspace knowledge rather than a conversation or
+billing record. Session storage may preserve its working files across ordinary
+stop/resume. Recovery after provider expiry or runtime replacement requires a
+future memory-specific repository or portable checkpoint with trusted scope,
+version, checksums, generation fencing, conflict policy, secret exclusion,
+retention, and deletion. Uploading at shutdown may reduce loss but cannot be the
+only checkpoint.
 
 ## Minimum Hosted Conversation Promise
 

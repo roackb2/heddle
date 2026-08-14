@@ -29,6 +29,11 @@ This package stays independent of `@heddleagent/runtime`; only the compatible
 Execution Host imports the runtime. Official storage adapters may implement
 its public lifecycle ports without moving product policy into Heddle.
 
+Execution Host filesystem continuity is also outside this client package. A
+provider-managed session volume may preserve a scoped working directory, but
+it does not replace the purpose-named invocation lifecycle store, product
+history, a domain-owned portable checkpoint, or durable in-flight execution.
+
 Planned entrypoints preserve the current capability boundaries for contracts,
 authority, conversation lifecycle, MCP, HTTP/SSE, Node helpers, testing, and
 versioned specification artifacts. The current implementation remains in

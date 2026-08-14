@@ -8,12 +8,15 @@ questions for each state surface:
 3. Which storage boundary can a programmatic host replace today?
 4. What corruption, atomicity, retention, or security constraints still apply?
 
-The inventory describes the post-`v5.1.0` implementation. Update it when adding
-a production writer, changing a persisted schema, or widening a repository
-contract.
+The inventory describes the `v5.13.0` implementation and the selected v6
+package-foundation posture. Update it when adding a production writer, changing
+a persisted schema, widening a repository contract, or selecting an official
+adapter.
 
 For the shorter adopter-facing decision guide, see the
 [durability support matrix](../guides/programmatic/durability-support.md).
+For the current implementation status and exact next gate for every surface,
+see the [durable-state implementation tracker](durable-state-tracker.md).
 
 ## Terms
 
@@ -36,10 +39,35 @@ The labels in this document are deliberately narrower than "persistent":
   product recovery state.
 - **Process-local**: coordination held only in memory. Losing it interrupts the
   operation even when related durable records remain.
+- **Continuity storage**: a filesystem or cache that preserves convenient warm
+  state across an executor restart but can expire or reset. It is not canonical
+  durability unless the product promise explicitly accepts those limits.
+- **Canonical durable state**: the authoritative committed record from which a
+  new host, runtime version, or provider can recover. It has explicit scope,
+  concurrency, integrity, deletion, retention, and migration semantics.
+- **Portable checkpoint**: a versioned, integrity-checked serialization of one
+  selected domain. A checkpoint is not a safe replay of active processes,
+  pending approvals, sockets, locks, or other execution coordination.
 
 "Host replacement" below means a new process on a different machine or
 ephemeral replica without the old local filesystem. A shared volume counts as
 the same storage, not as remote portability.
+
+## Physical layout is not a persistence boundary
+
+`stateRoot` is the default local composition directory, not a promise that all
+files beneath it share one lifecycle or may be copied together. It currently
+co-locates canonical conversation records, workspace knowledge, security
+policy, caches, diagnostics, machine facts, and process-adjacent files. Physical
+co-location does not erase their different authority, privacy, retention, or
+restore rules.
+
+For local and single-host use, a durable filesystem can preserve the complete
+configured state root. For hosted or replaceable executors, persist each
+correctness-critical domain through its public repository, use a session
+filesystem only for continuity, and serialize only an explicitly allowlisted
+domain when no remote-ready repository exists. Never treat a recursive upload
+of `.heddle` as a provider-neutral recovery protocol.
 
 ## Lifecycle Matrix
 
@@ -47,6 +75,7 @@ the same storage, not as remote portability.
 | --- | --- | --- | --- | --- | --- |
 | Conversation sessions | **Remote-ready** | Reloaded from the repository | Survives; expired fenced leases can be reclaimed | Survives when the host supplies the same remote repository and authenticated scope with atomic revision compare-and-set | Session delete is revision-checked; default files retain superseded and interrupted revision bodies |
 | Conversation archives | **Remote-ready** | Reloaded through the session manifest | Survives | Survives when the host supplies the same remote archive repository and scope | Append-only today; default files can retain orphan content and have no archive GC policy |
+| Normalized LLM usage | **Conversation-owned persisted metadata** | Reloaded with the latest persisted session request and turn summary | Survives with its owning conversation | Follows the configured conversation repository; it is not a billing ledger | Session deletion follows conversation behavior; product pricing, budgets, billing retention, and analytics remain outside Heddle |
 | Result artifacts | **Host-replaceable** | Reloaded from catalog and content keys | Survives with the same artifact root | Only if a custom synchronous repository reaches shared storage; not a remote-ready promise | No public delete, retention, or orphan cleanup contract |
 | Raw turn traces | **Workspace-local diagnostic** | Existing trace files remain | Survives | Does not follow the session unless state storage is shared or copied | No retention or GC policy; session summaries can retain a local-only `traceFile` locator |
 | Memory notes and maintenance records | **Workspace-local** | Reloaded from `.heddle/memory` | Survives | Only when the workspace files are mounted, copied, or intentionally synchronized | Human-editable notes plus append-only maintenance JSONL; no general retention policy |
@@ -61,6 +90,7 @@ the same storage, not as remote portability.
 | Provider credentials | **Machine-local secret store** | Server-side store is unaffected | Survives with mode `0600` | Must be re-provisioned or supplied explicitly; never migrate through generic state sync | Per-provider removal exists; malformed storage fails to an empty store |
 | Session image uploads | **Workspace-local input files** | Existing absolute paths remain usable on the same host | Survives | Does not follow a remote session unless separately copied | No session-delete cascade or retention policy today |
 | Logs, layout snapshots, browser evidence, and eval output | **Diagnostic** | Files remain, but are not UI recovery state | Files survive | No portability contract | Eval output has explicit cleanup; other diagnostics have no shared retention policy |
+| Privileged control-plane audit events | **Host-sink operational evidence** | Not a browser recovery source | Local structured logs survive only with the configured log destination | The hosted access-control callback can append to a product/SIEM-owned sink | The host owns retention, redaction, immutability, export, and deletion policy |
 | Active runs, replay buffers, subscribers, pending approvals, browser windows, and scheduler handles | **Process-local** | Browser clients can reconnect only while the owning server still has the run | Lost and treated as interrupted | Lost | Removed when the process/run closes; there is no durable in-flight recovery |
 
 ## Current Extension Surfaces
@@ -76,6 +106,81 @@ storage contract. The current extension surface is:
 | MCP | `McpConfigStorePort`, `McpActivationStorePort`, and `McpCatalogStorePort` | Synchronous whole-document stores; activation/config authority differs from rebuildable discovery cache | **Host-replaceable for an in-process host**, not remote-ready |
 | Skill activation | `AgentSkillActivationStorePort` | Synchronous consent metadata containing source paths | **Host-replaceable for an in-process host**, not portable skill storage |
 | All other rows | No general injected persistence port | Domain-specific files, diagnostics, secrets, or process coordination | Local/machine/process semantics remain authoritative |
+
+## Hosted Execution Host strategy
+
+A replaceable Execution Host needs several persistence mechanisms, not one
+serialized runtime directory:
+
+1. **Canonical domain records commit continuously.** Conversation sessions,
+   archives, hosted invocation lifecycle, heartbeat authority, and any future
+   correctness-critical domain use their purpose-named repositories. A
+   repository describes required scope, atomicity, fencing, and recovery; its
+   concrete adapter may use PostgreSQL, object storage, or a reviewed hybrid.
+2. **A session filesystem provides continuity, not authority.** A managed
+   per-session filesystem can preserve source files, installed dependencies,
+   local caches, and selected Heddle files across microVM stop/resume. If it can
+   expire or reset on a runtime update, every long-lived promise still needs a
+   canonical repository or portable checkpoint.
+3. **Portable checkpoints serialize one allowlisted domain.** A safe object-
+   storage checkpoint uses immutable content plus a small compare-and-swap
+   manifest containing trusted scope, schema/runtime version, generation,
+   checksums, encryption metadata, and committed time. It commits periodically
+   or at an explicit domain boundary; termination-time upload is only best-
+   effort cleanup.
+4. **Telemetry streams to an observability sink.** Logs, metrics, traces, and
+   audit events are emitted during execution. They are not restored into a new
+   agent process and do not belong in a workspace checkpoint.
+5. **In-flight execution requires orchestration.** Persisting files or status
+   rows does not make model calls, tool side effects, pending approvals,
+   cancellation handles, or replay buffers safely resumable. That promise needs
+   a separately selected workflow/queue design with idempotency and fencing.
+
+The default hosted recovery order is therefore: establish verified identity,
+load canonical records, hydrate any selected checkpoint into an empty scoped
+workspace, start new process-local coordination, and report any lost prior
+execution as interrupted. Never reanimate an active run from copied process
+files.
+
+### Where “Heddle state” persists
+
+“Heddle state” is a physical shorthand, not an ownership boundary:
+
+| State | Canonical hosted home |
+| --- | --- |
+| Conversation session and compaction metadata | The paired conversation repositories; commonly a transactional database, with archive content optionally offloaded behind the archive contract |
+| Hosted invocation lifecycle and heartbeat authority | A transactional/fenced store such as PostgreSQL |
+| Large immutable archive content, artifacts, uploads, and evidence | Object storage once the owning domain has a remote-ready content contract |
+| Heddle memory notes and maintenance records | The memory domain's workspace locally; for cross-version hosted recovery, a future memory-specific repository or portable memory checkpoint, commonly backed by object storage |
+| Workspace source files and build state | Per-session filesystem for continuity; an explicit workspace checkpoint only when cross-version recovery is a selected product promise |
+| Usage metadata | The owning conversation record; product billing or budget ledgers remain product-owned |
+| Logs, metrics, traces, and audit | OpenTelemetry/log/audit sinks selected by the host |
+| Credentials and browser profiles | Re-provisioned secret/session systems; never a generic state snapshot |
+| Active runs and approvals | Process-local today; a future workflow capability rather than a repository adapter |
+
+For memory specifically, a session filesystem may act as a write-back working
+copy. A durable hosted implementation must still hydrate from and checkpoint to
+a memory-owned canonical source before the provider's retention or runtime-
+version boundary. Because memory is human-editable knowledge with catalogs,
+notes, append-only maintenance events, and locks, its future contract must
+define single-writer/CAS behavior, conflict handling, deletion, and secret
+exclusion. It must not reuse the conversation repository or blindly snapshot
+the entire state root.
+
+### Package boundary
+
+Domain contracts use purpose names and remain with the package that owns their
+semantics. Concrete adapter packages use technology names because they ship
+technology-specific dependencies, migrations, limits, and operations. For
+example, `@heddleagent/postgres/conversations` may implement the purpose-named
+conversation capability, while a future `@heddleagent/s3/artifacts` may
+implement an artifact-content contract. See the
+[package-family naming rule](../../packages/README.md#naming-rule-purpose-for-contracts-technology-for-adapters).
+
+Do not introduce a universal `StorageProvider`. A database, object store,
+session filesystem, observability backend, secret manager, and workflow engine
+solve different consistency and lifecycle problems even when all can retain
+bytes.
 
 ## Remote-Ready Conversation State
 
@@ -168,10 +273,11 @@ Important gaps in the current file implementation:
 - there is no delete, retention, garbage-collection, large-blob, or streaming
   contract.
 
-Artifacts are the strongest candidate for the next focused storage boundary.
+If artifact portability is selected, it needs its own focused storage boundary.
 That work should define asynchronous metadata and content operations, opaque
 stable addresses, commit/current-pointer atomicity, and cleanup semantics. It
-should not introduce a universal storage provider shared by unrelated domains.
+must not be smuggled into the active memory-portability design or introduce a
+universal storage provider shared by unrelated domains.
 
 ## Workspace-Local Product State
 
@@ -185,9 +291,19 @@ a transcript or application database.
 Maintenance combines an in-process queue with an exclusive lock file. Invalid
 JSONL entries are skipped during tolerant reads, and a process failure may leave
 pending candidates or a lock until stale-lock recovery. Memory explicitly must
-not contain credentials or secrets. Remote knowledge synchronization, if ever
-needed, should be a separate product boundary with conflict and authority rules;
-it should not be inferred from the conversation repository contract.
+not contain credentials or secrets. The selected portable-memory design must be
+a separate domain boundary with conflict and authority rules; it must not be
+inferred from the conversation repository contract.
+
+For an ephemeral Execution Host, provider-managed session storage can preserve
+the working memory directory across ordinary stop/resume, but it remains a
+continuity layer if the provider can expire it or reset it on a runtime update.
+Longer-lived recovery should use a memory-specific repository or checkpoint:
+write an immutable, scoped revision; atomically advance a generation manifest;
+and restore only after validating its schema, scope, checksums, and runtime
+compatibility. Checkpoint after selected memory maintenance boundaries and
+periodically for long sessions. A shutdown checkpoint may reduce loss, but must
+not be the sole commit path.
 
 ### Approval policy and project configuration
 
@@ -349,6 +465,22 @@ discovery data and must not be replicated.
   and gitignored reports under `evals/results` by default. The eval cleanup
   command owns deletion. These are developer-tool outputs, not runtime state.
 
+### Telemetry export
+
+Heddle's normalized LLM usage contract retains provider/model attribution,
+token/cache/reasoning categories, request counts, and provider-reported cost
+when available. The conversation domain persists the request usage needed to
+explain a completed turn. It does not own pricing tables, tenant budgets,
+billing enforcement, or a product analytics ledger.
+
+Privileged control-plane operations also emit bounded audit events through an
+optional hosted access-control callback. The host may route those events and
+runtime logs, traces, and metrics through OpenTelemetry, CloudWatch, a SIEM, or
+another operational backend. An official telemetry integration should export
+signals continuously, preserve redaction and bounded-cardinality rules, and
+avoid adding an observability backend to the recovery path. It is a technology
+adapter, not a `StorageProvider`, and no official exporter package exists yet.
+
 ## Process-Local Coordination
 
 [`ConversationRunService`](../../src/core/chat/runs/service.ts) owns active runs,
@@ -382,25 +514,31 @@ with the same level of reasoning.
 
 ## Ranked Follow-Up
 
-1. **Keep the adopter support matrix current.** The
+1. **Keep the implementation tracker current.** Update the
+   [tracker](durable-state-tracker.md), this inventory, and the adopter
    [durability support matrix](../guides/programmatic/durability-support.md)
-   now distinguishes local, completed-conversation, and durable in-flight
-   promises. Update it whenever an extension surface or support level changes.
-2. **Design the artifact boundary only if the next host needs it.** Define an
+   together whenever a contract, official adapter, or selected next gate
+   changes. Merge is not implementation; record code, adapter, release, and
+   deployed recovery evidence separately.
+2. **Design portable memory recovery before promising it.** Define the memory-
+   specific authority, snapshot/repository shape, CAS/conflict behavior,
+   encryption, retention, deletion, and cold-start hydration contract. Use a
+   provider session filesystem as continuity and a canonical checkpoint for
+   recovery beyond provider expiry or runtime-version replacement.
+3. **Design the artifact boundary only if the next host needs it.** Define an
    asynchronous metadata/content split, stable opaque addresses, atomic content
    plus current-pointer semantics, size/streaming limits, and explicit deletion
    and orphan cleanup. Add an adapter only against that domain contract.
-3. **Harden local writers by domain and risk.** Use atomic replacement,
+4. **Harden local writers by domain and risk.** Use atomic replacement,
    domain-appropriate locks, and explicit corruption behavior for state whose
    concurrent loss changes user-visible truth. Do not hide this work behind a
    generic file repository wrapper.
-4. **Specify trace semantics before trace portability.** Decide event ordering,
+5. **Specify trace semantics before trace portability.** Decide event ordering,
    redaction, partial-run visibility, retention, session linkage, and stable
    addressing before creating a trace port.
-5. **Keep machine/security state local.** Credentials, browser profiles,
+6. **Keep machine/security state local.** Credentials, browser profiles,
    daemon discovery, and absolute-path workspace catalogs should remain outside
-   general remote persistence. Memory synchronization also requires its own
-   authority/conflict design rather than reuse of the session repository.
+   general remote persistence.
 
 The result is intentionally several domain-owned storage boundaries, not one
 universal persistence abstraction.

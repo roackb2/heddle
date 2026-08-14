@@ -47,7 +47,7 @@ export const PACKAGE_DEFINITIONS = [
     directory: 'postgres',
     name: '@heddleagent/postgres',
     description:
-      'Official PostgreSQL adapters for supported Heddle-owned durable storage ports',
+      'Official PostgreSQL adapters for selected Heddle-owned domain persistence ports',
     node: true,
     files: [
       'LICENSE',
@@ -58,20 +58,316 @@ export const PACKAGE_DEFINITIONS = [
   },
 ];
 
-export const DURABLE_PORT_REQUIREMENTS = [
-  { id: 'conversation-sessions', status: 'launch-required' },
-  { id: 'conversation-archives', status: 'launch-required' },
-  { id: 'heartbeat-task-authority', status: 'launch-required' },
+export const POSTGRES_ADAPTER_REQUIREMENTS = [
+  {
+    id: 'conversation-sessions',
+    portContracts: ['ChatSessionRepository'],
+    launchPolicy: 'required',
+    implementationStatus: 'planned',
+  },
+  {
+    id: 'conversation-archives',
+    portContracts: ['ChatArchiveRepository'],
+    launchPolicy: 'required',
+    implementationStatus: 'planned',
+  },
+  {
+    id: 'heartbeat-task-authority',
+    portContracts: ['HeartbeatTaskStore', 'HeartbeatTargetedTaskStore'],
+    launchPolicy: 'required',
+    implementationStatus: 'existing-v5',
+  },
   {
     id: 'execution-host-conversation-lifecycle',
-    status: 'launch-required',
+    portContracts: ['HostedConversationTurnLifecycleStore'],
+    launchPolicy: 'required',
+    implementationStatus: 'blocked-on-domain-port',
   },
-  { id: 'result-artifacts', status: 'excluded' },
-  { id: 'standalone-heartbeat-checkpoint', status: 'excluded' },
-  { id: 'agent-skill-activation', status: 'excluded' },
-  { id: 'mcp-workspace-stores', status: 'excluded' },
-  { id: 'active-run-coordination', status: 'excluded' },
-  { id: 'local-machine-sensitive-state', status: 'excluded' },
+  {
+    id: 'result-artifacts',
+    portContracts: ['ArtifactRepository'],
+    launchPolicy: 'deferred',
+    implementationStatus: 'unavailable',
+  },
+  {
+    id: 'standalone-heartbeat-checkpoint',
+    portContracts: ['HeartbeatCheckpointStore'],
+    launchPolicy: 'deferred',
+    implementationStatus: 'unavailable',
+  },
+  {
+    id: 'agent-skill-activation',
+    portContracts: ['AgentSkillActivationStorePort'],
+    launchPolicy: 'not-planned',
+    implementationStatus: 'unavailable',
+  },
+  {
+    id: 'mcp-config',
+    portContracts: ['McpConfigStorePort'],
+    launchPolicy: 'not-planned',
+    implementationStatus: 'unavailable',
+  },
+  {
+    id: 'mcp-activation',
+    portContracts: ['McpActivationStorePort'],
+    launchPolicy: 'not-planned',
+    implementationStatus: 'unavailable',
+  },
+  {
+    id: 'mcp-discovery-catalog',
+    portContracts: ['McpCatalogStorePort'],
+    launchPolicy: 'not-planned',
+    implementationStatus: 'unavailable',
+  },
+];
+
+const POSTGRES_ADAPTER_STATUS_VALUES = {
+  launchPolicy: new Set(['required', 'deferred', 'not-planned']),
+  implementationStatus: new Set([
+    'existing-v5',
+    'planned',
+    'blocked-on-domain-port',
+    'unavailable',
+  ]),
+};
+
+const DURABLE_STATE_STATUS_VALUES = {
+  stateClass: new Set([
+    'canonical',
+    'continuity',
+    'diagnostic',
+    'coordination',
+    'secret',
+    'accounting',
+    'audit',
+  ]),
+  backendClass: new Set([
+    'remote-ready',
+    'host-replaceable',
+    'workspace-local',
+    'machine-local',
+    'process-local',
+    'none',
+    'embedded',
+    'host-sink',
+    'external',
+  ]),
+  contractStatus: new Set([
+    'public-port',
+    'public-data',
+    'internal-port',
+    'no-port',
+    'proposed-port',
+    'external',
+  ]),
+  officialAdapterStatus: new Set([
+    'available',
+    'selected-not-implemented',
+    'not-selected',
+    'not-applicable',
+  ]),
+};
+
+export const DURABLE_STATE_SURFACE_REQUIREMENTS = [
+  {
+    id: 'conversation-sessions',
+    stateClass: 'canonical',
+    backendClass: 'remote-ready',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'selected-not-implemented',
+    postgresDecisionId: 'conversation-sessions',
+  },
+  {
+    id: 'conversation-archives',
+    stateClass: 'canonical',
+    backendClass: 'remote-ready',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'selected-not-implemented',
+    postgresDecisionId: 'conversation-archives',
+  },
+  {
+    id: 'result-artifacts',
+    stateClass: 'canonical',
+    backendClass: 'host-replaceable',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'result-artifacts',
+  },
+  {
+    id: 'raw-turn-traces',
+    stateClass: 'diagnostic',
+    backendClass: 'workspace-local',
+    contractStatus: 'public-data',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'memory-notes-maintenance',
+    stateClass: 'canonical',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'remembered-approvals',
+    stateClass: 'canonical',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'project-config',
+    stateClass: 'canonical',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'mcp-config',
+    stateClass: 'canonical',
+    backendClass: 'host-replaceable',
+    contractStatus: 'internal-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'mcp-config',
+  },
+  {
+    id: 'mcp-activation',
+    stateClass: 'canonical',
+    backendClass: 'host-replaceable',
+    contractStatus: 'internal-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'mcp-activation',
+  },
+  {
+    id: 'mcp-discovery-catalog',
+    stateClass: 'continuity',
+    backendClass: 'host-replaceable',
+    contractStatus: 'internal-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'mcp-discovery-catalog',
+  },
+  {
+    id: 'agent-skill-activation',
+    stateClass: 'canonical',
+    backendClass: 'host-replaceable',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'agent-skill-activation',
+  },
+  {
+    id: 'custom-agent-definitions',
+    stateClass: 'canonical',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'heartbeat-task-authority',
+    stateClass: 'canonical',
+    backendClass: 'host-replaceable',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'available',
+    postgresDecisionId: 'heartbeat-task-authority',
+  },
+  {
+    id: 'standalone-heartbeat-checkpoint',
+    stateClass: 'continuity',
+    backendClass: 'host-replaceable',
+    contractStatus: 'public-port',
+    officialAdapterStatus: 'not-selected',
+    postgresDecisionId: 'standalone-heartbeat-checkpoint',
+  },
+  {
+    id: 'browser-settings-profiles',
+    stateClass: 'secret',
+    backendClass: 'machine-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'runtime-workspace-catalog',
+    stateClass: 'continuity',
+    backendClass: 'machine-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'daemon-registry',
+    stateClass: 'continuity',
+    backendClass: 'machine-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'provider-credentials',
+    stateClass: 'secret',
+    backendClass: 'machine-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'session-image-uploads',
+    stateClass: 'canonical',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'diagnostic-output',
+    stateClass: 'diagnostic',
+    backendClass: 'workspace-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'active-run-coordination',
+    stateClass: 'coordination',
+    backendClass: 'process-local',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'execution-host-conversation-lifecycle',
+    stateClass: 'canonical',
+    backendClass: 'none',
+    contractStatus: 'proposed-port',
+    officialAdapterStatus: 'selected-not-implemented',
+    postgresDecisionId: 'execution-host-conversation-lifecycle',
+  },
+  {
+    id: 'workspace-continuity-checkpoints',
+    stateClass: 'continuity',
+    backendClass: 'none',
+    contractStatus: 'no-port',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'normalized-llm-usage',
+    stateClass: 'accounting',
+    backendClass: 'embedded',
+    contractStatus: 'public-data',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'control-plane-audit-events',
+    stateClass: 'audit',
+    backendClass: 'host-sink',
+    contractStatus: 'public-data',
+    officialAdapterStatus: 'not-applicable',
+  },
+  {
+    id: 'telemetry-events',
+    stateClass: 'diagnostic',
+    backendClass: 'host-sink',
+    contractStatus: 'public-data',
+    officialAdapterStatus: 'not-selected',
+  },
+  {
+    id: 'product-canonical-truth',
+    stateClass: 'canonical',
+    backendClass: 'external',
+    contractStatus: 'external',
+    officialAdapterStatus: 'not-applicable',
+  },
 ];
 
 export function createFoundationManifest(definition, nodeVersion) {
@@ -111,8 +407,18 @@ export function assertFoundationManifest(
 export function assertDurablePortInventory(inventory) {
   assert.equal(
     inventory.schemaVersion,
-    1,
-    'The durable-port inventory must use schema version 1.',
+    2,
+    'The durable-port inventory must use schema version 2.',
+  );
+  assert.equal(
+    inventory.adapterPackage,
+    '@heddleagent/postgres',
+    'The durable-port inventory must name the concrete adapter package.',
+  );
+  assert.equal(
+    inventory.productionMigrationExecutionOwner,
+    'adopter',
+    'Production migration execution must remain adopter-owned.',
   );
   assert.ok(
     Array.isArray(inventory.ports),
@@ -120,7 +426,10 @@ export function assertDurablePortInventory(inventory) {
   );
 
   const expectedRequirements = new Map(
-    DURABLE_PORT_REQUIREMENTS.map(({ id, status }) => [id, status]),
+    POSTGRES_ADAPTER_REQUIREMENTS.map((requirement) => [
+      requirement.id,
+      requirement,
+    ]),
   );
   const actualIds = inventory.ports.map(({ id }) => id);
   assert.equal(
@@ -131,34 +440,73 @@ export function assertDurablePortInventory(inventory) {
   assert.deepEqual(
     [...actualIds].sort(),
     [...expectedRequirements.keys()].sort(),
-    'The durable-port inventory must contain exactly the reviewed Heddle state surfaces.',
+    'The durable-port inventory must contain exactly the reviewed Heddle durable ports.',
   );
 
   for (const port of inventory.ports) {
-    const expectedStatus = expectedRequirements.get(port.id);
-    assert.equal(
-      port.v6Status,
-      expectedStatus,
-      `${port.id} must retain its reviewed v6 launch status.`,
+    const expected = expectedRequirements.get(port.id);
+
+    for (const field of ['launchPolicy', 'implementationStatus']) {
+      assert.ok(
+        POSTGRES_ADAPTER_STATUS_VALUES[field].has(port[field]),
+        `${port.id}.${field} must use an approved status.`,
+      );
+      assert.equal(
+        port[field],
+        expected[field],
+        `${port.id}.${field} must retain its reviewed status.`,
+      );
+    }
+
+    assertUniqueNonEmptyStringArray(
+      port.portContracts,
+      `${port.id}.portContracts`,
+    );
+    for (const contract of port.portContracts) {
+      assert.doesNotMatch(
+        contract,
+        /postgres|sql|drizzle/i,
+        `${port.id}.portContracts must remain technology-neutral domain contracts.`,
+      );
+    }
+    assert.deepEqual(
+      port.portContracts,
+      expected.portContracts,
+      `${port.id}.portContracts must retain the reviewed domain contracts.`,
     );
 
     for (const field of [
-      'contract',
-      'ownerPackage',
+      'portOwnerPackage',
       'currentEvidence',
       'publicSurface',
       'currentAdapter',
       'consistency',
-      'migrationOwner',
+      'implementationGate',
     ]) {
       assertNonEmptyString(port[field], `${port.id}.${field}`);
     }
+    assert.notEqual(
+      port.portOwnerPackage,
+      inventory.adapterPackage,
+      `${port.id}.portOwnerPackage must identify the domain package rather than the PostgreSQL adapter package.`,
+    );
 
-    if (port.v6Status === 'launch-required') {
+    if (port.launchPolicy === 'required') {
       assertNonEmptyString(port.conformance, `${port.id}.conformance`);
       assertNonEmptyString(
-        port.implementationGate,
-        `${port.id}.implementationGate`,
+        port.plannedAdapterEntryPoint,
+        `${port.id}.plannedAdapterEntryPoint`,
+      );
+      assert.ok(
+        port.plannedAdapterEntryPoint.startsWith(
+          `${inventory.adapterPackage}/`,
+        ),
+        `${port.id}.plannedAdapterEntryPoint must start with ${inventory.adapterPackage}/.`,
+      );
+      assert.notEqual(
+        port.implementationStatus,
+        'unavailable',
+        `${port.id} is launch-required and cannot claim that its adapter is unavailable.`,
       );
       assert.equal(
         port.exclusionRationale,
@@ -168,16 +516,113 @@ export function assertDurablePortInventory(inventory) {
       continue;
     }
 
+    assert.equal(
+      port.implementationStatus,
+      'unavailable',
+      `${port.id} is not selected for launch and must not imply an available official adapter.`,
+    );
     assertNonEmptyString(
       port.exclusionRationale,
       `${port.id}.exclusionRationale`,
     );
     assert.equal(
-      port.implementationGate,
+      port.plannedAdapterEntryPoint,
       undefined,
-      `${port.id} is excluded and must not imply an implementation gate in this launch.`,
+      `${port.id} is not selected for launch and must not claim a planned adapter entrypoint.`,
     );
   }
+}
+
+export function assertDurableStateSurfaceInventory(
+  inventory,
+  postgresInventory,
+) {
+  assert.equal(
+    inventory.schemaVersion,
+    1,
+    'The durable-state surface tracker must use schema version 1.',
+  );
+  assert.ok(
+    Array.isArray(inventory.surfaces),
+    'The durable-state surface tracker must contain a surfaces array.',
+  );
+  assert.ok(
+    Array.isArray(postgresInventory.ports),
+    'The PostgreSQL durable-port inventory must contain a ports array.',
+  );
+
+  const expectedRequirements = new Map(
+    DURABLE_STATE_SURFACE_REQUIREMENTS.map((requirement) => [
+      requirement.id,
+      requirement,
+    ]),
+  );
+  const actualIds = inventory.surfaces.map(({ id }) => id);
+  assert.equal(
+    new Set(actualIds).size,
+    actualIds.length,
+    'The durable-state surface tracker must not contain duplicate IDs.',
+  );
+  assert.deepEqual(
+    [...actualIds].sort(),
+    [...expectedRequirements.keys()].sort(),
+    'The durable-state surface tracker must contain exactly the reviewed platform state surfaces.',
+  );
+
+  const postgresDecisionIds = new Set(
+    postgresInventory.ports.map(({ id }) => id),
+  );
+  const mappedPostgresDecisionIds = new Set();
+
+  for (const surface of inventory.surfaces) {
+    const expected = expectedRequirements.get(surface.id);
+
+    for (const field of [
+      'stateClass',
+      'backendClass',
+      'contractStatus',
+      'officialAdapterStatus',
+    ]) {
+      assert.ok(
+        DURABLE_STATE_STATUS_VALUES[field].has(surface[field]),
+        `${surface.id}.${field} must use an approved status.`,
+      );
+      assert.equal(
+        surface[field],
+        expected[field],
+        `${surface.id}.${field} must retain its reviewed status.`,
+      );
+    }
+
+    for (const field of [
+      'surface',
+      'ownerDomain',
+      'currentEvidence',
+      'nextGate',
+    ]) {
+      assertNonEmptyString(surface[field], `${surface.id}.${field}`);
+    }
+
+    assert.equal(
+      surface.postgresDecisionId,
+      expected.postgresDecisionId,
+      `${surface.id}.postgresDecisionId must retain its reviewed PostgreSQL decision mapping.`,
+    );
+
+    if (surface.postgresDecisionId !== undefined) {
+      assert.ok(
+        postgresDecisionIds.has(surface.postgresDecisionId),
+        `${surface.id}.postgresDecisionId must reference a current PostgreSQL durable-port decision.`,
+      );
+      mappedPostgresDecisionIds.add(surface.postgresDecisionId);
+    }
+  }
+
+  assert.deepEqual(
+    [...mappedPostgresDecisionIds].sort(),
+    [...postgresDecisionIds].sort(),
+    'Every PostgreSQL durable-port decision must map to at least one canonical platform state surface.',
+  );
 }
 
 export function verifyPackageFamily(
@@ -276,17 +721,38 @@ export function verifyPackageFamily(
     );
   }
 
-  assertDurablePortInventory(
+  const postgresInventory = readJson(
+    new URL(
+      'packages/postgres/durable-port-support.json',
+      repositoryUrl,
+    ),
+  );
+  assertDurablePortInventory(postgresInventory);
+  assertDurableStateSurfaceInventory(
     readJson(
       new URL(
-        'packages/postgres/durable-port-support.json',
+        'docs/architecture/durable-state-surfaces.json',
         repositoryUrl,
       ),
     ),
+    postgresInventory,
   );
 
   process.stdout.write(
-    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations and ${DURABLE_PORT_REQUIREMENTS.length} durable-state decisions.\n`,
+    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, ${DURABLE_STATE_SURFACE_REQUIREMENTS.length} platform state surfaces, and ${POSTGRES_ADAPTER_REQUIREMENTS.length} PostgreSQL adapter decisions.\n`,
+  );
+}
+
+function assertUniqueNonEmptyStringArray(value, field) {
+  assert.ok(Array.isArray(value), `${field} must be an array.`);
+  assert.ok(value.length > 0, `${field} must not be empty.`);
+  assert.equal(
+    new Set(value).size,
+    value.length,
+    `${field} must not contain duplicates.`,
+  );
+  value.forEach((item, index) =>
+    assertNonEmptyString(item, `${field}[${index}]`),
   );
 }
 

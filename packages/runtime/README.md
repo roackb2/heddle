@@ -24,6 +24,14 @@ Execution Host.
 
 The runtime will not depend on any other `@heddleagent/*` package. The CLI may
 depend on it, and optional adapter packages may implement its public ports.
+Those ports are named for domain purpose and invariants. A physical `stateRoot`
+is the default file composition, not one portable state contract, and this
+package will not expose a universal `StorageProvider`.
+
+Technology-specific packages remain leaf adapters. PostgreSQL can implement
+transactional conversation or heartbeat ports; a future object-store package
+can implement selected content or checkpoint ports; an observability package
+can export telemetry. None becomes a dependency of the runtime itself.
 
 The planned public entrypoints are `.`, `/runs`, `/runs/http-sse`, `/advanced`,
 and `/heartbeat/testing`. This is a package-surface plan, not a claim that those
