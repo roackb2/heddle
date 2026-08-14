@@ -151,6 +151,15 @@ jobs:
       - name: Verify packed Execution Host client
         run: yarn execution-host-client:pack:verify
 
+      - name: Set up release Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Pin release npm
+        run: npm install --global npm@12.0.2
+
       - name: Verify npm release state
         run: node scripts/verify-execution-host-client-pack.mjs --verify-registry
 

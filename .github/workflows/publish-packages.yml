@@ -10,6 +10,7 @@ on:
       - package.json
       - packages/execution-host-client/**
       - scripts/execution-host-client-release-state.mjs
+      - scripts/execution-host-client-pack-result.mjs
       - scripts/finalize-execution-host-client-release.mjs
       - scripts/verify-execution-host-client-package.mjs
       - scripts/verify-execution-host-client-pack.mjs
@@ -83,6 +84,9 @@ jobs:
       - name: Select release state
         id: release
         run: node scripts/execution-host-client-release-state.mjs
+
+      - name: Verify release artifact
+        run: node scripts/verify-execution-host-client-pack.mjs
 
       - name: Create immutable release tag
         if: steps.release.outputs.publication_needed == 'true'
