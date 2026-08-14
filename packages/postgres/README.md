@@ -54,37 +54,22 @@ package may coordinate that domain operation through an injected purpose-named
 content port; it must not import an S3 implementation or make S3 part of the
 conversation contract.
 
-## v6 durability inventory and launch posture
+## Activation boundary
 
 The live [durable-state inventory](../../docs/architecture/durable-state.md)
 and [adopter support matrix](../../docs/guides/programmatic/durability-support.md)
-govern this list.
+describe Heddle's released persistence behavior. This private foundation does
+not change those support claims.
 
-| Purpose-named domain port | Launch policy | Current implementation status |
-| --- | --- | --- |
-| Conversation sessions | **Required**, paired with archives under one authenticated scope | Planned; no official PostgreSQL adapter exists yet |
-| Conversation compaction archives | **Required**, paired with sessions | Planned; no official PostgreSQL adapter exists yet |
-| Heartbeat task authority, checkpoints, and run records | **Required** | Existing in `@roackb2/heddle-postgres`; not yet migrated to this private v6 foundation |
-| Separate Execution Host conversation lifecycle | **Required after its public port lands** | Blocked on the reviewed domain contract; no official PostgreSQL adapter exists yet |
-| Standalone one-off heartbeat checkpoint | **Deferred** | No selected PostgreSQL adapter; scheduled durability belongs to `HeartbeatTaskStore` |
-| Result artifacts | **Deferred** | Current domain contract is local-biased and not remote-ready |
-
-The first public version must expose domain-specific entrypoints and an exact
-implemented support matrix. Its root must not imply that every row above is
-available. Every launch adapter requires reviewed migrations, isolation and
-fencing tests, real-PostgreSQL conformance, and restart/recovery evidence.
-
-The repository-wide
-[durable-state tracker](../../docs/architecture/durable-state-tracker.md)
-records every persistence concern independently of backend. The machine-
-readable [`durable-port-support.json`](durable-port-support.json) is only this
-package's PostgreSQL adapter decision matrix. `yarn package-family:verify`
-rejects missing, duplicated, silently reclassified, or technology-leaking
-domain contracts in either inventory.
+The first public version must expose only implemented domain-specific
+entrypoints. Each exported adapter requires reviewed migrations, isolation and
+fencing tests, real-PostgreSQL conformance, restart/recovery evidence, and a
+README support table that matches the shipped exports. Mentioning a possible
+domain here does not make its adapter available.
 
 The current official implementation remains in
 `@roackb2/heddle-postgres` and covers heartbeat only. Activate this package
 only after its domain-specific entrypoints, dependency direction, migrations,
-and real-store conformance exist for every launch-required row; do not expose a
+and real-store conformance exist for every exported domain; do not expose a
 generic root provider first. See the [package-family boundary](../README.md)
 before changing this status.

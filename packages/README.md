@@ -17,7 +17,7 @@ backend package later when a stable public port and real adopter need exist.
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | CLI, daemon, and browser control plane portions of `@roackb2/heddle` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | `@roackb2/heddle-remote` |
 | `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | `@roackb2/heddle-adopter` |
-| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | `@roackb2/heddle-postgres`, expanded by an explicit support matrix |
+| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | `@roackb2/heddle-postgres`; additional domains require released contracts and conformance |
 
 The in-process run service will be exposed from
 `@heddleagent/runtime/runs`; it is not a sixth package. Its conventional Node

@@ -7,8 +7,8 @@ the state required to keep that promise truthful.
 This guide is the adopter-facing support matrix. For implementation ownership,
 file behavior, corruption handling, and known atomicity/retention gaps, read the
 contributor-facing [durable-state inventory](../../architecture/durable-state.md).
-The [implementation tracker](../../architecture/durable-state-tracker.md)
-records which contracts and official adapters actually exist today.
+This guide describes released behavior only; future adapter plans do not change
+the support claims below.
 
 ## Promise Levels
 
@@ -53,12 +53,14 @@ provider-managed filesystem that expires or resets on a runtime update is a
 write-back working copy, not the sole source of truth.
 
 “Repository” describes the domain contract, not a mandatory database choice.
-A transactional adapter commonly stores revisioned sessions, lifecycle, and
-heartbeat authority in PostgreSQL. An object adapter can store immutable
-archive content, artifacts, uploads, or a selected domain checkpoint in S3 or
-another object store. A reviewed hybrid writes immutable content first and then
-commits the authoritative manifest/reference, so interruption can leave an
-orphan object but cannot publish a pointer to missing content.
+A transactional adapter commonly stores revisioned sessions and heartbeat
+authority in PostgreSQL. Products persist their invocation lifecycle in
+product-owned storage today; Heddle does not currently expose a public lifecycle
+repository. An object adapter can store immutable archive content, artifacts,
+uploads, or a selected domain checkpoint in S3 or another object store. A
+reviewed hybrid writes immutable content first and then commits the authoritative
+manifest/reference, so interruption can leave an orphan object but cannot
+publish a pointer to missing content.
 
 Heddle memory is durable workspace knowledge rather than a conversation or
 billing record. Session storage may preserve its working files across ordinary

@@ -419,7 +419,6 @@ framework, or deployment platform.
 - [Development guide](docs/guides/development.md)
 - [Core layering](docs/architecture/core-layering.md)
 - [Durable state](docs/architecture/durable-state.md)
-- [Durable state implementation tracker](docs/architecture/durable-state-tracker.md)
 - [Framework vision](docs/strategy/framework-vision.md)
 
 ## Development

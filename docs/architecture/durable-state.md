@@ -8,15 +8,13 @@ questions for each state surface:
 3. Which storage boundary can a programmatic host replace today?
 4. What corruption, atomicity, retention, or security constraints still apply?
 
-The inventory describes the `v5.13.0` implementation and the selected v6
-package-foundation posture. Update it when adding a production writer, changing
-a persisted schema, widening a repository contract, or selecting an official
+The inventory describes the current implementation and its technology-neutral
+persistence boundaries. Update it when adding a production writer, changing a
+persisted schema, widening a repository contract, or releasing an official
 adapter.
 
 For the shorter adopter-facing decision guide, see the
 [durability support matrix](../guides/programmatic/durability-support.md).
-For the current implementation status and exact next gate for every surface,
-see the [durable-state implementation tracker](durable-state-tracker.md).
 
 ## Terms
 
@@ -113,10 +111,12 @@ A replaceable Execution Host needs several persistence mechanisms, not one
 serialized runtime directory:
 
 1. **Canonical domain records commit continuously.** Conversation sessions,
-   archives, hosted invocation lifecycle, heartbeat authority, and any future
-   correctness-critical domain use their purpose-named repositories. A
-   repository describes required scope, atomicity, fencing, and recovery; its
-   concrete adapter may use PostgreSQL, object storage, or a reviewed hybrid.
+   archives, heartbeat authority, and any future correctness-critical Heddle
+   domain use their purpose-named repositories. A repository describes required
+   scope, atomicity, fencing, and recovery; its concrete adapter may use
+   PostgreSQL, object storage, or a reviewed hybrid. Product-owned invocation
+   lifecycle truth must also commit before terminal success; Heddle does not
+   currently expose a public lifecycle repository for it.
 2. **A session filesystem provides continuity, not authority.** A managed
    per-session filesystem can preserve source files, installed dependencies,
    local caches, and selected Heddle files across microVM stop/resume. If it can
@@ -149,7 +149,8 @@ files.
 | State | Canonical hosted home |
 | --- | --- |
 | Conversation session and compaction metadata | The paired conversation repositories; commonly a transactional database, with archive content optionally offloaded behind the archive contract |
-| Hosted invocation lifecycle and heartbeat authority | A transactional/fenced store such as PostgreSQL |
+| Heartbeat authority | Its injected task store; an official PostgreSQL adapter exists today |
+| Hosted invocation lifecycle | Product-owned persistence today; Heddle has no public lifecycle repository yet |
 | Large immutable archive content, artifacts, uploads, and evidence | Object storage once the owning domain has a remote-ready content contract |
 | Heddle memory notes and maintenance records | The memory domain's workspace locally; for cross-version hosted recovery, a future memory-specific repository or portable memory checkpoint, commonly backed by object storage |
 | Workspace source files and build state | Per-session filesystem for continuity; an explicit workspace checkpoint only when cross-version recovery is a selected product promise |
@@ -511,34 +512,6 @@ durable-state domains:
 Any new production writer under `src/core` or `src/server` must either join an
 owner above, define a new owner and lifecycle here, or be explicitly excluded
 with the same level of reasoning.
-
-## Ranked Follow-Up
-
-1. **Keep the implementation tracker current.** Update the
-   [tracker](durable-state-tracker.md), this inventory, and the adopter
-   [durability support matrix](../guides/programmatic/durability-support.md)
-   together whenever a contract, official adapter, or selected next gate
-   changes. Merge is not implementation; record code, adapter, release, and
-   deployed recovery evidence separately.
-2. **Design portable memory recovery before promising it.** Define the memory-
-   specific authority, snapshot/repository shape, CAS/conflict behavior,
-   encryption, retention, deletion, and cold-start hydration contract. Use a
-   provider session filesystem as continuity and a canonical checkpoint for
-   recovery beyond provider expiry or runtime-version replacement.
-3. **Design the artifact boundary only if the next host needs it.** Define an
-   asynchronous metadata/content split, stable opaque addresses, atomic content
-   plus current-pointer semantics, size/streaming limits, and explicit deletion
-   and orphan cleanup. Add an adapter only against that domain contract.
-4. **Harden local writers by domain and risk.** Use atomic replacement,
-   domain-appropriate locks, and explicit corruption behavior for state whose
-   concurrent loss changes user-visible truth. Do not hide this work behind a
-   generic file repository wrapper.
-5. **Specify trace semantics before trace portability.** Decide event ordering,
-   redaction, partial-run visibility, retention, session linkage, and stable
-   addressing before creating a trace port.
-6. **Keep machine/security state local.** Credentials, browser profiles,
-   daemon discovery, and absolute-path workspace catalogs should remain outside
-   general remote persistence.
 
 The result is intentionally several domain-owned storage boundaries, not one
 universal persistence abstraction.
