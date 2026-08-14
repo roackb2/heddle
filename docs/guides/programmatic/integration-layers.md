@@ -83,8 +83,8 @@ disconnect as implicit cancellation.
 | A terminal evaluation with no host loop | `runQuickstartConversationCli` | [`01-interactive-chat.ts`](../../../examples/sdk/01-interactive-chat.ts) |
 | A local loop that needs product tools or MCP | Quickstart plus tools/host extensions | [`02-add-a-tool.ts`](../../../examples/sdk/02-add-a-tool.ts), [`03-add-an-mcp-server.ts`](../../../examples/sdk/03-add-an-mcp-server.ts) |
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
-| A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
-| Express with REST + SSE | Core plus `@roackb2/heddle/hosted/http-sse` | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
+| A server/worker that owns transport | `@heddleagent/runtime` + `@heddleagent/runtime/runs` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
+| Express with REST + SSE | Core plus `@heddleagent/runtime/runs/http-sse` | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
 | A remote client over any transport | `@heddleagent/run-client` plus a host transport | [Remote conversation runs](remote-runs.md) |
 | A browser using the conventional REST/SSE contract | `@heddleagent/run-client/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
@@ -128,7 +128,7 @@ lifetimes differ, clients can reconnect, or a turn needs a separately
 addressable cancel/approval lifecycle. It is a process-local coordinator above
 the engine, not a transport or durable message broker.
 
-Import it from `@roackb2/heddle/hosted` so the hosted-process assumption is
+Import it from `@heddleagent/runtime/runs` so the hosted-process assumption is
 visible. The root export remains available for compatibility.
 
 ### Remote run protocol
@@ -153,7 +153,7 @@ approval operations. Validate all untrusted wire data and project internal run
 results into an explicitly public schema. Authentication and authorization must
 happen before resolving the Heddle run address.
 
-For Node HTTP/SSE, `@roackb2/heddle/hosted/http-sse` owns strict replay cursor
+For Node HTTP/SSE, `@heddleagent/runtime/runs/http-sse` owns strict replay cursor
 parsing, canonical frames, backpressure, and subscriber disconnect cleanup.
 The host still owns route registration, authentication/authorization, public
 schemas, JSON error policy, CORS, and limits. Express and other Node frameworks
@@ -196,7 +196,7 @@ Host alone imports Heddle and receives no adopter database credential. See
 | Public API fields | Host-owned validation schemas and terminal result/error projection |
 | Remote cursor/retry correctness | `ConversationRunConsumerService` |
 | Runtime run-envelope validation | `ConversationRunProtocolCodec` with host activity/result schemas |
-| Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` plus host routes and policy |
+| Conventional Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` plus host routes and policy |
 | Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` plus host schemas and headers |
 | tRPC, WebSocket, or IPC | Host transport adapter above the application service |
 | React or other UI state | Product client/application layer above the protocol client |

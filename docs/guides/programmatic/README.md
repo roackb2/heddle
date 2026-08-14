@@ -11,11 +11,11 @@ deeper only when you need to. This mirrors how the public API is organized.
 The public entry points span two independent axes: customization depth and
 hosting assumptions.
 
-- `@roackb2/heddle` — the **curated** default surface (rungs 1–5): everything a
+- `@heddleagent/runtime` — the **curated** default surface (rungs 1–5): everything a
   product host needs to build an agentic experience.
-- `@roackb2/heddle/hosted` — process-local run identity, replay, cancellation,
+- `@heddleagent/runtime/runs` — process-local run identity, replay, cancellation,
   and approvals for a long-lived host process.
-- `@roackb2/heddle/hosted/http-sse` — opt-in Node HTTP/SSE framing,
+- `@heddleagent/runtime/runs/http-sse` — opt-in Node HTTP/SSE framing,
   backpressure, replay-cursor, and subscriber-disconnect correctness.
 - `@heddleagent/run-client` — an independently installable, browser-safe package
   with runtime contracts plus transport-neutral cursor, duplicate, gap,
@@ -29,7 +29,7 @@ hosting assumptions.
   conveniences, and canonical OpenAPI/JSON Schema/golden artifacts for other
   languages. The former `@roackb2/heddle-adopter@5.13.0` coordinate remains
   installable during migration.
-- `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
+- `@heddleagent/runtime/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,
   integrations). It does not implicitly opt into remote hosting or a transport.

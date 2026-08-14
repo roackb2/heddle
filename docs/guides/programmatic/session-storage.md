@@ -23,7 +23,7 @@ durability, and durable in-flight execution, see the
 catalog and immutable revision files beneath it:
 
 ```ts
-import { createConversationEngine } from '@roackb2/heddle'
+import { createConversationEngine } from '@heddleagent/runtime'
 
 const engine = createConversationEngine({
   workspaceRoot,
@@ -36,7 +36,7 @@ To choose the catalog location explicitly:
 
 ```ts
 import { join } from 'node:path'
-import { createConversationEngine } from '@roackb2/heddle'
+import { createConversationEngine } from '@heddleagent/runtime'
 
 const sessionStoragePath = join(dataDir, 'agent-sessions.catalog.json')
 const engine = createConversationEngine({
@@ -73,7 +73,7 @@ to load and rewrite the entire session collection:
 import {
   createConversationEngine,
   type ChatSessionRepository,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const sessionRepository: ChatSessionRepository = {
   list: async (input) => listSessionPage(input),
@@ -93,7 +93,7 @@ import {
   ChatArchivePersistenceCodec,
   createConversationEngine,
   type ChatArchiveRepository,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const archiveRepository: ChatArchiveRepository = {
   loadManifest: async (sessionId) => {
@@ -144,7 +144,7 @@ report at `engine.persistence.conversations`. To inspect a configuration before
 constructing the engine:
 
 ```ts
-import { ConversationPersistenceService } from '@roackb2/heddle'
+import { ConversationPersistenceService } from '@heddleagent/runtime'
 
 const readiness = ConversationPersistenceService.assess({
   persistence: {
@@ -185,7 +185,7 @@ format. Heddle exports the database-neutral parts of the contract:
 import {
   ChatSessionCatalogPagination,
   ChatSessionPersistenceCodec,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 // Fail loudly if JSON/JSONB cannot reconstruct one complete Heddle session.
 const session = ChatSessionPersistenceCodec.parseRecord(row.session)
@@ -357,7 +357,7 @@ import { test } from 'node:test'
 import {
   ChatSessionRepositoryConformance,
   type ChatSessionRepositoryConformanceHarness,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const harness: ChatSessionRepositoryConformanceHarness = {
   // Each call must return a new instance, already bound to this server-side

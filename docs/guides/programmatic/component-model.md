@@ -44,10 +44,10 @@ This distinction matters because three similar terms describe different
 things:
 
 - the **Heddle runtime** is the model, tool, conversation, approval, trace, and
-  artifact machinery shipped by `@roackb2/heddle`;
+  artifact machinery shipped by `@heddleagent/runtime`;
 - **hosted runs** are public lifecycle utilities for addressable, reconnectable
   runs inside an adopter-owned long-lived Node process, shipped at
-  `@roackb2/heddle/hosted`; and
+  `@heddleagent/runtime/runs`; and
 - a **Heddle Execution Host** is a separately deployed application that embeds
   the Heddle runtime and is invoked through a language-neutral network
   contract.
@@ -60,8 +60,8 @@ with a cloud provider product such as AWS AgentCore Runtime.
 
 | Shape | Where Heddle runs | Start with | Best fit |
 | --- | --- | --- | --- |
-| Embedded SDK | In your TypeScript/Node backend | `@roackb2/heddle` | The backend may import Heddle and should directly own tools, storage adapters, policy, and UI integration |
-| Adopter-hosted run service | In your long-lived TypeScript/Node server or worker | `@roackb2/heddle/hosted`, optionally `@heddleagent/run-client` | A turn must outlive one request, support reconnect/cancel, or stream to another process while remaining inside your deployment |
+| Embedded SDK | In your TypeScript/Node backend | `@heddleagent/runtime` | The backend may import Heddle and should directly own tools, storage adapters, policy, and UI integration |
+| Adopter-hosted run service | In your long-lived TypeScript/Node server or worker | `@heddleagent/runtime/runs`, optionally `@heddleagent/run-client` | A turn must outlive one request, support reconnect/cancel, or stream to another process while remaining inside your deployment |
 | Separate Execution Host | In an independently deployed compatible host | `@heddleagent/execution-host-client` or the published OpenAPI/JSON Schema contract | The product backend uses another language or needs the agent workstation isolated from product data and infrastructure |
 | Heddle coding agent | In the local CLI, daemon, and browser control plane | `heddle` | You want to use or inspect Heddle as a finished coding-agent product before embedding the SDK |
 
@@ -101,8 +101,8 @@ adopter database credential.
 
 | Surface | Use it when | Important boundary |
 | --- | --- | --- |
-| `@roackb2/heddle` | Heddle runs inside a TypeScript/Node process | This is the supported runtime and SDK |
-| `@roackb2/heddle/hosted` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
+| `@heddleagent/runtime` | Heddle runs inside a TypeScript/Node process | This is the supported runtime and SDK |
+| `@heddleagent/runtime/runs` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
 | `@heddleagent/run-client` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
 | `@roackb2/heddle-postgres` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is heartbeat-specific, not a general product DB or conversation-history adapter |
 | `@heddleagent/execution-host-client` | A product invokes a separate compatible Execution Host | Authority, transport, turn orchestration, durable lifecycle semantics, Node helpers, and cross-language conformance |
@@ -120,7 +120,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 
 | Component | Status | What the status means |
 | --- | --- | --- |
-| `@roackb2/heddle` and `/hosted` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
+| `@heddleagent/runtime` and `/runs` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@heddleagent/run-client` | Public | Browser-safe run protocol and optional HTTP/SSE client |
 | `@heddleagent/execution-host-client` | Public | The canonical product-backend integration kit, including durable lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
 | `@heddleagent/postgres/execution-host/conversations` | Public | Official PostgreSQL lifecycle adapter over an adopter-managed database and migration process |

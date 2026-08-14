@@ -15,7 +15,7 @@ Use it when you want:
 - trace persistence, artifact tools, and memory maintenance.
 
 ```ts
-import { createConversationEngine } from '@roackb2/heddle'
+import { createConversationEngine } from '@heddleagent/runtime'
 
 const engine = createConversationEngine({
   workspaceRoot: process.cwd(),
@@ -84,7 +84,7 @@ For host event adapters, import `HeddleEventType` instead of duplicating event
 name strings:
 
 ```ts
-import { HeddleEventType } from '@roackb2/heddle'
+import { HeddleEventType } from '@heddleagent/runtime'
 
 if (activity.type === HeddleEventType.assistantStream) {
   renderDelta(activity.text)
@@ -100,8 +100,8 @@ process-local run identity, cancellation, ordered activity delivery, approvals,
 and bounded replay for reconnecting subscribers.
 
 ```ts
-import { createConversationEngine } from '@roackb2/heddle'
-import { ConversationRunService } from '@roackb2/heddle/hosted'
+import { createConversationEngine } from '@heddleagent/runtime'
+import { ConversationRunService } from '@heddleagent/runtime/runs'
 
 const runs = new ConversationRunService({
   replay: { maxEventsPerRun: 512, retentionMs: 300_000 },
@@ -171,7 +171,7 @@ Hosted services usually cannot persist under a local state root. Implement the
 `ArtifactRepository` port and pass it to the engine (or the quickstart runner):
 
 ```ts
-import { createConversationEngine, type ArtifactRepository } from '@roackb2/heddle'
+import { createConversationEngine, type ArtifactRepository } from '@heddleagent/runtime'
 
 const artifactRepository: ArtifactRepository = {
   readCatalog: () => loadCatalogFromDatabase(),
@@ -205,7 +205,7 @@ record-oriented database adapter. A hosted completed-conversation promise must
 also inject the archive repository through the same conversation capability.
 
 ```ts
-import { createConversationEngine, type ChatSessionRepository } from '@roackb2/heddle'
+import { createConversationEngine, type ChatSessionRepository } from '@heddleagent/runtime'
 
 const sessionRepository: ChatSessionRepository = {
   list: async (input) => listSessionPage(input),
@@ -238,7 +238,7 @@ files.
 import {
   createConversationEngine,
   type ChatArchiveRepository,
-} from '@roackb2/heddle'
+} from '@heddleagent/runtime'
 
 const archiveRepository: ChatArchiveRepository = {
   loadManifest: async (sessionId) => loadManifest(sessionId),

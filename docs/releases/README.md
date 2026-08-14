@@ -64,6 +64,28 @@ npm publish ./packages/run-client --dry-run --access public --tag latest
 The gate builds the existing browser-safe implementation, packs it, installs
 the tarball into one fresh ESM consumer, and imports both public entrypoints.
 
+## Runtime Release Lane
+
+`@heddleagent/runtime` is independently versioned and publishes from `main`.
+It contains the existing embeddable SDK/runtime source graph without the CLI,
+TUI, daemon product lifecycle, or built browser UI. Its package-only gate is:
+
+```bash
+yarn package-family:verify
+yarn runtime:pack:verify
+npm publish ./packages/runtime --dry-run --access public --tag latest
+```
+
+Merging a runtime release to `main` runs the package workflow, creates the
+package-specific `runtime-v<version>` tag, publishes the missing immutable
+version to `latest`, verifies the registry version, and creates the matching
+GitHub release. The first coordinate publication may require a one-time manual
+npm bootstrap before trusted publishing can be configured; later releases use
+the same `npm-release` environment and OIDC workflow as the other v6 packages.
+
+Do not unpublish `@roackb2/heddle@5.13.0`. It remains the compatibility package
+and current home of the `heddle` executable until `@heddleagent/cli` is live.
+
 ## Execution Host Client Release Lane
 
 `@heddleagent/execution-host-client` is independently versioned from the root

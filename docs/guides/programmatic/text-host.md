@@ -5,7 +5,7 @@ programmatic hosts. It handles assistant stream deltas, activity status lines,
 trace labels, compaction status, and final turn summaries.
 
 ```ts
-import { createConversationTextHost } from '@roackb2/heddle'
+import { createConversationTextHost } from '@heddleagent/runtime'
 
 const textHost = createConversationTextHost({
   activity: 'status',

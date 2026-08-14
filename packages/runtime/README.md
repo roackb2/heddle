@@ -1,43 +1,73 @@
 # `@heddleagent/runtime`
 
-Status: **private package foundation; not published or installable**
+The supported TypeScript and Node.js runtime for embedding Heddle in a product
+backend, worker, desktop process, or compatible Execution Host.
 
-This package will be the supported TypeScript/Node runtime and embeddable SDK
-for products that run Heddle in their own process or inside a compatible
-Execution Host.
+```bash
+npm install @heddleagent/runtime
+```
+
+The default entrypoint is the curated SDK:
+
+```ts
+import {
+  ConversationAgentService,
+  createConversationEngine,
+} from '@heddleagent/runtime'
+```
+
+Use the subpaths only when the host needs their additional assumptions:
+
+```ts
+import { ConversationRunService } from '@heddleagent/runtime/runs'
+import { streamConversationRunSse } from '@heddleagent/runtime/runs/http-sse'
+import { OpenAiAdapter } from '@heddleagent/runtime/advanced'
+import { HeartbeatTaskStoreConformance } from '@heddleagent/runtime/heartbeat/testing'
+```
+
+## Entry points
+
+| Import | Responsibility |
+| --- | --- |
+| `@heddleagent/runtime` | Curated conversation SDK, tools, MCP extensions, approvals, results, and persistence ports |
+| `@heddleagent/runtime/runs` | Process-local addressable runs, replay, cancellation, and approval resolution |
+| `@heddleagent/runtime/runs/http-sse` | Optional Node HTTP/SSE cursor, framing, backpressure, and disconnect helpers |
+| `@heddleagent/runtime/advanced` | Lower-level models, tools, memory, trace, heartbeat, browser drivers, and embeddable server composition |
+| `@heddleagent/runtime/heartbeat/testing` | Executable conformance scenarios for custom heartbeat task stores |
+
+The `/runs` entrypoint was named `/hosted` on the former
+`@roackb2/heddle` package. The implementation and behavior are unchanged; the
+new name makes clear that it is an in-process run service, not a hosted Heddle
+service.
 
 ## Owns
 
-- the model/tool execution runtime and curated programmatic SDK;
+- the model/tool execution loop and curated programmatic SDK;
 - conversation engines, capabilities, approvals, traces, artifacts, and
   Heddle-owned persistence ports;
-- the in-process addressable run service at the future `/runs` subpath; and
-- optional Node HTTP/SSE run transport helpers at `/runs/http-sse`.
+- process-local run lifecycle mechanics; and
+- reusable heartbeat and low-level runtime composition.
 
 ## Does not own
 
-- the finished Heddle CLI, daemon, or browser control-plane product;
-- browser-side protocol consumption;
-- a product backend's separate Execution Host authority or network client;
-- PostgreSQL implementations; or
+- the finished `heddle` command, TUI, daemon lifecycle, or built browser UI;
+- browser-side run protocol consumption;
+- product-backend authority for a separate compatible Execution Host;
+- PostgreSQL or other technology-specific persistence implementations; or
 - product authentication, records, policy, queries, retention, and UI.
 
-The runtime will not depend on any other `@heddleagent/*` package. The CLI may
-depend on it, and optional adapter packages may implement its public ports.
-Those ports are named for domain purpose and invariants. A physical `stateRoot`
-is the default file composition, not one portable state contract, and this
-package will not expose a universal `StorageProvider`.
+The optional `playwright` peer enables the built-in Playwright browser driver.
+The optional `cyberloop` peer supports CyberLoop integrations. Neither is
+required for ordinary conversation-agent use.
 
-Technology-specific packages remain leaf adapters. PostgreSQL can implement
-transactional conversation or heartbeat ports; a future object-store package
-can implement selected content or checkpoint ports; an observability package
-can export telemetry. None becomes a dependency of the runtime itself.
+## Package boundary
 
-The planned public entrypoints are `.`, `/runs`, `/runs/http-sse`, `/advanced`,
-and `/heartbeat/testing`. This is a package-surface plan, not a claim that those
-entrypoints exist here today.
+This package compiles the repository's canonical runtime source graph. It does
+not maintain a second copy of the runtime implementation. The
+`@heddleagent/cli` product may depend on this package; the runtime must never
+depend on the CLI. Technology-specific packages implement public runtime ports
+one way and are never imported by the runtime itself.
 
-The current implementation remains in `@roackb2/heddle`. Activate this package
-only through the coordinated migration that moves each implementation once,
-adds package-local build and boundary tests, and freshly verifies the tarball.
-See the [package-family boundary](../README.md) before changing this status.
+The former `@roackb2/heddle@5.13.0` package remains installable while consumers
+migrate. It also contains the legacy `heddle` executable; use the old package
+for that product until `@heddleagent/cli` is released.

@@ -1,5 +1,5 @@
 // ===========================================================================
-// Heddle — Heartbeat adapter verification (`@roackb2/heddle/heartbeat/testing`)
+// Heddle — Heartbeat adapter verification (`@heddleagent/runtime/heartbeat/testing`)
 // ===========================================================================
 // This opt-in entrypoint contains executable contract scenarios for custom
 // persistence adapters. It stays outside the runtime entrypoints so production
