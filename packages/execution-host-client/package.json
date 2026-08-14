@@ -1,0 +1,21 @@
+{
+  "name": "@heddleagent/execution-host-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Product-backend contracts and helpers for invoking compatible Heddle Execution Hosts",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/execution-host-client"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

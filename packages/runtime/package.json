@@ -1,0 +1,21 @@
+{
+  "name": "@heddleagent/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Embeddable TypeScript and Node.js agent runtime and SDK for Heddle-powered products",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/runtime"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

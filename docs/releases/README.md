@@ -26,6 +26,12 @@ For a user-facing release:
    `packages/heddle-adopter/package.json`, and
    `packages/heddle-postgres/package.json`. The packages initially release in
    lockstep, and the build fails when their versions diverge.
+   The private `@heddleagent/*` directories documented in
+   [`packages/README.md`](../../packages/README.md) are v6 package-boundary
+   foundations, not release artifacts. Do not version, pack, or publish them
+   during a 5.x release. `yarn package-family:verify` keeps them private and
+   implementation-free until the coordinated migration replaces the current
+   package coordinates.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
