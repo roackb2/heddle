@@ -21,6 +21,7 @@ import {
   assertDistTagTransition,
   assertRegistryArtifactMatches,
   createExecutionHostClientReleaseMetadata,
+  parseNpmViewResult,
   parseRegistryArtifactResult,
 } from './execution-host-client-release-state.mjs';
 import { parseNpmPackResult } from './execution-host-client-pack-result.mjs';
@@ -416,7 +417,7 @@ async function waitForRegistryArtifact(target) {
 }
 
 function readDistTags(packageName) {
-  return JSON.parse(
+  return parseNpmViewResult(
     run(
       'npm',
       [
@@ -430,6 +431,7 @@ function readDistTags(packageName) {
       ],
       repositoryDirectory,
     ).stdout,
+    `${packageName} dist-tags`,
   );
 }
 
@@ -447,7 +449,12 @@ function readDistTagsIfPresent(packageName) {
     ],
     repositoryDirectory,
   );
-  if (result.status === 0) return JSON.parse(result.stdout);
+  if (result.status === 0) {
+    return parseNpmViewResult(
+      result.stdout,
+      `${packageName} dist-tags`,
+    );
+  }
 
   assert.match(
     `${result.stdout}\n${result.stderr}`,

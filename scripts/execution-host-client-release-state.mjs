@@ -43,7 +43,7 @@ export function createExecutionHostClientReleaseMetadata(packageJson) {
 
 export function parseRegistryArtifactResult(result, target) {
   if (result.status === 0) {
-    const artifact = JSON.parse(result.stdout);
+    const artifact = parseNpmViewResult(result.stdout, target);
     assert.equal(
       typeof artifact.version,
       'string',
@@ -68,6 +68,31 @@ export function parseRegistryArtifactResult(result, target) {
     `Registry lookup for ${target} failed for a reason other than an absent immutable version.`,
   );
   return { kind: 'missing' };
+}
+
+/**
+ * Normalize the single-result JSON envelopes emitted by npm 10 (object) and
+ * npm 12 (array), rejecting ambiguous or non-object registry responses.
+ */
+export function parseNpmViewResult(stdout, target) {
+  const parsed = JSON.parse(stdout);
+  const result = Array.isArray(parsed)
+    ? readSingleNpmViewResult(parsed, target)
+    : parsed;
+  assert.ok(
+    typeof result === 'object' && result !== null,
+    `Registry metadata for ${target} is not an object.`,
+  );
+  return result;
+}
+
+function readSingleNpmViewResult(results, target) {
+  assert.equal(
+    results.length,
+    1,
+    `Registry metadata for ${target} must contain exactly one result.`,
+  );
+  return results[0];
 }
 
 export function assertRegistryArtifactMatches(
