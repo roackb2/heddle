@@ -3,6 +3,7 @@ import {
   assertDistTagTransition,
   assertRegistryArtifactMatches,
   createExecutionHostClientReleaseMetadata,
+  parseNpmViewResult,
   parseRegistryArtifactResult,
   selectExecutionHostClientRelease,
 } from '../../../../scripts/execution-host-client-release-state.mjs';
@@ -53,14 +54,31 @@ describe('Execution Host client release state', () => {
     ).toThrow('failed for a reason other than an absent immutable version');
   });
 
-  it('parses and verifies immutable registry integrity', () => {
+  it.each([
+    [
+      'npm 10 object',
+      {
+        version: '6.0.0',
+        'dist.integrity': 'sha512-exact',
+      },
+    ],
+    [
+      'npm 12 array',
+      [
+        {
+          version: '6.0.0',
+          'dist.integrity': 'sha512-exact',
+        },
+      ],
+    ],
+  ])('parses and verifies immutable registry integrity from an %s', (
+    _label,
+    registryOutput,
+  ) => {
     const artifact = parseRegistryArtifactResult(
       {
         status: 0,
-        stdout: JSON.stringify({
-          version: '6.0.0',
-          'dist.integrity': 'sha512-exact',
-        }),
+        stdout: JSON.stringify(registryOutput),
         stderr: '',
       },
       '@heddleagent/execution-host-client@6.0.0',
@@ -78,6 +96,43 @@ describe('Execution Host client release state', () => {
         integrity: 'sha512-different',
       }),
     ).toThrow('differs from the verified local tarball');
+  });
+
+  it.each([
+    ['an empty npm 12 result', []],
+    [
+      'multiple npm 12 results',
+      [
+        { version: '6.0.0', 'dist.integrity': 'sha512-exact' },
+        { version: '6.0.1', 'dist.integrity': 'sha512-other' },
+      ],
+    ],
+  ])('rejects %s', (_label, registryOutput) => {
+    expect(() =>
+      parseRegistryArtifactResult(
+        {
+          status: 0,
+          stdout: JSON.stringify(registryOutput),
+          stderr: '',
+        },
+        '@heddleagent/execution-host-client@6.0.0',
+      ),
+    ).toThrow('must contain exactly one result');
+  });
+
+  it.each([
+    ['npm 10 object', { next: '6.0.0-next.0', latest: '6.0.0' }],
+    [
+      'npm 12 array',
+      [{ next: '6.0.0-next.0', latest: '6.0.0' }],
+    ],
+  ])('normalizes dist-tags from an %s', (_label, registryOutput) => {
+    expect(
+      parseNpmViewResult(
+        JSON.stringify(registryOutput),
+        '@heddleagent/execution-host-client dist-tags',
+      ),
+    ).toEqual({ next: '6.0.0-next.0', latest: '6.0.0' });
   });
 
   it('moves latest to the stable release while preserving other channels', () => {
