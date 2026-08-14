@@ -25,11 +25,11 @@ choices.
 
 When copying this example into another project, replace the relative source
 imports with `@roackb2/heddle`, `@roackb2/heddle/hosted`, and the independently
-installable `@roackb2/heddle-remote` package as shown by each layer. Stage 01
+installable `@heddleagent/run-client` package as shown by each layer. Stage 01
 requires Heddle only; stage 02 additionally uses `express`, its TypeScript
-types, `zod`, and `@roackb2/heddle-remote`; stage 03 uses
-`@roackb2/heddle-remote` and the shared Zod wire contracts. Stage 03 opts into
-`@roackb2/heddle-remote/http-sse`, which declares its SSE parser directly.
+types, `zod`, and `@heddleagent/run-client`; stage 03 uses
+`@heddleagent/run-client` and the shared Zod wire contracts. Stage 03 opts into
+`@heddleagent/run-client/http-sse`, which declares its SSE parser directly.
 Declare the packages each layer imports instead of relying on transitive
 dependencies.
 
@@ -252,7 +252,7 @@ HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret \
 
 [`browser-client.ts`](03-browser-client/browser-client.ts) supplies the
 host-owned public schemas and protocol to
-`@roackb2/heddle-remote/http-sse`. The Heddle client owns URL construction,
+`@heddleagent/run-client/http-sse`. The Heddle client owns URL construction,
 header composition, HTTP error decoding, incremental SSE parsing, response
 validation, event identity checks, reader cleanup, and abort propagation.
 

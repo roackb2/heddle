@@ -17,10 +17,10 @@ hosting assumptions.
   and approvals for a long-lived host process.
 - `@roackb2/heddle/hosted/http-sse` — opt-in Node HTTP/SSE framing,
   backpressure, replay-cursor, and subscriber-disconnect correctness.
-- `@roackb2/heddle-remote` — an independently installable, browser-safe package
+- `@heddleagent/run-client` — an independently installable, browser-safe package
   with runtime contracts plus transport-neutral cursor, duplicate, gap,
   terminal, and reconnect correctness.
-- `@roackb2/heddle-remote/http-sse` — opt-in browser-safe fetch/SSE parsing and
+- `@heddleagent/run-client/http-sse` — opt-in browser-safe fetch/SSE parsing and
   transport validation for the conventional REST run resource.
 - `@heddleagent/execution-host-client` — an independently installable backend
   SDK for invoking a separate Execution Host: v1 contracts, ES256 authority,

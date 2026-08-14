@@ -13,17 +13,20 @@ import {
   assertPostgresManifest,
   createPostgresManifest,
 } from '../../../../scripts/verify-postgres-package.mjs';
+import {
+  assertRunClientManifest,
+  createRunClientManifest,
+} from '../../../../scripts/verify-run-client-package.mjs';
 
 const rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
 
 const NODE_VERSION = '>=20';
 
 describe('v6 package-family foundation', () => {
-  it('keeps exactly three packages as private foundations', () => {
+  it('keeps exactly two packages as private foundations', () => {
     expect(PACKAGE_DEFINITIONS.map(({ name }) => name)).toEqual([
       '@heddleagent/runtime',
       '@heddleagent/cli',
-      '@heddleagent/run-client',
     ]);
   });
 
@@ -53,6 +56,33 @@ describe('v6 package-family foundation', () => {
     expect(() =>
       assertFoundationManifest(manifest, definition, NODE_VERSION),
     ).toThrow();
+  });
+});
+
+describe('@heddleagent/run-client activation', () => {
+  it('accepts the exact browser-safe stable manifest', () => {
+    const manifest = createRunClientManifest(rootPackage);
+
+    expect(() => assertRunClientManifest(manifest, rootPackage)).not.toThrow();
+  });
+
+  it.each([
+    ['old coordinate', { name: '@roackb2/heddle-remote' }],
+    ['private package', { private: true }],
+    ['wrong version', { version: rootPackage.version }],
+    ['runtime dependency', {
+      dependencies: {
+        ...createRunClientManifest(rootPackage).dependencies,
+        '@heddleagent/runtime': '^6.0.0',
+      },
+    }],
+  ])('rejects an unsafe %s mutation', (_label, mutation) => {
+    const manifest = {
+      ...createRunClientManifest(rootPackage),
+      ...mutation,
+    };
+
+    expect(() => assertRunClientManifest(manifest, rootPackage)).toThrow();
   });
 });
 

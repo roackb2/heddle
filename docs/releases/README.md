@@ -21,15 +21,14 @@ For a user-facing release:
 
 1. Choose the version to ship.
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
-3. Update the package version in `package.json`,
-   `packages/heddle-remote/package.json`, and
-   `packages/heddle-postgres/package.json`. The packages initially release in
-   lockstep, and the build fails when their versions diverge.
-   The legacy `@roackb2/heddle-adopter` package is frozen at `5.13.0`; its
-   source remains recoverable from that release tag and is not part of another
-   5.x release. Three private `@heddleagent/*` directories documented in
+3. Update the package version in `package.json` and
+   `packages/heddle-postgres/package.json`. Those remaining local v5 packages
+   release in lockstep. The legacy `@roackb2/heddle-adopter` and
+   `@roackb2/heddle-remote` packages are frozen at `5.13.0`; their source
+   remains recoverable from that release tag and they are not part of another
+   5.x release. Two private `@heddleagent/*` directories documented in
    [`packages/README.md`](../../packages/README.md) remain non-releaseable.
-   The activated Execution Host client and PostgreSQL adapter family use
+   The activated run client, Execution Host client, and PostgreSQL adapter family use
    independent release lanes below and never inherit a root-package version
    implicitly.
 4. Verify the release candidate on the intended commit.
@@ -48,10 +47,22 @@ Before tagging a release, use the normal green checkpoint baseline:
 - `yarn build`
 - `yarn test`
 - `npm pack --dry-run --cache /tmp/heddle-npm-cache`
-- `npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache`
 - `npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache`
 
 Add more verification if the release changes a workflow that needs manual validation.
+
+## Run Client Release Lane
+
+`@heddleagent/run-client` is independently versioned and publishes from
+`main`. Its package-only gate intentionally stays small:
+
+```bash
+yarn run-client:pack:verify
+npm publish ./packages/run-client --dry-run --access public --tag latest
+```
+
+The gate builds the existing browser-safe implementation, packs it, installs
+the tarball into one fresh ESM consumer, and imports both public entrypoints.
 
 ## Execution Host Client Release Lane
 
@@ -223,8 +234,7 @@ Do not infer release boundaries from version-bump commit messages alone when an 
 For the actual release pass:
 
 1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
-2. Confirm the intended next version matches in `package.json`,
-   `packages/heddle-remote/package.json`, and
+2. Confirm the intended next version matches in `package.json` and
    `packages/heddle-postgres/package.json`.
 3. Run the release verification baseline.
 4. Review the git range since the previous release tag.
@@ -241,7 +251,6 @@ Typical release sequence:
 
 ```bash
 npm view @roackb2/heddle version
-npm view @roackb2/heddle-remote version
 npm view @roackb2/heddle-adopter version
 npm view @roackb2/heddle-postgres version
 gh release list --limit 5
@@ -251,7 +260,6 @@ gh api user
 yarn build
 yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
-npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache
 npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache
 yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
@@ -264,18 +272,15 @@ Before a package's first publication, its `npm view` command is expected to
 return `E404`; confirm the package name is genuinely unregistered rather than
 treating that first-release state as a failed preflight.
 
-After the GitHub release, the operator publishes all verified 5.x artifacts.
-Publish the independent remote package first, Heddle next, then the optional
-PostgreSQL package whose peer dependency requires that Heddle version:
+After the GitHub release, the operator publishes the remaining verified 5.x
+artifacts: Heddle first, then the optional PostgreSQL package whose peer
+dependency requires that Heddle version:
 
 ```bash
-yarn remote:publish
 npm publish
 yarn legacy-postgres:publish
 ```
 
-`yarn remote:publish` cleans, verifies, and compiles the remote package before
-invoking npm, so the operator cannot accidentally publish stale `dist` output.
 `yarn legacy-postgres:publish` verifies and builds the v5 optional adapter
 against the same Heddle version before publication. Pass normal npm publish
 flags through these scripts when needed.

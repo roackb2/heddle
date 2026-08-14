@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const OUTPUT_DIRECTORIES = new Map([
   ['root', new URL('../dist/', import.meta.url)],
-  ['remote', new URL('../packages/heddle-remote/dist/', import.meta.url)],
+  ['run-client', new URL('../packages/run-client/dist/', import.meta.url)],
   [
     'execution-host-client',
     new URL('../packages/execution-host-client/dist/', import.meta.url),

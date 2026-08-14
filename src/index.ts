@@ -14,7 +14,7 @@
 //   5. Advanced: storage     — back sessions/archives/artifacts with your store
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
-// `@roackb2/heddle/hosted`, the lightweight `@roackb2/heddle-remote` client,
+// `@roackb2/heddle/hosted`, the lightweight `@heddleagent/run-client` client,
 // and the independent backend-side
 // `@heddleagent/execution-host-client` package.
 // Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,

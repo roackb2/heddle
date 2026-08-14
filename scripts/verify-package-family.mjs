@@ -10,6 +10,10 @@ import {
   POSTGRES_PACKAGE_NAME,
   verifyPostgresPackage,
 } from './verify-postgres-package.mjs';
+import {
+  RUN_CLIENT_PACKAGE_NAME,
+  verifyRunClientPackage,
+} from './verify-run-client-package.mjs';
 
 const AUTHOR = 'Jay / Fienna Liang <roackb2@gmail.com>';
 const REPOSITORY_URL = 'git+https://github.com/roackb2/heddle.git';
@@ -33,14 +37,6 @@ export const PACKAGE_DEFINITIONS = [
     description:
       'Heddle coding-agent CLI, daemon, and local browser control-plane product',
     node: true,
-    files: ['LICENSE', 'README.md', 'package.json'],
-  },
-  {
-    directory: 'run-client',
-    name: '@heddleagent/run-client',
-    description:
-      'Browser-safe JavaScript protocol and transport clients for consuming Heddle runs',
-    node: false,
     files: ['LICENSE', 'README.md', 'package.json'],
   },
 ];
@@ -127,10 +123,15 @@ export function verifyPackageFamily(
 
   verifyExecutionHostClientPackage(repositoryUrl, { writeOutput: false });
   verifyPostgresPackage(repositoryUrl, { writeOutput: false });
+  verifyRunClientPackage(repositoryUrl, { writeOutput: false });
 
   const expectedPackageNames = PACKAGE_DEFINITIONS
     .map(({ name }) => name)
-    .concat(EXECUTION_HOST_CLIENT_NAME, POSTGRES_PACKAGE_NAME)
+    .concat(
+      EXECUTION_HOST_CLIENT_NAME,
+      POSTGRES_PACKAGE_NAME,
+      RUN_CLIENT_PACKAGE_NAME,
+    )
     .sort();
   const actualFoundationNames = readdirSync(
     new URL('packages/', repositoryUrl),
@@ -152,15 +153,11 @@ export function verifyPackageFamily(
   assert.deepEqual(
     actualFoundationNames,
     expectedPackageNames,
-    'The @heddleagent scope must contain exactly three private foundations and two activated packages.',
+    'The @heddleagent scope must contain exactly two private foundations and three activated packages.',
   );
 
   const legacyPackages = new Map([
     [new URL('package.json', repositoryUrl), '@roackb2/heddle'],
-    [
-      new URL('packages/heddle-remote/package.json', repositoryUrl),
-      '@roackb2/heddle-remote',
-    ],
     [
       new URL('packages/heddle-postgres/package.json', repositoryUrl),
       '@roackb2/heddle-postgres',
@@ -176,7 +173,7 @@ export function verifyPackageFamily(
   }
 
   process.stdout.write(
-    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, two activated packages, and ${legacyPackages.size} local v5 package identities.\n`,
+    `Verified ${PACKAGE_DEFINITIONS.length} private @heddleagent package foundations, three activated packages, and ${legacyPackages.size} local v5 package identities.\n`,
   );
 }
 
