@@ -61,7 +61,7 @@ with a cloud provider product such as AWS AgentCore Runtime.
 | --- | --- | --- | --- |
 | Embedded SDK | In your TypeScript/Node backend | `@roackb2/heddle` | The backend may import Heddle and should directly own tools, storage adapters, policy, and UI integration |
 | Adopter-hosted run service | In your long-lived TypeScript/Node server or worker | `@roackb2/heddle/hosted`, optionally `@roackb2/heddle-remote` | A turn must outlive one request, support reconnect/cancel, or stream to another process while remaining inside your deployment |
-| Separate Execution Host | In an independently deployed compatible host | `@roackb2/heddle-adopter` or the published OpenAPI/JSON Schema contract | The product backend uses another language or needs the agent workstation isolated from product data and infrastructure |
+| Separate Execution Host | In an independently deployed compatible host | `@heddleagent/execution-host-client` or the published OpenAPI/JSON Schema contract | The product backend uses another language or needs the agent workstation isolated from product data and infrastructure |
 | Heddle coding agent | In the local CLI, daemon, and browser control plane | `heddle` | You want to use or inspect Heddle as a finished coding-agent product before embedding the SDK |
 
 The first two shapes are normal public SDK integration. The third is a public
@@ -104,8 +104,7 @@ adopter database credential.
 | `@roackb2/heddle/hosted` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
 | `@roackb2/heddle-remote` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
 | `@roackb2/heddle-postgres` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is heartbeat-specific, not a general product DB or conversation-history adapter |
-| `@roackb2/heddle-adopter` | A product invokes a separate compatible Execution Host | Stable v5 provides authority, transport, base turn orchestration, Node, and wire-testing helpers |
-| `@heddleagent/execution-host-client` | Preview the renamed integration kit and durable lifecycle | Canonical source adds store-backed lifecycle semantics and cross-language conformance, but `6.0.0-next.0` remains unpublished until its package release gate passes |
+| `@heddleagent/execution-host-client` | A product invokes a separate compatible Execution Host | Authority, transport, turn orchestration, durable lifecycle semantics, Node helpers, and cross-language conformance |
 | v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |
 
 The embedded runtime promise and the separate-host portability promise are
@@ -121,8 +120,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 | --- | --- | --- |
 | `@roackb2/heddle` and `/hosted` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@roackb2/heddle-remote` | Public | Browser-safe run protocol and optional HTTP/SSE client |
-| `@roackb2/heddle-adopter` | Public, experimental | Stable v5 TypeScript adopter helpers plus canonical OpenAPI, JSON Schema, wire fixtures, and an independent Python wire-contract proof |
-| `@heddleagent/execution-host-client` | Unpublished v6 candidate | The renamed canonical implementation plus the new durable lifecycle, store conformance, and shared TypeScript/Python lifecycle fixtures; not installable until `next` is verified |
+| `@heddleagent/execution-host-client` | Public | The canonical product-backend integration kit, including durable lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |
 

@@ -5,17 +5,17 @@ products that invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** version `6.0.0-next.0` is an unpublished v6
-> prerelease candidate. Until it is published, the stable package remains
-> `@roackb2/heddle-adopter@5.13.0`. Heddle does not currently distribute
+> **Current availability:** stable version `6.0.0`. The former
+> `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
+> migration. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
 > public surface documents and tests the adopter boundary without implying a
 > generally available deployment.
 
-After npm confirms the `next` dist-tag:
+Install the package:
 
 ```bash
-npm install @heddleagent/execution-host-client@next
+npm install @heddleagent/execution-host-client
 ```
 
 The package does **not** contain Heddle's agent loop, AgentCore deployment,
@@ -36,7 +36,7 @@ reference edges.
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
-Non-TypeScript adopters can consume the versioned candidate
+Non-TypeScript adopters can consume the versioned
 [`spec/v1`](spec/v1/README.md) OpenAPI 3.1.1 document, JSON Schema bundle, and
 golden conformance fixtures directly. The
 [`Python v1 conformance reference`](conformance/reference-adopters/python-v1/README.md)

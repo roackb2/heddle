@@ -7,15 +7,15 @@ const executionHostClientPackage = readPackage(
 );
 
 describe('@heddleagent/execution-host-client package boundary', () => {
-  it('is an explicit next-channel prerelease without becoming a root subpath', () => {
+  it('is a stable package without becoming a root subpath', () => {
     expect(executionHostClientPackage.name).toBe(
       '@heddleagent/execution-host-client',
     );
-    expect(executionHostClientPackage.version).toBe('6.0.0-next.0');
+    expect(executionHostClientPackage.version).toBe('6.0.0');
     expect(executionHostClientPackage.private).toBeUndefined();
     expect(executionHostClientPackage.publishConfig).toEqual({
       access: 'public',
-      tag: 'next',
+      tag: 'latest',
       registry: 'https://registry.npmjs.org/',
     });
     expect(executionHostClientPackage.repository.directory).toBe(

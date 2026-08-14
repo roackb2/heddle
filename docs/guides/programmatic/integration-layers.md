@@ -88,11 +88,10 @@ disconnect as implicit cancellation.
 | A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
 | A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 | A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
-| A backend invoking a separately deployed Execution Host | `@roackb2/heddle-adopter` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
+| A backend invoking a separately deployed Execution Host | `@heddleagent/execution-host-client` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
 
-The table uses the stable v5 coordinate. Its canonical source is moving to the
-unpublished `@heddleagent/execution-host-client@6.0.0-next.0` candidate; switch
-only after the `next` package is verified on npm.
+The former `@roackb2/heddle-adopter@5.13.0` coordinate remains installable
+during migration.
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -170,14 +169,13 @@ normal client architecture.
 
 ### Execution Host adopter
 
-Use `@roackb2/heddle-adopter` when Heddle runs in a separate Execution Host
+Use `@heddleagent/execution-host-client` when Heddle runs in a separate Execution Host
 rather than inside the product backend. The package owns v1 validation, short-
 lived execution authority, independent MCP capability verification, and the
 `ExecutionHost` outbound port. Its optional conversation and Node surfaces also
 own generic turn orchestration, JWKS/conversation HTTP mechanics, and safe
-local key-file loading. The unpublished
-`@heddleagent/execution-host-client@6.0.0-next.0` candidate adds durable
-lifecycle ordering over an injected store. The adopter retains product
+local key-file loading. It also owns durable lifecycle ordering over an
+injected store. The adopter retains product
 authentication, tenant mapping, production key
 storage/rotation, invocation-ID selection, product MCP behavior, the database
 adapter and schema, retention, and product result application. The Execution
