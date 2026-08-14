@@ -1,4 +1,4 @@
-import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
+import type { ResolvedRuntimeHost } from '@heddleagent/runtime/cli';
 
 export type CliV2CommandEdgeOptions = {
   workspaceRoot: string;

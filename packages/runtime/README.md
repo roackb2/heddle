@@ -33,6 +33,7 @@ import { HeartbeatTaskStoreConformance } from '@heddleagent/runtime/heartbeat/te
 | `@heddleagent/runtime/runs` | Process-local addressable runs, replay, cancellation, and approval resolution |
 | `@heddleagent/runtime/runs/http-sse` | Optional Node HTTP/SSE cursor, framing, backpressure, and disconnect helpers |
 | `@heddleagent/runtime/advanced` | Lower-level models, tools, memory, trace, heartbeat, browser drivers, and embeddable server composition |
+| `@heddleagent/runtime/cli` | Curated package-to-package bridge used by the official CLI product |
 | `@heddleagent/runtime/heartbeat/testing` | Executable conformance scenarios for custom heartbeat task stores |
 
 The `/runs` entrypoint was named `/hosted` on the former
@@ -69,5 +70,5 @@ depend on the CLI. Technology-specific packages implement public runtime ports
 one way and are never imported by the runtime itself.
 
 The former `@roackb2/heddle@5.13.0` package remains installable while consumers
-migrate. It also contains the legacy `heddle` executable; use the old package
-for that product until `@heddleagent/cli` is released.
+migrate. It also contains the former package location of the `heddle`
+executable; new installations use `@heddleagent/cli`.

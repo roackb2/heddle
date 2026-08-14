@@ -1,8 +1,8 @@
-import type { LlmProvider } from '@/core/llm/types.js';
 import {
   ProviderCredentialCommandService,
+  type LlmProvider,
   type ProviderCredentialCommandOptions,
-} from '@/core/auth/index.js';
+} from '@heddleagent/runtime/cli';
 
 export type AuthCliCommand = 'status' | 'logout' | 'login';
 export type AuthCliOptions = ProviderCredentialCommandOptions;

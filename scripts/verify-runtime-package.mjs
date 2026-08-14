@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const RUNTIME_PACKAGE_NAME = '@heddleagent/runtime';
-export const RUNTIME_PACKAGE_VERSION = '6.0.0';
+export const RUNTIME_PACKAGE_VERSION = '6.1.0';
 
 const dependencies = (rootPackage) => ({
   '@anthropic-ai/sdk': rootPackage.dependencies['@anthropic-ai/sdk'],
@@ -76,6 +76,10 @@ export function createRuntimeManifest(rootPackage) {
         types: './dist/src/advanced.d.ts',
         import: './dist/src/advanced.js',
       },
+      './cli': {
+        types: './dist/src/cli-runtime.d.ts',
+        import: './dist/src/cli-runtime.js',
+      },
       './heartbeat/testing': {
         types: './dist/src/heartbeat-testing.d.ts',
         import: './dist/src/heartbeat-testing.js',
@@ -133,6 +137,7 @@ export function verifyRuntimePackage(
   for (const entrypoint of [
     'src/index.ts',
     'src/advanced.ts',
+    'src/cli-runtime.ts',
     'src/hosted.ts',
     'src/hosted/http-sse.ts',
     'src/heartbeat-testing.ts',

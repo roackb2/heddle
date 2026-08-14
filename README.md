@@ -34,12 +34,16 @@ Start here:
 | Heddle SDK and runtime | Import the model/tool/conversation runtime into your TypeScript or Node backend | `@heddleagent/runtime` |
 | Hosted run layer | Keep Heddle in your server or worker, and add addressable runs, replay, cancellation, and remote clients | `@heddleagent/runtime/runs` and `@heddleagent/run-client` |
 | Separate Execution Host | Invoke an independently deployed compatible host from any backend language; expose product capabilities through invocation-bound MCP | `@heddleagent/execution-host-client` or its OpenAPI/JSON Schema contract |
-| Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `heddle` |
+| Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `@heddleagent/cli` (`heddle` command) |
 
 The stable separate-host package is
 `@heddleagent/execution-host-client@6.0.0`. The former
 `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
 migration.
+
+The stable coding-agent package is `@heddleagent/cli@6.0.0`; it installs the
+`heddle` command. The former `@roackb2/heddle@5.13.0` coordinate remains
+installable during migration.
 
 The **runtime** is library code. The **hosted run layer** runs inside
 infrastructure you operate; it is not a Heddle cloud service. A compatible
@@ -300,7 +304,7 @@ complete product host.
 Install the CLI:
 
 ```bash
-npm install -g @roackb2/heddle
+npm install -g @heddleagent/cli
 ```
 
 Configure one provider. For OpenAI, either use a Platform API key:
@@ -392,8 +396,8 @@ Heddle is designed to make assumptions and limitations visible:
   Python proof keep this boundary language-neutral;
 - the legacy `@roackb2/heddle-adopter@5.13.0` package remains installable for
   migration but is no longer the canonical implementation;
-- the legacy `@roackb2/heddle@5.13.0` package remains installable for SDK
-  migration and remains the current home of the `heddle` executable;
+- the legacy `@roackb2/heddle@5.13.0` package remains installable while SDK and
+  CLI users migrate to the independently versioned v6 packages;
 - `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
   but the adopter still owns PostgreSQL operations, migration rollout, trusted
   namespace resolution, delivery, and product-side idempotency;

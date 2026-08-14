@@ -11,6 +11,7 @@
   "include": [
     "../../src/index.ts",
     "../../src/advanced.ts",
+    "../../src/cli-runtime.ts",
     "../../src/hosted.ts",
     "../../src/hosted/**/*.ts",
     "../../src/heartbeat-testing.ts"

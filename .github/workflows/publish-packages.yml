@@ -6,15 +6,18 @@ on:
       - main
     paths:
       - .github/workflows/publish-packages.yml
+      - docs/releases/cli-v*.md
       - docs/releases/execution-host-client-v*.md
       - docs/releases/postgres-v*.md
       - docs/releases/run-client-v*.md
       - docs/releases/runtime-v*.md
       - package.json
+      - packages/cli/**
       - packages/execution-host-client/**
       - packages/postgres/**
       - packages/run-client/**
       - packages/runtime/**
+      - scripts/cli-release-state.mjs
       - scripts/execution-host-client-release-state.mjs
       - scripts/execution-host-client-pack-result.mjs
       - scripts/finalize-execution-host-client-release.mjs
@@ -26,6 +29,8 @@ on:
       - scripts/verify-postgres-pack.mjs
       - scripts/run-client-release-state.mjs
       - scripts/runtime-release-state.mjs
+      - scripts/verify-cli-package.mjs
+      - scripts/verify-cli-pack.mjs
       - scripts/verify-run-client-package.mjs
       - scripts/verify-run-client-pack.mjs
       - scripts/verify-runtime-package.mjs
@@ -119,6 +124,86 @@ jobs:
               --target "${GITHUB_SHA}" \
               --title "@heddleagent/runtime ${RELEASE_VERSION}" \
               --notes-file "docs/releases/runtime-v${RELEASE_VERSION}.md"
+          fi
+
+  cli:
+    name: cli
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm-release
+
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Pin release tooling
+        run: npm install --global npm@12.0.2 yarn@1.22.22
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build and verify CLI
+        run: yarn cli:pack:verify
+
+      - name: Select release state
+        id: release
+        run: yarn cli:release:state
+
+      - name: Create immutable release tag
+        if: steps.release.outputs.publication_needed == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            test "$(git rev-list -n 1 "${RELEASE_TAG}")" = "${GITHUB_SHA}"
+            test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "${RELEASE_TAG}" -m "Heddle CLI v${RELEASE_VERSION}"
+            git push origin "refs/tags/${RELEASE_TAG}"
+          fi
+
+      - name: Publish package when missing
+        if: steps.release.outputs.publication_needed == 'true'
+        run: >-
+          npm publish ./packages/cli
+          --provenance
+          --access public
+          --tag latest
+
+      - name: Verify registry release
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          test "$(npm view "@heddleagent/cli@${RELEASE_VERSION}" version)" = "${RELEASE_VERSION}"
+          test "$(npm view @heddleagent/cli dist-tags.latest)" = "${RELEASE_VERSION}"
+
+      - name: Create or verify GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            test "$(gh release view "${RELEASE_TAG}" --json targetCommitish --jq .targetCommitish)" = "${GITHUB_SHA}"
+          else
+            gh release create "${RELEASE_TAG}" \
+              --target "${GITHUB_SHA}" \
+              --title "@heddleagent/cli ${RELEASE_VERSION}" \
+              --notes-file "docs/releases/cli-v${RELEASE_VERSION}.md"
           fi
 
   run-client:

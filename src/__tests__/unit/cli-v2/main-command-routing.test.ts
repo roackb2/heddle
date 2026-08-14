@@ -41,7 +41,7 @@ describe('CLI command routing', () => {
 
     expect(source).toContain("import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';");
     expect(source).toContain("import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';");
-    expect(source).toContain("import { ProjectConfigService } from '@/core/project-config/index.js';");
+    expect(source).toMatch(/ProjectConfigService,[\s\S]*?from '@heddleagent\/runtime\/cli';/);
     expect(source).toContain('InitCliV2CommandEdgeService.run({ workspaceRoot: resolved.workspaceRoot });');
     expect(source).toContain('const projectConfig = ProjectConfigService.read(workspaceRoot);');
     expect(source).not.toContain("from './auth.js'");

@@ -26,19 +26,16 @@ For a user-facing release:
    release in lockstep. The legacy `@roackb2/heddle-adopter` and
    `@roackb2/heddle-remote` packages are frozen at `5.13.0`; their source
    remains recoverable from that release tag and they are not part of another
-   5.x release. Two private `@heddleagent/*` directories documented in
-   [`packages/README.md`](../../packages/README.md) remain non-releaseable.
-   The activated run client, Execution Host client, and PostgreSQL adapter family use
-   independent release lanes below and never inherit a root-package version
-   implicitly.
+   5.x release. The five stable `@heddleagent/*` packages documented in
+   [`packages/README.md`](../../packages/README.md) use independent release
+   lanes and never inherit a root-package version implicitly.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
 7. Create an annotated git tag on the shipped commit.
 8. Push the commit and tag, then create the GitHub release from the curated release note.
-9. Keep root v5 npm publishing as a final manual operator step. The activated
-   Execution Host client follows its independently versioned, OIDC-backed
-   release-PR lane below.
+9. Keep root v5 npm publishing as a final manual operator step. The v6 package
+   family follows independently versioned, OIDC-backed release lanes below.
 
 ## Verification Baseline
 
@@ -84,14 +81,34 @@ npm bootstrap before trusted publishing can be configured; later releases use
 the same `npm-release` environment and OIDC workflow as the other v6 packages.
 
 Do not unpublish `@roackb2/heddle@5.13.0`. It remains the compatibility package
-and current home of the `heddle` executable until `@heddleagent/cli` is live.
+while SDK and CLI users migrate.
+
+## CLI Release Lane
+
+`@heddleagent/cli` is independently versioned and publishes from `main`. It
+ships the existing `heddle` executable, terminal/TUI workflows, daemon, and
+built browser control plane. Its reusable runtime behavior comes from
+`@heddleagent/runtime`; the CLI package does not copy the agent loop.
+
+```bash
+yarn package-family:verify
+yarn cli:pack:verify
+npm publish ./packages/cli --dry-run --access public --tag latest
+```
+
+The pack gate installs exact local runtime and CLI tarballs into a fresh
+consumer, verifies the executable and version, exercises daemon help, and
+confirms the browser assets are present. The main workflow publishes runtime
+changes first, then creates `cli-v<version>`, publishes the missing CLI version
+to `latest`, verifies npm, and creates the matching GitHub release. The first
+coordinate publication may require the same one-time manual npm bootstrap as
+the other v6 packages.
 
 ## Execution Host Client Release Lane
 
 `@heddleagent/execution-host-client` is independently versioned from the root
 runtime. Stable releases use the normal npm `latest` tag. Do not bump the root,
-remote, PostgreSQL, or private-foundation manifests for this package-only
-release.
+remote, PostgreSQL, or other v6 package manifests for this package-only release.
 
 Before review or publication, run:
 
@@ -161,7 +178,7 @@ this independently versioned package.
 `@heddleagent/postgres` is independently versioned and exports only adapters
 that have migrations and real-database conformance. Its stable releases use
 `latest` and package-specific `postgres-v<version>` tags. Do not bump the root,
-remote, legacy PostgreSQL, or private-foundation manifests for this package.
+remote, legacy PostgreSQL, or other v6 package manifests for this package.
 
 Before review or publication, run:
 

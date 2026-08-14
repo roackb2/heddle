@@ -1,13 +1,16 @@
 import { resolve } from 'node:path';
 import compact from 'lodash/compact.js';
-import { DEFAULT_OPENAI_MODEL, LlmAdapterService } from '@/advanced.js';
-import { ProviderCredentialRepository } from '@/core/auth/index.js';
-import { MemoryCatalogService } from '@/core/memory/catalog.js';
-import { MemoryMaintenanceService } from '@/core/memory/maintainer.js';
-import { MemoryValidationService } from '@/core/memory/validation.js';
-import { MemoryVisibilityService } from '@/core/memory/visibility.js';
-import type { MemoryValidationResult } from '@/core/memory/types.js';
-import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
+import {
+  DEFAULT_OPENAI_MODEL,
+  LlmAdapterService,
+  LlmProviderRuntimeService,
+  MemoryCatalogService,
+  MemoryMaintenanceService,
+  MemoryValidationService,
+  MemoryVisibilityService,
+  ProviderCredentialRepository,
+  type MemoryValidationResult,
+} from '@heddleagent/runtime/cli';
 import type { CliV2CommandEdgeOptions } from './types.js';
 
 export type MemoryCliCommand = 'status' | 'init' | 'list' | 'read' | 'search' | 'validate' | 'maintain';

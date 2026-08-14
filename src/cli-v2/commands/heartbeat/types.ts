@@ -1,5 +1,5 @@
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
-import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
+import type { ResolvedRuntimeHost } from '@heddleagent/runtime/cli';
 
 export type HeartbeatCliOptions = {
   model?: string;

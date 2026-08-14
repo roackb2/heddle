@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       '@web': resolve(__dirname, 'src/web-v2'),
+      '@heddleagent/runtime/cli': resolve(__dirname, 'src/cli-runtime.ts'),
     },
   },
   test: {

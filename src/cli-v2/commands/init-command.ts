@@ -1,4 +1,4 @@
-import { ProjectConfigService } from '@/core/project-config/index.js';
+import { ProjectConfigService } from '@heddleagent/runtime/cli';
 
 export type InitCliV2CommandOptions = {
   workspaceRoot: string;

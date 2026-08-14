@@ -2,11 +2,12 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import {
   ControlPlaneChatSessionPresenter,
+  RuntimeHostResolver,
   startHeddleControlPlaneServer,
-} from '@/server/index.js';
-import type { HeddleControlPlaneServerHandle, HeddleControlPlaneServerOptions } from '@/server/index.js';
-import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
-import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
+  type HeddleControlPlaneServerHandle,
+  type HeddleControlPlaneServerOptions,
+  type ResolvedRuntimeHost,
+} from '@heddleagent/runtime/cli';
 
 export type DaemonCliOptions = {
   workspaceRoot?: string;

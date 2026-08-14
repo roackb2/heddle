@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import type { ControlPlaneHeartbeatTaskView } from '@/client-shared/api/types.js';
-import { truncate } from '@/core/utils/text.js';
+import { truncate } from '@heddleagent/runtime/cli';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';

@@ -1,5 +1,5 @@
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
-import type { AppRouter } from '@/server/router.js';
+import type { AppRouter } from '@heddleagent/runtime/cli';
 
 // Interface code imports API contracts from this shared client boundary. Keep
 // AppRouter type imports isolated here so web-v2, TUI, and CLI code never reach

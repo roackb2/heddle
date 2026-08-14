@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import type { ControlPlaneHeartbeatRunView } from '@/client-shared/api/types.js';
-import { truncate } from '@/core/utils/text.js';
+import { truncate } from '@heddleagent/runtime/cli';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { parsePositiveInt, stringFlag } from './args.js';
 import { firstLine, stripHeartbeatDecisionLine } from './summary.js';

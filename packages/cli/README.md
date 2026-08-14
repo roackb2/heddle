@@ -1,10 +1,13 @@
 # `@heddleagent/cli`
 
-Status: **private package foundation; not published or installable**
-
-This package will ship the finished Heddle coding-agent product. Installing it
-will provide the `heddle` executable even though the npm package itself uses a
+This package ships the finished Heddle coding-agent product. Installing it
+provides the `heddle` executable even though the npm package itself uses a
 scoped name.
+
+```bash
+npm install --global @heddleagent/cli
+heddle --help
+```
 
 ## Owns
 
@@ -20,13 +23,13 @@ scoped name.
 - separate Execution Host client contracts; or
 - database adapters.
 
-The CLI will depend on `@heddleagent/runtime`. Reusable behavior discovered in
-the CLI should move into the runtime rather than being duplicated by other
-products.
+The CLI depends on `@heddleagent/runtime`. Reusable behavior discovered in the
+CLI moves into the runtime rather than being duplicated by other products. The
+package compiles the canonical `src/cli-v2` product surfaces and bundles the
+canonical browser control-plane assets; it does not contain a second copy of
+the runtime.
 
-The current implementation and `heddle` binary remain in
-`@roackb2/heddle`. Activate this package only after the CLI imports a deliberate
-runtime public surface, retains its daemon/browser assets, and passes clean
-binary-install verification. No `bin` field belongs in this foundation
-manifest. See the [package-family boundary](../README.md) before changing this
-status.
+`@roackb2/heddle@5.13.0` remains installable for existing users. Version 6
+changes the package coordinate while intentionally preserving the current CLI,
+TUI, daemon, and browser control-plane feature set. See the
+[package-family boundary](../README.md) before changing this responsibility.

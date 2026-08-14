@@ -32,11 +32,14 @@ conversation 與 run 基礎之上。
 | Heddle SDK 與 runtime | 把 model、tool 與 conversation runtime 匯入 TypeScript 或 Node backend | `@heddleagent/runtime` |
 | Hosted run layer | Heddle 仍在你的 server 或 worker 內，額外提供可定址 run、replay、cancellation 與 remote client | `@heddleagent/runtime/runs` 與 `@heddleagent/run-client` |
 | 獨立 Execution Host | 任何語言的 backend 都能呼叫另外部署的 compatible host，並透過 invocation-bound MCP 暴露產品能力 | `@heddleagent/execution-host-client` 或 OpenAPI／JSON Schema contract |
-| Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `heddle` |
+| Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `@heddleagent/cli`（`heddle` command） |
 
 獨立 Execution Host 的穩定套件是
 `@heddleagent/execution-host-client@6.0.0`。舊的
 `@roackb2/heddle-adopter@5.13.0` coordinate 在遷移期間仍可安裝。
+
+穩定的 coding-agent 套件是 `@heddleagent/cli@6.0.0`，安裝後提供
+`heddle` command。舊的 `@roackb2/heddle@5.13.0` coordinate 在遷移期間仍可安裝。
 
 **Runtime** 是 library code。**Hosted run layer** 在你營運的 infrastructure
 內執行，並不是 Heddle cloud service。Compatible **Execution Host** 則是另一個
@@ -281,7 +284,7 @@ Coding agent 是把 Heddle runtime 當成完整 product host 體驗的最快方�
 安裝 CLI：
 
 ```bash
-npm install -g @roackb2/heddle
+npm install -g @heddleagent/cli
 ```
 
 設定一個 provider。使用 OpenAI Platform API key：

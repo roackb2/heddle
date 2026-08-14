@@ -2,11 +2,14 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Command } from 'commander';
 import dayjs from 'dayjs';
-import { cleanupEvalResults } from '@/core/eval/cleanup.js';
-import { loadEvalCases } from '@/core/eval/case-loader.js';
-import { runAgentEvalCase } from '@/core/eval/agent-runner.js';
-import { writeEvalSuiteReport } from '@/core/eval/report-writer.js';
-import type { EvalCase, EvalSuiteReport } from '@/core/eval/schema.js';
+import {
+  cleanupEvalResults,
+  loadEvalCases,
+  runAgentEvalCase,
+  writeEvalSuiteReport,
+  type EvalCase,
+  type EvalSuiteReport,
+} from '@heddleagent/runtime/cli';
 
 export type EvalCliOptions = {
   repoRoot: string;
