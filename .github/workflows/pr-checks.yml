@@ -140,18 +140,6 @@ jobs:
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
 
-      - name: Set up release Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Pin release npm
-        run: npm install --global npm@12.0.2
-
-      - name: Verify PostgreSQL npm release state
-        run: node scripts/verify-postgres-pack.mjs --verify-registry
-
   test-execution-host-client:
     name: test-execution-host-client
     runs-on: ubuntu-latest
@@ -175,18 +163,6 @@ jobs:
 
       - name: Verify packed Execution Host client
         run: yarn execution-host-client:pack:verify
-
-      - name: Set up release Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Pin release npm
-        run: npm install --global npm@12.0.2
-
-      - name: Verify npm release state
-        run: node scripts/verify-execution-host-client-pack.mjs --verify-registry
 
   test-run-client:
     name: test-run-client

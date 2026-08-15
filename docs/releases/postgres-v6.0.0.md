@@ -30,24 +30,15 @@ recovery, conversation-session adapters, or the heartbeat adapter migration.
 
 ## Verification and publication
 
-The release gate verifies:
+The release checks verify:
 
 - the exact manifest, export, dependency, migration, and tarball allowlists;
 - JavaScript loading and strict TypeScript consumption from a fresh install;
 - the real-PostgreSQL conformance and concurrent fencing tests;
-- the immutable npm integrity and `latest -> 6.0.0` channel;
+- the `latest -> 6.0.0` npm channel after publication;
 - an annotated `postgres-v6.0.0` tag and normal GitHub release; and
 - continued availability of the legacy v5 PostgreSQL package.
 
-Publication uses the exact verified tarball. The npm package's trusted
-publisher is restricted to `roackb2/heddle`, `publish-packages.yml`, the
-`npm-release` environment, and protected `main`. npm can attach that publisher
-only after the new coordinate exists, so this first coordinate may require one
-operator-authenticated bootstrap publication from the tagged, clean main
-commit. Configure the trusted publisher immediately afterward and rerun the
-same workflow commit; subsequent immutable versions publish automatically on
-merge.
-
-Do not manually republish after a successful workflow. A recovery rerun must
-verify the already-published integrity and fresh consumers without mutating the
-immutable version.
+Publication is a separate manual operator action from the reviewed release
+commit. Merging a future release to `main` does not publish it. If a publish
+command ends ambiguously, inspect the exact version on npm before retrying.

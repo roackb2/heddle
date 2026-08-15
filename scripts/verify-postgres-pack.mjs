@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -11,15 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  NPM_REGISTRY,
-  assertDistTagTransition,
-  assertRegistryArtifactMatches,
-  parseNpmViewResult,
-  parseRegistryArtifactResult,
-} from './execution-host-client-release-state.mjs';
 import { parseNpmPackResult } from './execution-host-client-pack-result.mjs';
-import { createPostgresReleaseMetadata } from './postgres-release-state.mjs';
 import {
   POSTGRES_PACKAGE_NAME,
   POSTGRES_PACKAGE_VERSION,
@@ -37,21 +28,11 @@ const commandEnvironment = {
   ...process.env,
   npm_config_cache: join(temporaryDirectory, 'npm-cache'),
 };
-const publishIfMissing = process.argv.includes('--publish-if-missing');
-const verifyRegistry = process.argv.includes('--verify-registry');
-const acceptedArguments = publishIfMissing
-  ? ['--publish-if-missing']
-  : verifyRegistry
-    ? ['--verify-registry']
-    : [];
-
 assert.deepEqual(
   process.argv.slice(2),
-  acceptedArguments,
-  'The pack verifier accepts only one explicit registry mode.',
+  [],
+  'The pack verifier accepts no arguments and never publishes.',
 );
-
-let registryOutcome = 'packed';
 
 try {
   verifyPostgresPackage(new URL('../', import.meta.url), {
@@ -103,21 +84,11 @@ try {
     );
   }
 
-  const releaseMetadata = createPostgresReleaseMetadata(packageJson);
   const tarball = join(temporaryDirectory, packed.filename);
   verifyFreshConsumer(tarball, 'local-tarball-consumer');
 
-  if (publishIfMissing || verifyRegistry) {
-    registryOutcome = await verifyRegistryRelease({
-      packed,
-      tarball,
-      releaseMetadata,
-      publishIfMissing,
-    });
-  }
-
   process.stdout.write(
-    `${describeOutcome(registryOutcome)} ${POSTGRES_PACKAGE_NAME}@${POSTGRES_PACKAGE_VERSION} in a fresh runtime and TypeScript consumer.\n`,
+    `Verified packed ${POSTGRES_PACKAGE_NAME}@${POSTGRES_PACKAGE_VERSION} in a fresh runtime and TypeScript consumer.\n`,
   );
 } finally {
   rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -144,7 +115,7 @@ function verifyFreshConsumer(installSpec, directoryName) {
       '--no-fund',
       '--no-package-lock',
       '--registry',
-      NPM_REGISTRY,
+      'https://registry.npmjs.org/',
     ],
     consumerDirectory,
   );
@@ -285,229 +256,6 @@ function exportTargets(exports) {
   return Object.values(exports).flatMap((entry) =>
     typeof entry === 'string' ? [entry] : Object.values(entry),
   );
-}
-
-async function verifyRegistryRelease({
-  packed,
-  tarball,
-  releaseMetadata,
-  publishIfMissing,
-}) {
-  const target = `${releaseMetadata.name}@${releaseMetadata.version}`;
-  let artifact = readRegistryArtifact(target);
-  if (artifact.kind === 'published') {
-    assertRegistryArtifactMatches(artifact, {
-      version: releaseMetadata.version,
-      integrity: packed.integrity,
-    });
-    assert.equal(
-      readDistTags(releaseMetadata.name).latest,
-      releaseMetadata.version,
-      'The latest dist-tag must identify the repository version.',
-    );
-    verifyRegistryConsumers(releaseMetadata);
-    return 'already-published';
-  }
-
-  assert.equal(
-    existsSync(join(repositoryDirectory, releaseMetadata.releaseNote)),
-    true,
-    `Release ${releaseMetadata.version} requires ${releaseMetadata.releaseNote}.`,
-  );
-  if (!publishIfMissing) return 'release-ready';
-
-  assertPublicationContext(releaseMetadata);
-  const distTagsBefore = readDistTagsIfPresent(releaseMetadata.name);
-  const publishResult = publishTarball(tarball);
-  artifact = await waitForRegistryArtifact(target);
-  if (artifact.kind === 'missing') {
-    throw new Error(
-      `npm publish did not make ${target} publicly visible. Exit status: ${publishResult.status ?? 'unknown'}.`,
-    );
-  }
-
-  assertRegistryArtifactMatches(artifact, {
-    version: releaseMetadata.version,
-    integrity: packed.integrity,
-  });
-  assertDistTagTransition({
-    before: distTagsBefore,
-    after: readDistTags(releaseMetadata.name),
-    version: releaseMetadata.version,
-  });
-  verifyRegistryConsumers(releaseMetadata);
-  return 'published';
-}
-
-function assertPublicationContext(releaseMetadata) {
-  assert.equal(
-    run('git', ['status', '--porcelain'], repositoryDirectory).stdout,
-    '',
-    'Publication requires a clean worktree for commit, tag, and registry-integrity traceability.',
-  );
-  const tagsAtHead = run(
-    'git',
-    ['tag', '--points-at', 'HEAD'],
-    repositoryDirectory,
-  ).stdout.split('\n');
-  assert.ok(
-    tagsAtHead.includes(releaseMetadata.releaseTag),
-    `Publication requires annotated tag ${releaseMetadata.releaseTag} on HEAD.`,
-  );
-  assert.equal(
-    run(
-      'git',
-      ['cat-file', '-t', `refs/tags/${releaseMetadata.releaseTag}`],
-      repositoryDirectory,
-    ).stdout.trim(),
-    'tag',
-    `Release tag ${releaseMetadata.releaseTag} must be annotated.`,
-  );
-
-  if (process.env.GITHUB_ACTIONS === 'true') {
-    assert.equal(process.env.GITHUB_REPOSITORY, 'roackb2/heddle');
-    assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
-    assert.equal(
-      process.env.GITHUB_SHA,
-      run('git', ['rev-parse', 'HEAD'], repositoryDirectory).stdout.trim(),
-      'GitHub Actions must publish the exact checked-out main commit.',
-    );
-    assert.ok(
-      process.env.ACTIONS_ID_TOKEN_REQUEST_URL,
-      'GitHub Actions publication requires id-token: write for npm trusted publishing.',
-    );
-    return;
-  }
-
-  assert.equal(
-    run(
-      'npm',
-      ['whoami', '--registry', NPM_REGISTRY],
-      repositoryDirectory,
-    ).stdout.trim(),
-    'roackb2',
-    'Manual recovery publication must use the npm account that owns @heddleagent.',
-  );
-}
-
-function publishTarball(tarball) {
-  const result = spawnSync(
-    'npm',
-    [
-      'publish',
-      tarball,
-      '--access',
-      'public',
-      '--tag',
-      'latest',
-      '--registry',
-      NPM_REGISTRY,
-    ],
-    {
-      cwd: repositoryDirectory,
-      env: commandEnvironment,
-      stdio: 'inherit',
-    },
-  );
-  if (result.error) throw result.error;
-  return result;
-}
-
-function readRegistryArtifact(target) {
-  return parseRegistryArtifactResult(
-    runResult(
-      'npm',
-      [
-        'view',
-        target,
-        'version',
-        'dist.integrity',
-        '--json',
-        '--registry',
-        NPM_REGISTRY,
-        '--prefer-online',
-      ],
-      repositoryDirectory,
-    ),
-    target,
-  );
-}
-
-async function waitForRegistryArtifact(target) {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    const artifact = readRegistryArtifact(target);
-    if (artifact.kind === 'published') return artifact;
-    if (attempt < 119) await delay(5_000);
-  }
-  return { kind: 'missing' };
-}
-
-function readDistTags(packageName) {
-  return parseNpmViewResult(
-    run(
-      'npm',
-      [
-        'view',
-        packageName,
-        'dist-tags',
-        '--json',
-        '--registry',
-        NPM_REGISTRY,
-        '--prefer-online',
-      ],
-      repositoryDirectory,
-    ).stdout,
-    `${packageName} dist-tags`,
-  );
-}
-
-function readDistTagsIfPresent(packageName) {
-  const result = runResult(
-    'npm',
-    [
-      'view',
-      packageName,
-      'dist-tags',
-      '--json',
-      '--registry',
-      NPM_REGISTRY,
-      '--prefer-online',
-    ],
-    repositoryDirectory,
-  );
-  if (result.status === 0) {
-    return parseNpmViewResult(result.stdout, `${packageName} dist-tags`);
-  }
-  assert.match(
-    `${result.stdout}\n${result.stderr}`,
-    /E404|404 Not Found/,
-    `Registry dist-tag lookup for ${packageName} failed for a reason other than an absent package.`,
-  );
-  return {};
-}
-
-function verifyRegistryConsumers(releaseMetadata) {
-  verifyFreshConsumer(
-    `${releaseMetadata.name}@${releaseMetadata.version}`,
-    'registry-exact-consumer',
-  );
-  verifyFreshConsumer(
-    `${releaseMetadata.name}@latest`,
-    'registry-channel-consumer',
-  );
-}
-
-function describeOutcome(outcome) {
-  return {
-    packed: 'Verified packed',
-    'release-ready': 'Verified release-ready',
-    'already-published': 'Verified existing registry artifact',
-    published: 'Published and verified',
-  }[outcome];
-}
-
-function delay(milliseconds) {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
 function run(command, args, cwd) {
