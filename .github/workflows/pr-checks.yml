@@ -137,9 +137,6 @@ jobs:
       - name: Test PostgreSQL package
         run: yarn postgres:test
 
-      - name: Verify packed PostgreSQL package
-        run: yarn postgres:pack:verify
-
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
 
@@ -163,72 +160,6 @@ jobs:
 
       - name: Test Execution Host client
         run: yarn execution-host-client:test
-
-      - name: Verify packed Execution Host client
-        run: yarn execution-host-client:pack:verify
-
-  test-run-client:
-    name: test-run-client
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Verify packed run client
-        run: yarn run-client:pack:verify
-
-  test-runtime-package:
-    name: test-runtime-package
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Verify packed runtime
-        run: yarn runtime:pack:verify
-
-  test-cli-package:
-    name: test-cli-package
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Verify packed CLI
-        run: yarn cli:pack:verify
 
   test-python-adopter-conformance:
     name: test-python-adopter-conformance

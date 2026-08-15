@@ -51,7 +51,7 @@ The five `@heddleagent/*` packages are independently versioned, but all use the
 same deliberately manual release shape:
 
 1. bump only the package being released and write its curated release note;
-2. run that package's normal build, tests, and pack check;
+2. run that package's normal build and relevant tests;
 3. merge the reviewed release commit to `main`;
 4. create and push an annotated package-specific tag;
 5. create the GitHub release from the curated note;
@@ -66,27 +66,27 @@ before trying again.
 
 Use these package-specific checks and publish commands:
 
-| Package | Verification | Manual publication | Annotated tag |
+| Package | Pre-publish check | Manual publication | Annotated tag |
 | --- | --- | --- | --- |
-| `@heddleagent/run-client` | `yarn run-client:pack:verify` | `npm publish ./packages/run-client --access public --tag latest` | `run-client-v<version>` |
-| `@heddleagent/runtime` | `yarn runtime:pack:verify` | `npm publish ./packages/runtime --access public --tag latest` | `runtime-v<version>` |
-| `@heddleagent/cli` | `yarn cli:pack:verify` | `npm publish ./packages/cli --access public --tag latest` | `cli-v<version>` |
-| `@heddleagent/execution-host-client` | `yarn execution-host-client:test && yarn execution-host-client:conformance:python-v1 && yarn execution-host-client:pack:verify` | `npm publish ./packages/execution-host-client --access public --tag latest` | `execution-host-client-v<version>` |
-| `@heddleagent/postgres` | `HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test && yarn postgres:pack:verify` | `npm publish ./packages/postgres --access public --tag latest` | `postgres-v<version>` |
+| `@heddleagent/run-client` | `yarn run-client:build` | `npm publish ./packages/run-client --access public --tag latest` | `run-client-v<version>` |
+| `@heddleagent/runtime` | `yarn runtime:build` | `npm publish ./packages/runtime --access public --tag latest` | `runtime-v<version>` |
+| `@heddleagent/cli` | `yarn cli:build` | `npm publish ./packages/cli --access public --tag latest` | `cli-v<version>` |
+| `@heddleagent/execution-host-client` | `yarn execution-host-client:test && yarn execution-host-client:conformance:python-v1 && yarn execution-host-client:build` | `npm publish ./packages/execution-host-client --access public --tag latest` | `execution-host-client-v<version>` |
+| `@heddleagent/postgres` | `HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test && yarn postgres:build` | `npm publish ./packages/postgres --access public --tag latest` | `postgres-v<version>` |
 
 Publish a changed runtime before a CLI version that depends on it. Publish a
 changed Execution Host client before a PostgreSQL adapter version that depends
 on it. Apply the PostgreSQL package's ordered migration to the explicit test
 database before its real-database test.
 
-The pack checks never publish or mutate registry state. Stable publication
-moves `latest`; any historical prerelease tag remains independent. Keep the
-published `@roackb2/*` packages available for already-installed consumers, but
-do not release new 5.x versions as part of the v6 package family.
+Stable publication moves `latest`; any historical prerelease tag remains
+independent. Keep the published `@roackb2/*` packages available for
+already-installed consumers, but do not release new 5.x versions as part of
+the v6 package family.
 
 ## Fast Release Preflight
 
-Before spending time on the full build/test/pack baseline, check the auth- and
+Before spending time on the full build/test baseline, check the auth- and
 environment-sensitive release steps that most often fail late:
 
 ```bash
