@@ -3,7 +3,7 @@
 Status: **five stable packages**
 
 This directory records the v6 package identities and responsibility boundaries.
-`@heddleagent/execution-host-client@6.0.0` contains its canonical
+`@heddleagent/execution-host-client@6.1.0` contains its canonical
 implementation as a stable package. `@heddleagent/postgres@6.1.0` ships the
 Execution Host lifecycle and heartbeat adapters. `@heddleagent/run-client@6.0.0`
 ships the existing browser-safe run client under its final coordinate.
@@ -20,7 +20,7 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 | `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.1.0`; `/runs` replaces the former `/hosted` package-path name and `/cli` is the package-to-package bridge for the official CLI |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
-| `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
+| `@heddleagent/execution-host-client` | Product-backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.1.0`; official AgentCore transport at `/agentcore` |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.1.0`; Execution Host conversation lifecycle and heartbeat task authority are explicit subpaths |
 
 The in-process run service is exposed from
