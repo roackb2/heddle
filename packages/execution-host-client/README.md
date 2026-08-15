@@ -1,11 +1,11 @@
 # `@heddleagent/execution-host-client`
 
-`@heddleagent/execution-host-client` is the lightweight backend-side SDK for
+`@heddleagent/execution-host-client` is the backend-side SDK for
 products that invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** stable version `6.0.0`. The former
+> **Current availability:** stable version `6.1.0`. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
@@ -18,10 +18,10 @@ Install the package:
 npm install @heddleagent/execution-host-client
 ```
 
-The package does **not** contain Heddle's agent loop, AgentCore deployment,
-Terraform, product MCP tools, or product logic. It uses the official MCP SDK,
-plus `jose`, `zod`, `dayjs`, and `eventsource-parser`, for its optional
-reference edges.
+The package does **not** contain Heddle's agent loop, AgentCore Runtime
+deployment, Terraform, product MCP tools, or product logic. It uses the
+modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
+`jose`, `zod`, `dayjs`, and `eventsource-parser`, for its other edges.
 
 ## What it owns
 
@@ -33,6 +33,7 @@ reference edges.
 | `@heddleagent/execution-host-client/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@heddleagent/execution-host-client/http-sse` | Transport-neutral `ExecutionHost` port and strict direct-development HTTP/SSE client |
+| `@heddleagent/execution-host-client/agentcore` | Official AWS AgentCore/SigV4 implementation of the same `ExecutionHost` port |
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
@@ -53,7 +54,8 @@ The adopter still owns:
   allocation, the lifecycle-store implementation/schema/migrations, retention,
   and history queries;
 - implementing and hosting product MCP tools against its own APIs and data;
-- choosing an AgentCore/SigV4 transport, applying results, and rendering UI.
+- choosing and provisioning its AgentCore Runtime, applying results, and
+  rendering UI.
 
 ## Issue one invocation's authority
 
@@ -225,11 +227,32 @@ const productMcp = new NodeStreamableHttpMcpService({
 Use the lower-level `NodeMcpToolset` interface only when a tool needs custom MCP
 content or lifecycle semantics.
 
-## Invoke the direct development host
+## Invoke an Execution Host
 
-The direct client is useful for local and reviewed HTTPS deployments. A
-managed AgentCore deployment should supply a separate SigV4/AWS SDK transport
-which implements the same `ExecutionHost` port.
+Use the official AgentCore client for a Runtime deployed in the adopter's AWS
+account. It uses the normal AWS credential chain, signs the required Heddle
+authority headers, streams the response through the same strict protocol
+validation as the direct client, and deliberately makes only one ambiguous
+streaming attempt.
+
+```ts
+import {
+  AgentCoreExecutionHost,
+} from '@heddleagent/execution-host-client/agentcore'
+
+const host = new AgentCoreExecutionHost({
+  region: process.env.AWS_REGION!,
+  runtimeArn: process.env.AGENTCORE_RUNTIME_ARN!,
+  qualifier: process.env.AGENTCORE_RUNTIME_QUALIFIER,
+})
+```
+
+The product still owns the AWS account, Runtime deployment, IAM policy,
+configuration, and credentials environment. Heddle owns only the reusable
+invocation transport.
+
+For local development and reviewed direct HTTPS deployments, use the direct
+client:
 
 ```ts
 import { DirectHttpExecutionHost } from '@heddleagent/execution-host-client/http-sse'

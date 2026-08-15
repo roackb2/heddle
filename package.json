@@ -227,9 +227,9 @@
     }
   },
   "dependencies": {
-    "@heddleagent/run-client": "^6.0.0",
     "@anthropic-ai/sdk": "^0.54.0",
     "@fontsource-variable/inter": "^5.2.8",
+    "@heddleagent/run-client": "^6.0.0",
     "@hookform/resolvers": "^5.4.0",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -288,8 +288,10 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "3.1107.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
+    "@smithy/protocol-http": "5.5.16",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/express": "^5.0.6",
@@ -311,8 +313,8 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "eventsource-parser": "^3.1.0",
     "globals": "^17.5.0",
-    "jsdom": "^29.0.2",
     "jose": "^6.2.8",
+    "jsdom": "^29.0.2",
     "pg": "8.22.0",
     "react-dom": "^19.2.5",
     "streamdown": "^2.5.0",

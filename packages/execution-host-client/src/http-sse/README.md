@@ -9,5 +9,5 @@ host rejection, invalid protocol, and ambiguous interruption remain distinct.
 
 The adapter uses the Execution Host's direct local-token ingress. It does not
 implement AWS AgentCore invocation, SigV4, retries, durable result recovery, or
-product result projection. A future AgentCore transport can implement the same
-`ExecutionHost` port without changing the adopter's application service.
+product result projection. The official `../agentcore` module implements the
+same `ExecutionHost` port without changing the adopter's application service.

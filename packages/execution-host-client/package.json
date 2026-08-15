@@ -1,6 +1,6 @@
 {
   "name": "@heddleagent/execution-host-client",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Backend contracts, execution authority, lifecycle services, and clients for compatible Heddle Execution Hosts",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
@@ -54,6 +54,10 @@
       "types": "./dist/http-sse/index.d.ts",
       "import": "./dist/http-sse/index.js"
     },
+    "./agentcore": {
+      "types": "./dist/agentcore/index.d.ts",
+      "import": "./dist/agentcore/index.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
@@ -83,7 +87,9 @@
     "streaming"
   ],
   "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.1107.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@smithy/protocol-http": "^5.5.16",
     "dayjs": "^1.11.20",
     "eventsource-parser": "^3.1.0",
     "jose": "^6.2.8",

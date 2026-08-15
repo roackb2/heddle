@@ -37,7 +37,7 @@ Start here:
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `@heddleagent/cli` (`heddle` command) |
 
 The stable separate-host package is
-`@heddleagent/execution-host-client@6.0.0`. The former
+`@heddleagent/execution-host-client@6.1.0`. The former
 `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers.
 
@@ -224,7 +224,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@heddleagent/run-client` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
+| A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, direct and AgentCore clients, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
 | Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
 | Durable PostgreSQL heartbeat workers | `@heddleagent/postgres/heartbeat` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@heddleagent/runtime/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |

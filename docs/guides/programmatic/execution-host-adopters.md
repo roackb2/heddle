@@ -2,14 +2,15 @@
 
 Use the Execution Host integration contract when your product backend does not
 embed Heddle and instead invokes a separately deployed Heddle Execution Host.
-The package is small on purpose: it provides the security-sensitive contract
-machinery while your product keeps its language stack and domain ownership.
+The package is focused on purpose: it provides the security-sensitive contract
+and transport machinery while your product keeps its language stack and domain
+ownership.
 
 The package is currently an experimental public contract and local proving
 surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
-The stable coordinate is `@heddleagent/execution-host-client@6.0.0`. The
+The stable coordinate is `@heddleagent/execution-host-client@6.1.0`. The
 former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers. It does not include the durable
 lifecycle described below.
@@ -80,6 +81,8 @@ Its subpaths separate responsibility:
   an adopter-defined product toolset;
 - `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
   direct-development transport;
+- `/agentcore` provides the official AWS SDK/SigV4 implementation of that port
+  for an adopter-provisioned AgentCore Runtime;
 - `/testing` provides a Node-only loopback v1 fixture for local product/MCP
   integration tests without a model or AWS, plus real-store lifecycle
   conformance.
@@ -120,7 +123,7 @@ The package deliberately excludes:
 - production signing-key storage and rotation, route placement, and key
   revocation;
 - MCP tool registration, product APIs, or database access;
-- AWS AgentCore/SigV4 transport and deployment;
+- AWS account configuration, AgentCore Runtime deployment, and IAM policy;
 - Heddle's loop, tools, model runtime, workspace, or state serialization;
 - invocation-ID allocation, database implementation, explicit result lookup or
   retry after ambiguity, billing, and UI.
@@ -148,13 +151,15 @@ minimization.
 
 `DirectHttpExecutionHost` targets local development and reviewed direct HTTPS
 deployments. It owns strict request/SSE validation but uses the Execution Host
-local-token ingress. It is not an AgentCore client.
+local-token ingress.
 
-A managed AgentCore adapter should implement the same `ExecutionHost` port with
-the AWS SDK and SigV4 while preserving the same v1 body, forwarded custom
-headers, ordered stream semantics, and no-ambiguous-retry rule. Keeping that
-adapter separate prevents AWS types from leaking into the product application
-service.
+`AgentCoreExecutionHost` from
+`@heddleagent/execution-host-client/agentcore` is the official AWS SDK/SigV4
+transport. It preserves the same v1 body, forwards only the required custom
+headers before signing, validates ordered stream semantics, and never retries
+an ambiguous streaming invocation. The adopter supplies its AWS region,
+Runtime ARN, optional qualifier, credential environment, IAM policy, and
+Runtime deployment.
 
 ## Progressive Node adoption
 
