@@ -6,8 +6,8 @@ adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
 > **Current availability:** stable version `6.0.0`. The former
-> `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
-> migration. Heddle does not currently distribute
+> `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
+> installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
 > public surface documents and tests the adopter boundary without implying a
 > generally available deployment.

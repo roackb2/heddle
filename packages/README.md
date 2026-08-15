@@ -9,9 +9,9 @@ first official v6 database adapter. `@heddleagent/run-client@6.0.0` ships the
 existing browser-safe run client under its final coordinate.
 `@heddleagent/runtime@6.1.0` ships the existing embeddable SDK and the bridge
 used by the official CLI. `@heddleagent/cli@6.0.0` ships the existing `heddle`
-command, TUI, daemon, and browser control plane. Existing
-`@roackb2/*` packages remain supported until each replacement is independently
-verified and released.
+command, TUI, daemon, and browser control plane. The former `@roackb2/*`
+coordinates are deprecated and remain installable only so existing applications
+keep running; new integrations should use the `@heddleagent/*` packages.
 
 ## Initial v6 family
 
@@ -21,7 +21,7 @@ verified and released.
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
-| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.0.0`; first entrypoint implements the Execution Host conversation lifecycle; heartbeat remains in `@roackb2/heddle-postgres` until its separate migration |
+| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.0.0`; the first entrypoint implements the Execution Host conversation lifecycle |
 
 The in-process run service is exposed from
 `@heddleagent/runtime/runs`; it is not a sixth package. Its conventional Node
@@ -88,22 +88,16 @@ flowchart LR
 - Future adapter packages follow the same one-way dependency rule. They are not
   part of the initial release merely because their names appear in this design.
 
-## Activation rules
+## Legacy coordinates
 
-All five packages are activated and independently versioned. Each package
-compiles one canonical implementation path, declares only its own runtime
-dependencies, and has a packed-consumer verification before publication.
+The `@roackb2/heddle`, `@roackb2/heddle-remote`, and
+`@roackb2/heddle-adopter` packages are deprecated. They are not the starting
+point for new applications and do not receive a new v5 release line. Existing
+published versions remain on npm so already-installed applications continue to
+resolve them.
 
-Run `yarn package-family:verify` to enforce all of the following:
-
-- exactly the five selected package identities exist;
-- all five activated packages have exact reviewed stable manifests, dependency
-  boundaries, exports, source ownership, and release tags;
-- package licenses and repository metadata remain consistent; and
-- the two remaining local v5 package identities stay present, while the
-  published former adopter and remote-client tarballs remain installable
-  during migration.
-
-Future package changes preserve one canonical code path, the existing build,
-and one packed-consumer smoke. Do not create file dependencies, duplicate
-implementations, or introduce a workspace/build-tool migration.
+The deprecated `@roackb2/heddle-postgres` package still contains the existing
+heartbeat PostgreSQL adapter. That capability has not yet moved into
+`@heddleagent/postgres`; do not infer heartbeat support from the new package's
+name. Its eventual move is a separate mechanical package slice, not part of the
+Execution Host lifecycle adapter shipped in `6.0.0`.

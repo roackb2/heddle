@@ -38,12 +38,12 @@ Start here:
 
 The stable separate-host package is
 `@heddleagent/execution-host-client@6.0.0`. The former
-`@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
-migration.
+`@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
+installable only for existing consumers.
 
 The stable coding-agent package is `@heddleagent/cli@6.0.0`; it installs the
 `heddle` command. The former `@roackb2/heddle@5.13.0` coordinate remains
-installable during migration.
+installable only for existing consumers and is deprecated for new installs.
 
 The **runtime** is library code. The **hosted run layer** runs inside
 infrastructure you operate; it is not a Heddle cloud service. A compatible
@@ -226,7 +226,7 @@ that already owns the mechanics your host needs:
 | Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
 | A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, hosted-turn orchestration, durable requested/accepted/terminal persistence semantics, product-MCP verification, an `ExecutionHost` client port, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
 | Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
-| Durable PostgreSQL heartbeat workers | `@roackb2/heddle-postgres` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
+| Existing PostgreSQL heartbeat workers | Deprecated `@roackb2/heddle-postgres` | Legacy claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@heddleagent/runtime/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
 
 Existing tRPC, Fastify, Hono, Nest, WebSocket, IPC, queue, React, or other stacks
@@ -394,13 +394,13 @@ Heddle is designed to make assumptions and limitations visible:
   adopter still owns identity, policy, production key operations, tools, and
   results; canonical OpenAPI/JSON Schema/golden fixtures and a clean-room
   Python proof keep this boundary language-neutral;
-- the legacy `@roackb2/heddle-adopter@5.13.0` package remains installable for
-  migration but is no longer the canonical implementation;
-- the legacy `@roackb2/heddle@5.13.0` package remains installable while SDK and
-  CLI users migrate to the independently versioned v6 packages;
-- `@roackb2/heddle-postgres` implements Heddle's heartbeat persistence policy,
-  but the adopter still owns PostgreSQL operations, migration rollout, trusted
-  namespace resolution, delivery, and product-side idempotency;
+- the deprecated `@roackb2/heddle-adopter@5.13.0` package remains installable
+  only so existing consumers keep running;
+- the deprecated `@roackb2/heddle@5.13.0` package remains installable only so
+  existing SDK and CLI consumers keep running;
+- the deprecated `@roackb2/heddle-postgres` package implements the existing
+  heartbeat persistence policy but is not a new-integration entry point or a
+  capability of `@heddleagent/postgres@6.0.0`;
 - the SDK is actively evolving, so review
   [release notes](docs/releases/README.md) before upgrading public APIs.
 

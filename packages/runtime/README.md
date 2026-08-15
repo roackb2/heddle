@@ -69,6 +69,6 @@ not maintain a second copy of the runtime implementation. The
 depend on the CLI. Technology-specific packages implement public runtime ports
 one way and are never imported by the runtime itself.
 
-The former `@roackb2/heddle@5.13.0` package remains installable while consumers
-migrate. It also contains the former package location of the `heddle`
-executable; new installations use `@heddleagent/cli`.
+The former `@roackb2/heddle@5.13.0` package is deprecated and remains
+installable only for existing consumers. New SDK installations use this
+package; new coding-agent installations use `@heddleagent/cli`.

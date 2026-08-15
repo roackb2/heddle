@@ -29,7 +29,7 @@ package compiles the canonical `src/cli-v2` product surfaces and bundles the
 canonical browser control-plane assets; it does not contain a second copy of
 the runtime.
 
-`@roackb2/heddle@5.13.0` remains installable for existing users. Version 6
-changes the package coordinate while intentionally preserving the current CLI,
-TUI, daemon, and browser control-plane feature set. See the
+`@roackb2/heddle@5.13.0` is deprecated and remains installable only for
+existing users. Version 6 changes the package coordinate while intentionally
+preserving the current CLI, TUI, daemon, and browser control-plane feature set. See the
 [package-family boundary](../README.md) before changing this responsibility.

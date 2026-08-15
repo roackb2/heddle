@@ -33,8 +33,8 @@ CLI, React, authentication, authorization, timers, or product UI state. It
 remains independent of `@heddleagent/runtime` and requires adopters to supply
 their own public event schemas and credentials.
 
-`@roackb2/heddle-remote@5.13.0` remains installable for existing consumers.
-Version 6 changes the package coordinate but intentionally preserves the
-current feature set and public entrypoints.
+`@roackb2/heddle-remote@5.13.0` is deprecated and remains installable only for
+existing consumers. Version 6 changes the package coordinate but intentionally
+preserves the current feature set and public entrypoints.
 
 See the complete [remote conversation run guide](https://github.com/roackb2/heddle/blob/main/docs/guides/programmatic/remote-runs.md).
