@@ -34,8 +34,8 @@ For a user-facing release:
 6. Write curated release notes from that real scope.
 7. Create an annotated git tag on the shipped commit.
 8. Push the commit and tag, then create the GitHub release from the curated release note.
-9. Keep root v5 npm publishing as a final manual operator step. The v6 package
-   family follows independently versioned, OIDC-backed release lanes below.
+9. Keep npm publishing as a final manual operator step for every package.
+   Merging to `main` does not tag, publish, or create a GitHub release.
 
 ## Verification Baseline
 
@@ -48,167 +48,44 @@ Before tagging a release, use the normal green checkpoint baseline:
 
 Add more verification if the release changes a workflow that needs manual validation.
 
-## Run Client Release Lane
+## Manual v6 Package Publication
 
-`@heddleagent/run-client` is independently versioned and publishes from
-`main`. Its package-only gate intentionally stays small:
+The five `@heddleagent/*` packages are independently versioned, but all use the
+same deliberately manual release shape:
 
-```bash
-yarn run-client:pack:verify
-npm publish ./packages/run-client --dry-run --access public --tag latest
-```
+1. bump only the package being released and write its curated release note;
+2. run that package's normal build, tests, and pack check;
+3. merge the reviewed release commit to `main`;
+4. create and push an annotated package-specific tag;
+5. create the GitHub release from the curated note;
+6. confirm `npm whoami` is the owning account;
+7. run `npm publish <package-directory> --access public --tag latest`; and
+8. verify the exact version and `latest` dist-tag with `npm view`.
 
-The gate builds the existing browser-safe implementation, packs it, installs
-the tarball into one fresh ESM consumer, and imports both public entrypoints.
+npm may require an interactive browser or OTP approval. Publication is not a
+CI responsibility, and merging to `main` never implies that npm succeeded. If
+the publish command ends ambiguously, check the exact version with `npm view`
+before trying again.
 
-## Runtime Release Lane
+Use these package-specific checks and publish commands:
 
-`@heddleagent/runtime` is independently versioned and publishes from `main`.
-It contains the existing embeddable SDK/runtime source graph without the CLI,
-TUI, daemon product lifecycle, or built browser UI. Its package-only gate is:
+| Package | Verification | Manual publication | Annotated tag |
+| --- | --- | --- | --- |
+| `@heddleagent/run-client` | `yarn run-client:pack:verify` | `npm publish ./packages/run-client --access public --tag latest` | `run-client-v<version>` |
+| `@heddleagent/runtime` | `yarn runtime:pack:verify` | `npm publish ./packages/runtime --access public --tag latest` | `runtime-v<version>` |
+| `@heddleagent/cli` | `yarn cli:pack:verify` | `npm publish ./packages/cli --access public --tag latest` | `cli-v<version>` |
+| `@heddleagent/execution-host-client` | `yarn execution-host-client:test && yarn execution-host-client:conformance:python-v1 && yarn execution-host-client:pack:verify` | `npm publish ./packages/execution-host-client --access public --tag latest` | `execution-host-client-v<version>` |
+| `@heddleagent/postgres` | `HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test && yarn postgres:pack:verify` | `npm publish ./packages/postgres --access public --tag latest` | `postgres-v<version>` |
 
-```bash
-yarn package-family:verify
-yarn runtime:pack:verify
-npm publish ./packages/runtime --dry-run --access public --tag latest
-```
+Publish a changed runtime before a CLI version that depends on it. Publish a
+changed Execution Host client before a PostgreSQL adapter version that depends
+on it. Apply the PostgreSQL package's ordered migration to the explicit test
+database before its real-database test.
 
-Merging a runtime release to `main` runs the package workflow, creates the
-package-specific `runtime-v<version>` tag, publishes the missing immutable
-version to `latest`, verifies the registry version, and creates the matching
-GitHub release. The first coordinate publication may require a one-time manual
-npm bootstrap before trusted publishing can be configured; later releases use
-the same `npm-release` environment and OIDC workflow as the other v6 packages.
-
-Do not unpublish `@roackb2/heddle@5.13.0`. It remains the compatibility package
-while SDK and CLI users migrate.
-
-## CLI Release Lane
-
-`@heddleagent/cli` is independently versioned and publishes from `main`. It
-ships the existing `heddle` executable, terminal/TUI workflows, daemon, and
-built browser control plane. Its reusable runtime behavior comes from
-`@heddleagent/runtime`; the CLI package does not copy the agent loop.
-
-```bash
-yarn package-family:verify
-yarn cli:pack:verify
-npm publish ./packages/cli --dry-run --access public --tag latest
-```
-
-The pack gate installs exact local runtime and CLI tarballs into a fresh
-consumer, verifies the executable and version, exercises daemon help, and
-confirms the browser assets are present. The main workflow publishes runtime
-changes first, then creates `cli-v<version>`, publishes the missing CLI version
-to `latest`, verifies npm, and creates the matching GitHub release. The first
-coordinate publication may require the same one-time manual npm bootstrap as
-the other v6 packages.
-
-## Execution Host Client Release Lane
-
-`@heddleagent/execution-host-client` is independently versioned from the root
-runtime. Stable releases use the normal npm `latest` tag. Do not bump the root,
-remote, PostgreSQL, or other v6 package manifests for this package-only release.
-
-Before review or publication, run:
-
-```bash
-npm whoami
-yarn package-family:verify
-yarn typecheck
-yarn lint
-yarn test
-yarn execution-host-client:conformance:python-v1
-yarn build
-yarn execution-host-client:pack:verify
-yarn execution-host-client:release:verify
-npm publish ./packages/execution-host-client --dry-run --access public --tag latest
-git diff --check
-```
-
-`execution-host-client:pack:verify` packs the release, verifies every export
-and conformance fixture, installs the tarball in a fresh ESM consumer, imports
-all JavaScript subpaths, and typechecks all TypeScript subpaths.
-`execution-host-client:release:verify` additionally checks npm: an existing
-immutable version must have the same tarball integrity, while an absent version
-must have a matching release note. Changed bytes under an already published
-version fail closed and require a version bump.
-
-The default publication path is `.github/workflows/publish-packages.yml`. A
-release PR explicitly changes the Execution Host client version, maintains the
-matching `docs/releases/execution-host-client-v<version>.md`, and passes normal
-PR checks. Merging that PR to `main` makes the workflow:
-
-1. run the TypeScript and Python package gates on a GitHub-hosted runner;
-2. create or verify the annotated package-specific tag at the merge commit;
-3. pack and re-run fresh-consumer verification;
-4. publish only when the exact immutable version returns a registry `E404`;
-5. verify registry integrity, dist-tag movement, exact-version installation,
-   and channel installation; and
-6. create or verify the package-specific GitHub release.
-
-An ordinary relevant merge whose package bytes equal the already published
-version is a no-op. An ordinary merge that changes package bytes without a
-version bump fails. The workflow is serialized and may be rerun on the same
-`main` commit after an infrastructure failure; it never retries an ambiguous
-publish until it first checks the immutable version and integrity.
-
-npm trusted publishing authorizes only repository `roackb2/heddle`, workflow
-`publish-packages.yml`, and GitHub environment `npm-release`. The workflow uses
-`id-token: write`, Node 24, and a pinned npm CLI that supports OIDC. It stores
-no npm write token; trusted publishing automatically supplies provenance for
-future releases. The GitHub environment must allow deployments only from
-`main`. Do not broaden the workflow to pull requests or unprotected branches.
-
-Stable publication moves `latest` to the released version and preserves any
-other existing dist-tags. The historical `next` tag remains at
-`6.0.0-next.0`; it is not part of the normal release or installation path.
-
-For manual recovery on the exact tagged commit, use
-`yarn execution-host-client:publish:if-missing`. It requires a clean worktree,
-an annotated package tag on `HEAD`, the owning npm account, and interactive
-2FA. It is idempotent: a matching published artifact is verified and skipped.
-Do not unpublish `@roackb2/heddle-adopter@5.13.0`; keep it available while
-consumers migrate. Use a package-specific
-`execution-host-client-v<version>` tag rather than a root `v<version>` tag for
-this independently versioned package.
-
-## PostgreSQL Adapter Release Lane
-
-`@heddleagent/postgres` is independently versioned and exports only adapters
-that have migrations and real-database conformance. Its stable releases use
-`latest` and package-specific `postgres-v<version>` tags. Do not bump the root,
-remote, legacy PostgreSQL, or other v6 package manifests for this package.
-
-Before review or publication, run:
-
-```bash
-npm whoami
-yarn package-family:verify
-yarn typecheck
-yarn lint
-HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test
-yarn postgres:pack:verify
-yarn postgres:release:verify
-npm publish ./packages/postgres --dry-run --access public --tag latest
-git diff --check
-```
-
-Apply the package's ordered migration to the explicit test database before the
-real-PostgreSQL test. The PR and publication workflows do this against a fresh
-PostgreSQL 17 service. The pack verifier allowlists the tarball, verifies every
-export and migration, and consumes the exact artifact from fresh JavaScript
-and strict TypeScript projects.
-
-The main-only publication job follows the Execution Host client's immutable
-version, annotated tag, exact-integrity, fresh-consumer, and GitHub release
-rules. For the first coordinate only, npm may require an operator-authenticated
-bootstrap from the exact verified tarball because trusted-publisher settings
-cannot be attached before the package exists. Afterward, configure repository
-`roackb2/heddle`, workflow `publish-packages.yml`, environment `npm-release`,
-then rerun the same main commit. Manual recovery uses
-`yarn postgres:publish:if-missing`; it fails unless the worktree is clean and
-the annotated package tag identifies `HEAD`.
+The pack checks never publish or mutate registry state. Stable publication
+moves `latest`; any historical prerelease tag remains independent. Keep the
+published `@roackb2/*` packages available for already-installed consumers, but
+do not release new 5.x versions as part of the v6 package family.
 
 ## Fast Release Preflight
 
