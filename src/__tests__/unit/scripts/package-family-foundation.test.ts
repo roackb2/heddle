@@ -140,7 +140,7 @@ describe('@heddleagent/postgres activation', () => {
     ['unsupported adapter export', {
       exports: {
         ...createPostgresManifest(rootPackage).exports,
-        './heartbeat': './dist/heartbeat/index.js',
+        './artifacts': './dist/artifacts/index.js',
       },
     }],
   ])('rejects an unsafe %s mutation', (_label, mutation) => {

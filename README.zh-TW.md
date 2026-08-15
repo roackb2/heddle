@@ -216,7 +216,7 @@ mechanics 的最低層即可：
 | 一般 browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
 | Backend 呼叫獨立 Execution Host | `@heddleagent/execution-host-client` | Contract、authority/JWKS、hosted-turn orchestration、durable requested/accepted/terminal persistence、product-MCP verification、provider-neutral client port、store conformance 與 TypeScript/Python fixture |
 | 以 PostgreSQL 保存 Execution Host lifecycle | `@heddleagent/postgres/execution-host/conversations` | Atomic scope fencing、由 adopter 執行的 ordered migration、SQL constraint、expiry 與 real-PostgreSQL conformance |
-| 既有 PostgreSQL heartbeat worker | Deprecated `@roackb2/heddle-postgres` | Legacy heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是新的 integration 起點，也不是 `@heddleagent/postgres@6.0.0` 的能力 |
+| PostgreSQL heartbeat worker | `@heddleagent/postgres/heartbeat` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
 | 更底層的 runtime 組裝 | `@heddleagent/runtime/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |
 
 既有的 tRPC、Fastify、Hono、Nest、WebSocket、IPC、queue、React 或其他技術棧，

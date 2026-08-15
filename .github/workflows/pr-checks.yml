@@ -125,11 +125,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Apply PostgreSQL lifecycle migration
-        run: >-
-          psql "$HEDDLE_POSTGRES_TEST_URL"
-          --set ON_ERROR_STOP=1
-          --file packages/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql
+      - name: Apply PostgreSQL package migrations
+        run: |
+          psql "$HEDDLE_POSTGRES_TEST_URL" \
+            --set ON_ERROR_STOP=1 \
+            --file packages/postgres/migrations/heartbeat/0000_heartbeat_authority.sql
+          psql "$HEDDLE_POSTGRES_TEST_URL" \
+            --set ON_ERROR_STOP=1 \
+            --file packages/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql
 
       - name: Test PostgreSQL package
         run: yarn postgres:test

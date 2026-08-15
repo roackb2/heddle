@@ -71,10 +71,6 @@ export function verifyPackageFamily(
 
   const legacyPackages = new Map([
     [new URL('package.json', repositoryUrl), '@roackb2/heddle'],
-    [
-      new URL('packages/heddle-postgres/package.json', repositoryUrl),
-      '@roackb2/heddle-postgres',
-    ],
   ]);
 
   for (const [packageUrl, expectedName] of legacyPackages) {

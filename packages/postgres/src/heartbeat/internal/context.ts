@@ -6,7 +6,7 @@ import {
   type HeartbeatTaskExecution,
   type HeartbeatTaskRunRecord,
   type HeartbeatTaskRunRecordEntry,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import dayjs from 'dayjs';
 import {
   and,

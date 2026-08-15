@@ -58,6 +58,10 @@ try {
     'README.md',
     'LICENSE',
     'package.json',
+    'dist/heartbeat/index.js',
+    'dist/heartbeat/index.d.ts',
+    'dist/heartbeat/schema.js',
+    'migrations/heartbeat/0000_heartbeat_authority.sql',
     'dist/execution-host/conversations/index.js',
     'dist/execution-host/conversations/index.d.ts',
     'migrations/execution-host/conversations/0000_turn_lifecycle.sql',
@@ -107,6 +111,7 @@ function verifyFreshConsumer(installSpec, directoryName) {
       'install',
       installSpec,
       '@heddleagent/execution-host-client@6.0.0',
+      '@heddleagent/runtime@6.1.0',
       'drizzle-orm@0.45.2',
       'pg@8.22.0',
       '@types/pg@8.20.0',
@@ -163,6 +168,11 @@ function runtimeSmokeSource() {
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import {
+  createPostgresHeartbeatTaskAuthority,
+  heartbeatPostgresMigrationSqlUrl,
+  postgresHeartbeatTasks,
+} from '@heddleagent/postgres/heartbeat'
+import {
   createPostgresHostedConversationTurnLifecycleStore,
   executionHostConversationPostgresMigrationSqlUrls,
   postgresExecutionHostConversationTurns,
@@ -174,6 +184,10 @@ import { Pool } from 'pg'
 if (typeof createPostgresHostedConversationTurnLifecycleStore !== 'function') {
   throw new Error('The lifecycle store factory failed to load.')
 }
+if (typeof createPostgresHeartbeatTaskAuthority !== 'function' ||
+    !postgresHeartbeatTasks) {
+  throw new Error('The heartbeat authority failed to load.')
+}
 if (!postgresExecutionHostConversationTurns ||
     executionHostConversationPostgresMigrationSqlUrls.length !== 1) {
   throw new Error('The PostgreSQL schema or ordered migrations failed to load.')
@@ -181,6 +195,10 @@ if (!postgresExecutionHostConversationTurns ||
 const sql = readFileSync(executionHostConversationPostgresMigrationSqlUrls[0], 'utf8')
 if (!sql.includes('execution_host_conversation_turns')) {
   throw new Error('The packed lifecycle migration is invalid.')
+}
+const heartbeatSql = readFileSync(heartbeatPostgresMigrationSqlUrl, 'utf8')
+if (!heartbeatSql.includes('heartbeat_tasks')) {
+  throw new Error('The packed heartbeat migration is invalid.')
 }
 
 if (process.env.HEDDLE_POSTGRES_TEST_URL) {
@@ -232,6 +250,11 @@ if (process.env.HEDDLE_POSTGRES_TEST_URL) {
 function typesSmokeSource() {
   return `
 import {
+  createPostgresHeartbeatTaskAuthority,
+  type HeartbeatPostgresDatabase,
+  type PostgresHeartbeatTaskAuthority,
+} from '@heddleagent/postgres/heartbeat'
+import {
   createPostgresHostedConversationTurnLifecycleStore,
   executionHostConversationPostgresMigrationSqlUrls,
   postgresExecutionHostConversationTurns,
@@ -240,6 +263,7 @@ import {
 } from '@heddleagent/postgres/execution-host/conversations'
 import type { HostedConversationTurnLifecycleStore } from
   '@heddleagent/execution-host-client/conversation'
+import type { HeartbeatTargetedTaskStore } from '@heddleagent/runtime/advanced'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 declare const database: NodePgDatabase
@@ -247,7 +271,15 @@ const accepted: ExecutionHostConversationPostgresDatabase = database
 const store: PostgresHostedConversationTurnLifecycleStore =
   createPostgresHostedConversationTurnLifecycleStore({ database: accepted })
 const contract: HostedConversationTurnLifecycleStore = store
-void [contract, postgresExecutionHostConversationTurns,
+const heartbeatDatabase: HeartbeatPostgresDatabase = database
+const heartbeat: PostgresHeartbeatTaskAuthority =
+  createPostgresHeartbeatTaskAuthority({
+    database: heartbeatDatabase,
+    namespace: 'packed-consumer',
+    executionLeaseMs: 60_000,
+  })
+const heartbeatStore: HeartbeatTargetedTaskStore = heartbeat.store
+void [contract, heartbeatStore, postgresExecutionHostConversationTurns,
   executionHostConversationPostgresMigrationSqlUrls]
 `;
 }

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "rootDir": "./src",
     "paths": {
+      "@heddleagent/runtime/advanced": ["dist/src/advanced.d.ts"],
       "@heddleagent/execution-host-client/conversation": [
         "packages/execution-host-client/dist/conversation/index.d.ts"
       ]

@@ -4,9 +4,9 @@ Status: **five stable packages**
 
 This directory records the v6 package identities and responsibility boundaries.
 `@heddleagent/execution-host-client@6.0.0` contains its canonical
-implementation as a stable package. `@heddleagent/postgres@6.0.0` ships the
-first official v6 database adapter. `@heddleagent/run-client@6.0.0` ships the
-existing browser-safe run client under its final coordinate.
+implementation as a stable package. `@heddleagent/postgres@6.1.0` ships the
+Execution Host lifecycle and heartbeat adapters. `@heddleagent/run-client@6.0.0`
+ships the existing browser-safe run client under its final coordinate.
 `@heddleagent/runtime@6.1.0` ships the existing embeddable SDK and the bridge
 used by the official CLI. `@heddleagent/cli@6.0.0` ships the existing `heddle`
 command, TUI, daemon, and browser control plane. The former `@roackb2/*`
@@ -21,7 +21,7 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
-| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.0.0`; the first entrypoint implements the Execution Host conversation lifecycle |
+| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.1.0`; Execution Host conversation lifecycle and heartbeat task authority are explicit subpaths |
 
 The in-process run service is exposed from
 `@heddleagent/runtime/runs`; it is not a sixth package. Its conventional Node
@@ -91,13 +91,12 @@ flowchart LR
 ## Legacy coordinates
 
 The `@roackb2/heddle`, `@roackb2/heddle-remote`, and
-`@roackb2/heddle-adopter` packages are deprecated. They are not the starting
-point for new applications and do not receive a new v5 release line. Existing
-published versions remain on npm so already-installed applications continue to
-resolve them.
+`@roackb2/heddle-adopter`, and `@roackb2/heddle-postgres` packages are
+deprecated. They are not the starting point for new applications and do not
+receive a new v5 release line. Existing published versions remain on npm so
+already-installed applications continue to resolve them.
 
-The deprecated `@roackb2/heddle-postgres` package still contains the existing
-heartbeat PostgreSQL adapter. That capability has not yet moved into
-`@heddleagent/postgres`; do not infer heartbeat support from the new package's
-name. Its eventual move is a separate mechanical package slice, not part of the
-Execution Host lifecycle adapter shipped in `6.0.0`.
+The heartbeat PostgreSQL implementation now lives only under
+`@heddleagent/postgres/heartbeat`. The deprecated package's source directory is
+removed from the active repository; its historical source remains recoverable
+from the `v5.13.0` tag.

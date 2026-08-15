@@ -7,7 +7,7 @@ import {
 } from './verify-execution-host-client-package.mjs';
 
 export const POSTGRES_PACKAGE_NAME = '@heddleagent/postgres';
-export const POSTGRES_PACKAGE_VERSION = '6.0.0';
+export const POSTGRES_PACKAGE_VERSION = '6.1.0';
 
 export function createPostgresManifest(rootPackage) {
   return {
@@ -37,6 +37,14 @@ export function createPostgresManifest(rootPackage) {
       node: rootPackage.engines.node,
     },
     exports: {
+      './heartbeat': {
+        types: './dist/heartbeat/index.d.ts',
+        import: './dist/heartbeat/index.js',
+      },
+      './heartbeat/schema': {
+        types: './dist/heartbeat/schema.d.ts',
+        import: './dist/heartbeat/schema.js',
+      },
       './execution-host/conversations': {
         types: './dist/execution-host/conversations/index.d.ts',
         import: './dist/execution-host/conversations/index.js',
@@ -46,6 +54,7 @@ export function createPostgresManifest(rootPackage) {
     files: ['dist', 'migrations', 'README.md', 'LICENSE'],
     keywords: [
       'agent',
+      'heartbeat',
       'execution-host',
       'postgresql',
       'drizzle',
@@ -54,7 +63,16 @@ export function createPostgresManifest(rootPackage) {
     peerDependencies: {
       '@heddleagent/execution-host-client':
         `>=${EXECUTION_HOST_CLIENT_VERSION} <7`,
+      '@heddleagent/runtime': '>=6.0.0 <7',
       'drizzle-orm': `>=${rootPackage.devDependencies['drizzle-orm']} <1`,
+    },
+    peerDependenciesMeta: {
+      '@heddleagent/execution-host-client': {
+        optional: true,
+      },
+      '@heddleagent/runtime': {
+        optional: true,
+      },
     },
     dependencies: {
       dayjs: rootPackage.dependencies.dayjs,
@@ -95,6 +113,8 @@ export function verifyPostgresPackage(
     'The PostgreSQL package must ship the repository license without drift.',
   );
   for (const path of [
+    'src/heartbeat/index.ts',
+    'migrations/heartbeat/0000_heartbeat_authority.sql',
     'src/execution-host/conversations/index.ts',
     'migrations/execution-host/conversations/0000_turn_lifecycle.sql',
   ]) {
@@ -104,6 +124,11 @@ export function verifyPostgresPackage(
       `${POSTGRES_PACKAGE_NAME} is missing ${path}.`,
     );
   }
+  assert.equal(
+    existsSync(new URL('packages/heddle-postgres/', repositoryUrl)),
+    false,
+    'The legacy PostgreSQL source package must not duplicate the consolidated adapter family.',
+  );
 
   if (writeOutput) {
     process.stdout.write(

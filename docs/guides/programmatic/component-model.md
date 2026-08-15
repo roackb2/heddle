@@ -104,7 +104,7 @@ adopter database credential.
 | `@heddleagent/runtime` | Heddle runs inside a TypeScript/Node process | This is the supported runtime and SDK |
 | `@heddleagent/runtime/runs` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
 | `@heddleagent/run-client` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
-| Deprecated `@roackb2/heddle-postgres` | An existing deployment still uses the current PostgreSQL heartbeat adapter | It is the legacy heartbeat-only coordinate, not a general product DB or a capability of `@heddleagent/postgres@6.0.0` |
+| `@heddleagent/postgres/heartbeat` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is one explicit adapter subpath, not a general product DB or conversation-history adapter |
 | `@heddleagent/execution-host-client` | A product invokes a separate compatible Execution Host | Authority, transport, turn orchestration, durable lifecycle semantics, Node helpers, and cross-language conformance |
 | `@heddleagent/postgres/execution-host/conversations` | That product stores the generic lifecycle in PostgreSQL | Official atomic store and ordered migrations; no product history/query policy or pool ownership |
 | v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |

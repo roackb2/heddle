@@ -1,6 +1,6 @@
 {
   "name": "@heddleagent/postgres",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Official PostgreSQL adapters for selected Heddle-owned domain persistence ports",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
@@ -24,6 +24,14 @@
     "node": ">=20"
   },
   "exports": {
+    "./heartbeat": {
+      "types": "./dist/heartbeat/index.d.ts",
+      "import": "./dist/heartbeat/index.js"
+    },
+    "./heartbeat/schema": {
+      "types": "./dist/heartbeat/schema.d.ts",
+      "import": "./dist/heartbeat/schema.js"
+    },
     "./execution-host/conversations": {
       "types": "./dist/execution-host/conversations/index.d.ts",
       "import": "./dist/execution-host/conversations/index.js"
@@ -38,6 +46,7 @@
   ],
   "keywords": [
     "agent",
+    "heartbeat",
     "execution-host",
     "postgresql",
     "drizzle",
@@ -45,7 +54,16 @@
   ],
   "peerDependencies": {
     "@heddleagent/execution-host-client": ">=6.0.0 <7",
+    "@heddleagent/runtime": ">=6.0.0 <7",
     "drizzle-orm": ">=0.45.2 <1"
+  },
+  "peerDependenciesMeta": {
+    "@heddleagent/execution-host-client": {
+      "optional": true
+    },
+    "@heddleagent/runtime": {
+      "optional": true
+    }
   },
   "dependencies": {
     "dayjs": "^1.11.20"

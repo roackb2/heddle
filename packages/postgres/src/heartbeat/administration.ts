@@ -9,7 +9,7 @@ import {
   type ReconcileHeartbeatTasksInput,
   type ReconcileHeartbeatTasksResult,
   type UpdateHeartbeatTaskInput,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import { HeartbeatPostgresContext } from './internal/context.js';
 import type { PostgresHeartbeatTaskStore } from './store.js';
 

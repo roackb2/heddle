@@ -21,12 +21,10 @@ For a user-facing release:
 
 1. Choose the version to ship.
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
-3. Update the package version in `package.json` and
-   `packages/heddle-postgres/package.json`. Those remaining local v5 packages
-   release in lockstep. The legacy `@roackb2/heddle-adopter` and
-   `@roackb2/heddle-remote` packages are frozen at `5.13.0`; their source
-   remains recoverable from that release tag and they are not part of another
-   5.x release. The five stable `@heddleagent/*` packages documented in
+3. Update only the selected `@heddleagent/*` package manifest. The deprecated
+   `@roackb2/*` packages are frozen at `5.13.0`; their source remains
+   recoverable from that release tag and they are not part of another 5.x
+   release. The five stable `@heddleagent/*` packages documented in
    [`packages/README.md`](../../packages/README.md) use independent release
    lanes and never inherit a root-package version implicitly.
 4. Verify the release candidate on the intended commit.
@@ -44,7 +42,6 @@ Before tagging a release, use the normal green checkpoint baseline:
 - `yarn build`
 - `yarn test`
 - `npm pack --dry-run --cache /tmp/heddle-npm-cache`
-- `npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache`
 
 Add more verification if the release changes a workflow that needs manual validation.
 
@@ -150,8 +147,8 @@ Do not infer release boundaries from version-bump commit messages alone when an 
 For the actual release pass:
 
 1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
-2. Confirm the intended next version matches in `package.json` and
-   `packages/heddle-postgres/package.json`.
+2. Confirm the intended next version in the selected `@heddleagent/*` package
+   manifest.
 3. Run the release verification baseline.
 4. Review the git range since the previous release tag.
 5. Update or draft the release note in `docs/releases/`.
@@ -166,9 +163,6 @@ For the actual release pass:
 Typical release sequence:
 
 ```bash
-npm view @roackb2/heddle version
-npm view @roackb2/heddle-adopter version
-npm view @roackb2/heddle-postgres version
 gh release list --limit 5
 gh auth status
 gh auth switch -u <username-if-needed>
@@ -176,7 +170,6 @@ gh api user
 yarn build
 yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
-npm pack ./packages/heddle-postgres --dry-run --cache /tmp/heddle-npm-cache
 yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
 git push origin main
@@ -187,22 +180,6 @@ gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y
 Before a package's first publication, its `npm view` command is expected to
 return `E404`; confirm the package name is genuinely unregistered rather than
 treating that first-release state as a failed preflight.
-
-After the GitHub release, the operator publishes the remaining verified 5.x
-artifacts: Heddle first, then the optional PostgreSQL package whose peer
-dependency requires that Heddle version:
-
-```bash
-npm publish
-yarn legacy-postgres:publish
-```
-
-`yarn legacy-postgres:publish` verifies and builds the v5 optional adapter
-against the same Heddle version before publication. Pass normal npm publish
-flags through these scripts when needed.
-
-This remains a manual operator step unless npm publication was explicitly
-delegated.
 
 If the repo does not have a previous tag yet, run `yarn release:context <base-ref> HEAD` with the intended release boundary instead.
 

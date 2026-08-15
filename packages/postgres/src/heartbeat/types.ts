@@ -1,7 +1,7 @@
 import type {
   HeartbeatTargetedTaskStore,
   HeartbeatTaskAdministrationService,
-} from '@roackb2/heddle/advanced';
+} from '@heddleagent/runtime/advanced';
 import type { PgDatabase } from 'drizzle-orm/pg-core/db';
 import type { PgQueryResultHKT } from 'drizzle-orm/pg-core/session';
 
