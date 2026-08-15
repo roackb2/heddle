@@ -14,7 +14,8 @@
     "ignoreDeprecations": "5.0",
     "paths": {
       "@web/*": ["src/web-v2/*"],
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@heddleagent/runtime/cli": ["src/cli-runtime.ts"]
     },
     "types": ["vite/client"]
   },

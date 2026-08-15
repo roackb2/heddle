@@ -1,5 +1,6 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { parseNpmViewVersion } from './npm-view-version.mjs';
 
 const packageJson = JSON.parse(
   readFileSync(new URL('../packages/runtime/package.json', import.meta.url), 'utf8'),
@@ -13,7 +14,10 @@ const result = spawnSync(
 
 let publicationNeeded;
 if (result.status === 0) {
-  const publishedVersion = JSON.parse(result.stdout);
+  const publishedVersion = parseNpmViewVersion(
+    result.stdout,
+    `${packageJson.name}@${packageJson.version}`,
+  );
   if (publishedVersion !== packageJson.version) {
     throw new Error(
       `Registry returned ${JSON.stringify(publishedVersion)} for ${packageJson.name}@${packageJson.version}.`,

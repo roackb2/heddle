@@ -3,7 +3,7 @@ import type {
   ControlPlaneSessionMessage,
   ControlPlaneSessionTurn,
 } from '../../api/types.js';
-import type { ConversationTurnPresentationTimelineItem } from '@/core/chat/types.js';
+import type { ConversationTurnPresentationTimelineItem } from '@heddleagent/runtime/cli';
 
 export type ClientSharedSessionTurnPresentationItem = {
   id: string;

@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "./dist",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true,
+    "inlineSources": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@heddleagent/runtime/cli": ["packages/runtime/dist/src/cli-runtime.d.ts"]
+    }
+  },
+  "include": ["../../src/cli-v2/**/*"],
+  "exclude": [
+    "../../node_modules",
+    "../../src/__tests__",
+    "../../src/web-v2",
+    "./dist"
+  ]
+}

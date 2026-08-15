@@ -1,11 +1,12 @@
 import { resolve } from 'node:path';
-import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
-import type {
-  HeddleControlPlaneServerHandle,
-  HeddleControlPlaneServerOptions,
-  HeddleHeartbeatSchedulerSettings,
-} from '@/server/index.js';
-import { createServerLogger, startHeddleControlPlaneServer } from '@/server/index.js';
+import {
+  createServerLogger,
+  startHeddleControlPlaneServer,
+  type HeddleControlPlaneServerHandle,
+  type HeddleControlPlaneServerOptions,
+  type HeddleHeartbeatSchedulerSettings,
+  type ResolvedRuntimeHost,
+} from '@heddleagent/runtime/cli';
 
 const DEFAULT_CONTROL_PLANE_HOST = '127.0.0.1';
 const DEFAULT_CONTROL_PLANE_PORT = 8765;

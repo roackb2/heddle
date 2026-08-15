@@ -892,6 +892,15 @@
   resolved "https://registry.yarnpkg.com/@fontsource-variable/inter/-/inter-5.2.8.tgz#29b11476f5149f6a443b4df6516e26002d87941a"
   integrity sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==
 
+"@heddleagent/run-client@^6.0.0":
+  version "6.0.0"
+  resolved "https://registry.yarnpkg.com/@heddleagent/run-client/-/run-client-6.0.0.tgz#dced2736767e43cca0973940068781ecacbe70e2"
+  integrity sha512-SNdXnnpSH7vPaKgk0pKmbiYxxxWynsV4PL+dP3N9jmVNEuq37RoOodv5qQL6TL31sqX5Xgj5P8g5ide7NYoITg==
+  dependencies:
+    "@standard-schema/spec" "^1.1.0"
+    eventsource-parser "^3.1.0"
+    zod "^4.3.6"
+
 "@hono/node-server@^1.19.9":
   version "1.19.13"
   resolved "https://registry.yarnpkg.com/@hono/node-server/-/node-server-1.19.13.tgz#4838c766a1237253d4dde3281cf7d5c65186fd32"

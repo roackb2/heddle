@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import compact from 'lodash/compact.js';
 import { EventSource } from 'eventsource';
 import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
-import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
+import type { ResolvedRuntimeHost } from '@heddleagent/runtime/cli';
 import { ControlPlaneSessionApiService } from '@/cli-v2/services/sessions/control-plane-session-api-service.js';
 import {
   AskJsonlProtocolWriter,

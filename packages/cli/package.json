@@ -1,11 +1,15 @@
 {
   "name": "@heddleagent/cli",
-  "version": "0.0.0",
-  "private": true,
+  "version": "6.0.0",
   "description": "Heddle coding-agent CLI, daemon, and local browser control-plane product",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/roackb2/heddle.git",
@@ -17,5 +21,38 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "bin": {
+    "heddle": "./dist/src/cli-v2/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "ai-agent",
+    "coding-agent",
+    "cli",
+    "developer-tools"
+  ],
+  "dependencies": {
+    "@heddleagent/run-client": "^6.0.0",
+    "@heddleagent/runtime": "^6.1.0",
+    "@trpc/client": "^11.16.0",
+    "@trpc/server": "^11.16.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.1",
+    "dayjs": "^1.11.20",
+    "debounce": "^3.0.0",
+    "eventsource": "4.1.0",
+    "ink": "^6.8.0",
+    "lodash": "^4.18.1",
+    "marked": "^9.1.6",
+    "marked-terminal": "^6.3.0",
+    "react": "19.2.5",
+    "string-width": "^4.2.3",
+    "strip-ansi": "^6.0.1"
   }
 }

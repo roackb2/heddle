@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { parseNpmViewVersion } from './npm-view-version.mjs';
 
 const packageJson = JSON.parse(
-  readFileSync(new URL('../packages/run-client/package.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../packages/cli/package.json', import.meta.url), 'utf8'),
 );
-const releaseTag = `run-client-v${packageJson.version}`;
+const releaseTag = `cli-v${packageJson.version}`;
 const result = spawnSync(
   'npm',
   ['view', `${packageJson.name}@${packageJson.version}`, 'version', '--json'],
@@ -37,10 +37,9 @@ const outputs = {
   release_tag: releaseTag,
   version: packageJson.version,
 };
-const githubOutput = process.env.GITHUB_OUTPUT;
-if (githubOutput) {
+if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
-    githubOutput,
+    process.env.GITHUB_OUTPUT,
     `${Object.entries(outputs).map(([key, value]) => `${key}=${value}`).join('\n')}\n`,
   );
 }

@@ -10,7 +10,7 @@ import {
 } from '@trpc/client';
 import { observable } from '@trpc/server/observable';
 import type { EventSource } from 'eventsource';
-import type { AppRouter } from '@/server/router.js';
+import type { AppRouter } from '@heddleagent/runtime/cli';
 
 export type CreateControlPlaneTrpcLinksOptions = {
   url: string;

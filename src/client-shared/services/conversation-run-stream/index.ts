@@ -4,11 +4,11 @@ export {
   ConversationRunConsumerService,
   ConversationRunSequenceGapError,
   ConversationRunTerminalViolationError,
-} from '@/core/chat/remote/index.js';
+} from '@heddleagent/run-client';
 export type {
   ConversationRunConsumerEvent,
   ConversationRunEventAcceptance,
   ConversationRunReference,
   ConversationRunRetry,
   ConversationRunSubscriptionInput,
-} from '@/core/chat/remote/index.js';
+} from '@heddleagent/run-client';

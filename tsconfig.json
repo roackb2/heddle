@@ -16,7 +16,8 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@heddleagent/runtime/cli": ["src/cli-runtime.ts"]
     }
   },
   "include": ["src/**/*", "examples/**/*", "e2e/**/*", "scripts/**/*", "playwright.config.ts"],

@@ -1,6 +1,6 @@
 import type { EventSource } from 'eventsource';
 import { createTRPCProxyClient } from '@trpc/client';
-import type { AppRouter } from '@/server/router.js';
+import type { AppRouter } from '@heddleagent/runtime/cli';
 import { ClientSharedApiLinkService } from './links.js';
 
 export type CreateControlPlaneProxyClientOptions = {

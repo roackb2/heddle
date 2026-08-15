@@ -14,11 +14,14 @@ import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';
 import { MemoryCliV2CommandEdgeService } from '@/cli-v2/commands/memory-command.js';
 import type { CliV2CommandEdgeOptions } from '@/cli-v2/commands/types.js';
 import { CliV2ProjectAgentContextService } from './services/project-agent-context-service.js';
-import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
-import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { ProjectConfigService } from '@/core/project-config/index.js';
-import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
-import { ProviderCredentialRepository } from '@/core/auth/index.js';
+import {
+  FileDaemonRegistryRepository,
+  ProjectConfigService,
+  ProviderCredentialRepository,
+  RuntimeDaemonRegistryService,
+  RuntimeHostResolver,
+  RuntimeWorkspaceService,
+} from '@heddleagent/runtime/cli';
 
 type RootCliOptions = {
   cwd?: string;
@@ -35,6 +38,8 @@ const KNOWN_COMMANDS = new Set(['chat', 'chat-v2', 'ask', 'init', 'memory', 'aut
 const REMOVED_COMMAND_MESSAGES = new Map<string, string>([
   ['chat-v1', 'heddle chat-v1 has been removed from the public CLI. Use `heddle` or `heddle chat` for the supported terminal UI.'],
 ]);
+
+configurePackagedWebAssets();
 
 /**
  * Owns the public Heddle terminal host bootstrap.
@@ -411,6 +416,17 @@ function resolvePackageJsonCandidates(): string[] {
     resolve(import.meta.dirname, '../../package.json'),
     resolve(import.meta.dirname, '../../../package.json'),
   ];
+}
+
+function configurePackagedWebAssets() {
+  if (process.env.HEDDLE_WEB_DIST) {
+    return;
+  }
+
+  const assetsDir = resolve(import.meta.dirname, '../web-v2');
+  if (existsSync(resolve(assetsDir, 'index.html')) && existsSync(resolve(assetsDir, 'assets'))) {
+    process.env.HEDDLE_WEB_DIST = assetsDir;
+  }
 }
 
 function resolveHeddleRepoRoot(): string {

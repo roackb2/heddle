@@ -70,8 +70,10 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 At the distribution boundary:
 
 - `@heddleagent/runtime` ships the in-process TypeScript runtime and SDK. The
-  former `@roackb2/heddle@5.13.0` coordinate remains installable during the
-  CLI migration;
+  official CLI consumes its package-to-package `/cli` bridge;
+- `@heddleagent/cli` ships the `heddle` command, terminal/TUI workflows,
+  daemon, and local browser control plane. The former
+  `@roackb2/heddle@5.13.0` coordinate remains installable during migration;
 - `@heddleagent/runtime/runs` and `@heddleagent/run-client` add adopter-operated
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@heddleagent/execution-host-client` defines the public, language-neutral

@@ -26,6 +26,8 @@ const requiredFiles = [
   'dist/src/index.d.ts',
   'dist/src/advanced.js',
   'dist/src/advanced.d.ts',
+  'dist/src/cli-runtime.js',
+  'dist/src/cli-runtime.d.ts',
   'dist/src/hosted.js',
   'dist/src/hosted.d.ts',
   'dist/src/hosted/http-sse.js',
@@ -62,7 +64,7 @@ try {
   const packedPaths = new Set(packResult.files.map(({ path }) => path));
 
   assert.equal(packResult.name, '@heddleagent/runtime');
-  assert.equal(packResult.version, '6.0.0');
+  assert.equal(packResult.version, '6.1.0');
   for (const path of requiredFiles) {
     assert.equal(packedPaths.has(path), true, `Packed runtime is missing ${path}.`);
   }
@@ -102,12 +104,14 @@ try {
       "import { ConversationRunService } from '@heddleagent/runtime/runs';",
       "import { streamConversationRunSse } from '@heddleagent/runtime/runs/http-sse';",
       "import { OpenAiAdapter } from '@heddleagent/runtime/advanced';",
+      "import { RuntimeHostResolver } from '@heddleagent/runtime/cli';",
       "import { HeartbeatTaskStoreConformance } from '@heddleagent/runtime/heartbeat/testing';",
       "assert.equal(typeof ConversationAgentService, 'function');",
       "assert.equal(typeof createConversationEngine, 'function');",
       "assert.equal(typeof ConversationRunService, 'function');",
       "assert.equal(typeof streamConversationRunSse, 'function');",
       "assert.equal(typeof OpenAiAdapter, 'function');",
+      "assert.equal(typeof RuntimeHostResolver, 'function');",
       "assert.equal(typeof HeartbeatTaskStoreConformance, 'function');",
       '',
     ].join('\n'),
@@ -121,13 +125,15 @@ try {
       "import { ConversationRunService, type ConversationRunServiceOptions } from '@heddleagent/runtime/runs';",
       "import { streamConversationRunSse, type ConversationRunSseEvent, type StreamConversationRunSseOptions } from '@heddleagent/runtime/runs/http-sse';",
       "import { OpenAiAdapter, type LlmAdapter } from '@heddleagent/runtime/advanced';",
+      "import { RuntimeHostResolver, type ResolvedRuntimeHost } from '@heddleagent/runtime/cli';",
       "import { HeartbeatTaskStoreConformance, type HeartbeatTaskStoreConformanceHarness } from '@heddleagent/runtime/heartbeat/testing';",
       'void ConversationAgentService;',
       'void ConversationRunService;',
       'void streamConversationRunSse;',
       'void OpenAiAdapter;',
+      'void RuntimeHostResolver;',
       'void HeartbeatTaskStoreConformance;',
-      'type PublicTypes = ConversationAgentOptions | ConversationRunServiceOptions<{ sessionId: string }> | StreamConversationRunSseOptions<ConversationRunSseEvent> | LlmAdapter | HeartbeatTaskStoreConformanceHarness;',
+      'type PublicTypes = ConversationAgentOptions | ConversationRunServiceOptions<{ sessionId: string }> | StreamConversationRunSseOptions<ConversationRunSseEvent> | LlmAdapter | ResolvedRuntimeHost | HeartbeatTaskStoreConformanceHarness;',
       'declare const value: PublicTypes;',
       'void value;',
       '',

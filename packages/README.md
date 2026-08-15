@@ -1,15 +1,15 @@
 # Heddle Package Family
 
-Status: **one private v6 foundation and four stable packages**
+Status: **five stable packages**
 
 This directory records the v6 package identities and responsibility boundaries.
 `@heddleagent/execution-host-client@6.0.0` contains its canonical
 implementation as a stable package. `@heddleagent/postgres@6.0.0` ships the
 first official v6 database adapter. `@heddleagent/run-client@6.0.0` ships the
 existing browser-safe run client under its final coordinate.
-`@heddleagent/runtime@6.0.0` ships the existing embeddable SDK and runtime
-under its final coordinate. Only the CLI directory remains a private
-metadata-only foundation. Existing
+`@heddleagent/runtime@6.1.0` ships the existing embeddable SDK and the bridge
+used by the official CLI. `@heddleagent/cli@6.0.0` ships the existing `heddle`
+command, TUI, daemon, and browser control plane. Existing
 `@roackb2/*` packages remain supported until each replacement is independently
 verified and released.
 
@@ -17,8 +17,8 @@ verified and released.
 
 | Package | Responsibility | Migration status |
 | --- | --- | --- |
-| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Existing implementation activated at stable `6.0.0`; `/runs` replaces the former `/hosted` package-path name |
-| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Private foundation; implementation remains in `@roackb2/heddle` |
+| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.1.0`; `/runs` replaces the former `/hosted` package-path name and `/cli` is the package-to-package bridge for the official CLI |
+| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Product-backend contracts and helpers for invoking a separate compatible Execution Host | Canonical implementation moved; stable version `6.0.0` |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.0.0`; first entrypoint implements the Execution Host conversation lifecycle; heartbeat remains in `@roackb2/heddle-postgres` until its separate migration |
@@ -88,26 +88,22 @@ flowchart LR
 - Future adapter packages follow the same one-way dependency rule. They are not
   part of the initial release merely because their names appear in this design.
 
-## Foundation and activation rules
+## Activation rules
 
-The CLI directory contains only a manifest, boundary README, and repository
-license. Its manifest has `private: true`, has no exports or dependencies, and
-cannot be published. The runtime, run client, Execution Host client, and
-PostgreSQL adapter family are activated packages with independent builds and
-guarded stable releases.
+All five packages are activated and independently versioned. Each package
+compiles one canonical implementation path, declares only its own runtime
+dependencies, and has a packed-consumer verification before publication.
 
 Run `yarn package-family:verify` to enforce all of the following:
 
 - exactly the five selected package identities exist;
-- one foundation remains private at version `0.0.0` and implementation-free;
-- all four activated packages have exact reviewed stable manifests, dependency
+- all five activated packages have exact reviewed stable manifests, dependency
   boundaries, exports, source ownership, and release tags;
 - package licenses and repository metadata remain consistent; and
 - the two remaining local v5 package identities stay present, while the
   published former adopter and remote-client tarballs remain installable
   during migration.
 
-Each further activation preserves one canonical code path, the existing build,
+Future package changes preserve one canonical code path, the existing build,
 and one packed-consumer smoke. Do not create file dependencies, duplicate
-implementations, or introduce a workspace/build-tool migration merely to make
-an empty package installable.
+implementations, or introduce a workspace/build-tool migration.

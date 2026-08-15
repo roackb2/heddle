@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  PACKAGE_DEFINITIONS,
-  assertFoundationManifest,
-  createFoundationManifest,
-} from '../../../../scripts/verify-package-family.mjs';
+  assertCliManifest,
+  createCliManifest,
+} from '../../../../scripts/verify-cli-package.mjs';
 import {
   assertExecutionHostClientManifest,
   createExecutionHostClientManifest,
@@ -24,41 +23,26 @@ import {
 
 const rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
 
-const NODE_VERSION = '>=20';
+describe('@heddleagent/cli activation', () => {
+  it('accepts the exact installable coding-agent manifest', () => {
+    const manifest = createCliManifest(rootPackage);
 
-describe('v6 package-family foundation', () => {
-  it('keeps only the CLI as a private foundation', () => {
-    expect(PACKAGE_DEFINITIONS.map(({ name }) => name)).toEqual([
-      '@heddleagent/cli',
-    ]);
-  });
-
-  it('accepts only the exact metadata-only private manifest', () => {
-    const definition = PACKAGE_DEFINITIONS[0];
-    const manifest = createFoundationManifest(definition, NODE_VERSION);
-
-    expect(() =>
-      assertFoundationManifest(manifest, definition, NODE_VERSION),
-    ).not.toThrow();
+    expect(() => assertCliManifest(manifest, rootPackage)).not.toThrow();
   });
 
   it.each([
-    ['public flag', { private: false }],
-    ['wrong name', { name: '@heddleagent/not-runtime' }],
-    ['exports', { exports: { '.': './dist/index.js' } }],
-    ['binary', { bin: { heddle: './dist/cli.js' } }],
-    ['dependency', { dependencies: { zod: '^4.0.0' } }],
-    ['publish configuration', { publishConfig: { access: 'public' } }],
+    ['private package', { private: true }],
+    ['wrong name', { name: '@heddleagent/runtime' }],
+    ['wrong version', { version: '0.0.0' }],
+    ['wrong binary', { bin: { heddle: './dist/cli.js' } }],
+    ['missing runtime', { dependencies: {} }],
   ])('rejects an unsafe %s mutation', (_label, mutation) => {
-    const definition = PACKAGE_DEFINITIONS[0];
     const manifest = {
-      ...createFoundationManifest(definition, NODE_VERSION),
+      ...createCliManifest(rootPackage),
       ...mutation,
     };
 
-    expect(() =>
-      assertFoundationManifest(manifest, definition, NODE_VERSION),
-    ).toThrow();
+    expect(() => assertCliManifest(manifest, rootPackage)).toThrow();
   });
 });
 
