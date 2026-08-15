@@ -10,8 +10,9 @@ surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
 The stable coordinate is `@heddleagent/execution-host-client@6.0.0`. The
-former `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
-migration, but it does not include the durable lifecycle described below.
+former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
+installable only for existing consumers. It does not include the durable
+lifecycle described below.
 
 ```text
 ADOPTER BACKEND
@@ -99,7 +100,10 @@ Use `@heddleagent/postgres/execution-host/conversations`, apply its ordered SQL
 migrations through the product's normal migration system, and inject the
 resulting store into `DurableHostedConversationTurnService`. The product still
 owns its pool, authenticated scope, history queries, retention, and product
-result transaction.
+result transaction. Follow the package's
+[migration adoption steps](../../../packages/postgres/README.md#copy-the-migration-into-your-application)
+to locate the installed SQL, copy it into the application's checked-in
+sequence, and apply it before constructing the store.
 
 Backends outside TypeScript can use the versioned
 [OpenAPI, JSON Schema, and golden fixtures](../../../packages/execution-host-client/spec/v1/README.md)

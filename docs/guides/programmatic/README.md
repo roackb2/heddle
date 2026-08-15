@@ -27,8 +27,8 @@ hosting assumptions.
   hosted-turn orchestration, durable lifecycle semantics, product-MCP
   verification, a provider-neutral client port, optional Node HTTP/key
   conveniences, and canonical OpenAPI/JSON Schema/golden artifacts for other
-  languages. The former `@roackb2/heddle-adopter@5.13.0` coordinate remains
-  installable during migration.
+  languages. The former `@roackb2/heddle-adopter@5.13.0` coordinate is
+  deprecated and remains installable only for existing consumers.
 - `@heddleagent/runtime/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,

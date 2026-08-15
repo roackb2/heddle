@@ -73,7 +73,8 @@ At the distribution boundary:
   official CLI consumes its package-to-package `/cli` bridge;
 - `@heddleagent/cli` ships the `heddle` command, terminal/TUI workflows,
   daemon, and local browser control plane. The former
-  `@roackb2/heddle@5.13.0` coordinate remains installable during migration;
+  `@roackb2/heddle@5.13.0` coordinate is deprecated and remains installable
+  only for existing consumers;
 - `@heddleagent/runtime/runs` and `@heddleagent/run-client` add adopter-operated
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@heddleagent/execution-host-client` defines the public, language-neutral
@@ -81,8 +82,8 @@ At the distribution boundary:
   owns authority, wire, transport, base turn, MCP, Node, testing, and the
   reusable durable-turn lifecycle over an adopter-implemented atomic store,
   with shared TypeScript/Python lifecycle fixtures. The former
-  `@roackb2/heddle-adopter@5.13.0` coordinate remains installable during
-  migration;
+  `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
+  installable only for existing consumers;
 - `@heddleagent/postgres/execution-host/conversations` is the official
   PostgreSQL implementation of that lifecycle store port. It owns atomic SQL
   fencing, constraints, ordered migrations, and real-database conformance;

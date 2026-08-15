@@ -82,6 +82,37 @@ them before constructing the store. Runtime startup deliberately performs no
 schema mutation. The first migration owns only
 `heddle.execution_host_conversation_turns` and its constraints/index.
 
+### Copy the migration into your application
+
+The adapter exports migration URLs so your build or release tooling can locate
+the exact SQL shipped with the installed package:
+
+```bash
+node --input-type=module -e "import('@heddleagent/postgres/execution-host/conversations').then(({ executionHostConversationPostgresMigrationSqlUrls: urls }) => console.log(urls.map(String).join('\\n')))"
+```
+
+For a normal `node_modules` install, the current file is also available at:
+
+```text
+node_modules/@heddleagent/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql
+```
+
+Copy every exported migration, in array order, into your application's own
+checked-in migration directory. Rename the file only to fit the application's
+sequence; do not rewrite the SQL. For example:
+
+```bash
+cp node_modules/@heddleagent/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql \
+  apps/server/drizzle/0005_execution_host_conversations.sql
+```
+
+Commit that copy and let the application's existing migration command apply it
+before deploying code that constructs the store. This explicit adoption is
+required because the application—not a library running at startup—owns schema
+review, rollout order, rollback policy, and production database credentials.
+When upgrading `@heddleagent/postgres`, compare the exported ordered list with
+the migrations already adopted and copy only newly published files.
+
 ## Correctness promise
 
 - `invocation_id` is globally unique, so a duplicate request cannot execute

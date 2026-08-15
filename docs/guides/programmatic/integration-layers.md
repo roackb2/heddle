@@ -91,8 +91,8 @@ disconnect as implicit cancellation.
 | A backend invoking a separately deployed Execution Host | `@heddleagent/execution-host-client` plus a direct or AgentCore transport | [Execution Host adopter backend](execution-host-adopters.md) |
 | That backend needs the generic lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` plus the lifecycle service | [Execution Host adopter backend](execution-host-adopters.md) |
 
-The former `@roackb2/heddle-adopter@5.13.0` coordinate remains installable
-during migration.
+The former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and
+remains installable only for existing consumers.
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
