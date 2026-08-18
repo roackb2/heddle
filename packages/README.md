@@ -7,8 +7,9 @@ This directory records the v6 package identities and responsibility boundaries.
 implementation as a stable package. `@heddleagent/postgres@6.1.0` ships the
 Execution Host lifecycle and heartbeat adapters. `@heddleagent/run-client@6.0.0`
 ships the existing browser-safe run client under its final coordinate.
-`@heddleagent/runtime@6.2.0` ships the existing embeddable SDK, the bridge
-used by the official CLI, and an optional remote heartbeat-execution seam.
+`@heddleagent/runtime@6.3.0` ships the existing embeddable SDK, the bridge
+used by the official CLI, an optional remote heartbeat-execution seam, and the
+process-local heartbeat run lifecycle used by compatible Execution Hosts.
 `@heddleagent/cli@6.0.0` ships the existing `heddle`
 command, TUI, daemon, and browser control plane. The former `@roackb2/*`
 coordinates are deprecated and remain installable only so existing applications
@@ -18,7 +19,7 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 
 | Package | Responsibility | Migration status |
 | --- | --- | --- |
-| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.2.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and heartbeat execution may be delegated through a provider-neutral port |
+| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.3.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and Heddle owns the lifecycle for explicit heartbeat runs |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.2.0`; explicit conversation and heartbeat workflows with hosted heartbeat composition at `/heartbeat` |

@@ -21,7 +21,7 @@ Use the subpaths only when the host needs their additional assumptions:
 ```ts
 import { ConversationRunService } from '@heddleagent/runtime/runs'
 import { streamConversationRunSse } from '@heddleagent/runtime/runs/http-sse'
-import { OpenAiAdapter } from '@heddleagent/runtime/advanced'
+import { HeartbeatRunService, OpenAiAdapter } from '@heddleagent/runtime/advanced'
 import { HeartbeatTaskStoreConformance } from '@heddleagent/runtime/heartbeat/testing'
 ```
 
@@ -48,6 +48,13 @@ service.
   Heddle-owned persistence ports;
 - process-local run lifecycle mechanics; and
 - reusable heartbeat and low-level runtime composition.
+
+`HeartbeatRunService` starts one explicitly requested heartbeat cycle and
+returns its run id, result promise, ordered activity stream, and cancellation
+operation. A compatible Execution Host should use that handle rather than
+reimplementing callback buffering or terminal sequencing. Scheduling, task
+persistence, and deployment-specific model/tool/MCP preparation stay outside
+the service.
 
 ## Does not own
 
