@@ -7,14 +7,19 @@ import {
   EXECUTION_CONTRACT_VERSION,
   EXECUTION_HOST_LOCAL_TOKEN_HEADER,
   ExecutionHostConversationTurnRequestSchema,
+  ExecutionHostHeartbeatStreamEventSchema,
+  ExecutionHostHeartbeatTaskRequestSchema,
   ExecutionHostStreamEventSchema,
+  HEARTBEAT_TASK_WORKFLOW,
   MCP_CAPABILITY_HEADER,
   MODEL_API_KEY_HEADER,
   OpaqueIdSchema,
   RuntimeSessionIdSchema,
   TimestampSchema,
+  isExecutionHostHeartbeatTerminalEvent,
   isExecutionHostTerminalEvent,
   isSafeWebUrl,
+  type ExecutionHostHeartbeatStreamEvent,
   type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
 import {
@@ -27,17 +32,16 @@ import type {
   DirectHttpExecutionHostConfig,
   ExecutionHost,
   ExecutionHostConversationTurn,
+  ExecutionHostHeartbeatTask,
+  HeartbeatExecutionHost,
 } from './types.js';
 
 const MAX_SSE_BUFFER_CHARACTERS = 1_048_576;
 const MAX_PENDING_SSE_FRAMES = 1_024;
 const MAX_ERROR_BODY_BYTES = 16_384;
 const SecretSchema = z.string().min(8).max(4_096);
-const ConversationTurnSchema = z.object({
-  invocationId: OpaqueIdSchema,
+const InvocationAuthoritySchema = z.object({
   runtimeSessionId: RuntimeSessionIdSchema,
-  prompt: z.string().trim().min(1).max(200_000),
-  deadlineAt: TimestampSchema.optional(),
   executionAssertion: z.string().min(32).max(4_096),
   mcpCapability: z.string().min(32).max(4_096).optional(),
   modelApiKey: SecretSchema,
@@ -46,6 +50,17 @@ const ConversationTurnSchema = z.object({
     'signal must be an AbortSignal',
   ).optional(),
 }).strict();
+const ConversationTurnSchema = InvocationAuthoritySchema.extend({
+  invocationId: OpaqueIdSchema,
+  prompt: z.string().trim().min(1).max(200_000),
+  deadlineAt: TimestampSchema.optional(),
+}).strict();
+const HeartbeatTaskSchema = InvocationAuthoritySchema.extend(
+  ExecutionHostHeartbeatTaskRequestSchema.omit({
+    schemaVersion: true,
+    kind: true,
+  }).shape,
+).strict();
 const ApiErrorSchema = z.object({
   error: z.object({
     code: z.string().min(1).max(128).regex(/^[a-z0-9_]+$/),
@@ -57,7 +72,8 @@ const ApiErrorSchema = z.object({
  * Strict direct-development HTTP/SSE adapter for the Execution Host v1 wire.
  * It deliberately owns neither AWS SDK nor SigV4 behavior.
  */
-export class DirectHttpExecutionHost implements ExecutionHost {
+export class DirectHttpExecutionHost
+implements ExecutionHost, HeartbeatExecutionHost {
   readonly #endpoint: URL;
   readonly #fetch: typeof fetch;
   readonly #localToken: string;
@@ -76,8 +92,62 @@ export class DirectHttpExecutionHost implements ExecutionHost {
     if (input.signal?.aborted) {
       throw new ExecutionHostInvocationCancelledError();
     }
+    const body = ExecutionHostConversationTurnRequestSchema.parse({
+      schemaVersion: EXECUTION_CONTRACT_VERSION,
+      kind: CONVERSATION_TURN_WORKFLOW,
+      invocationId: input.invocationId,
+      prompt: input.prompt,
+      ...(input.deadlineAt ? { deadlineAt: input.deadlineAt } : {}),
+    });
+    yield* this.#streamInvocation(
+      input,
+      body,
+      ExecutionHostStreamEventSchema,
+      isExecutionHostTerminalEvent,
+    );
+  }
 
-    const response = await this.#invoke(input);
+  async *streamHeartbeatTask(
+    rawInput: ExecutionHostHeartbeatTask,
+  ): AsyncIterable<ExecutionHostHeartbeatStreamEvent> {
+    const input = HeartbeatTaskSchema.parse(rawInput);
+    if (input.signal?.aborted) {
+      throw new ExecutionHostInvocationCancelledError();
+    }
+    const body = ExecutionHostHeartbeatTaskRequestSchema.parse({
+      schemaVersion: EXECUTION_CONTRACT_VERSION,
+      kind: HEARTBEAT_TASK_WORKFLOW,
+      invocationId: input.invocationId,
+      taskId: input.taskId,
+      task: input.task,
+      ...(input.checkpoint ? { checkpoint: input.checkpoint } : {}),
+      runContext: input.runContext,
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.reasoningEffort
+        ? { reasoningEffort: input.reasoningEffort }
+        : {}),
+      ...(input.maxSteps !== undefined ? { maxSteps: input.maxSteps } : {}),
+      ...(input.searchIgnoreDirs
+        ? { searchIgnoreDirs: input.searchIgnoreDirs }
+        : {}),
+      ...(input.systemContext ? { systemContext: input.systemContext } : {}),
+      ...(input.deadlineAt ? { deadlineAt: input.deadlineAt } : {}),
+    });
+    yield* this.#streamInvocation(
+      input,
+      body,
+      ExecutionHostHeartbeatStreamEventSchema,
+      isExecutionHostHeartbeatTerminalEvent,
+    );
+  }
+
+  async *#streamInvocation<TEvent extends ValidatedStreamEvent>(
+    input: InvocationInput,
+    body: unknown,
+    schema: z.ZodType<TEvent>,
+    isTerminal: (event: TEvent) => boolean,
+  ): AsyncIterable<TEvent> {
+    const response = await this.#invoke(input, body);
     if (!response.ok) {
       throw new ExecutionHostRejectedError(
         response.status,
@@ -103,7 +173,7 @@ export class DirectHttpExecutionHost implements ExecutionHost {
     };
     const decoder = new TextDecoder();
     const pending: EventSourceMessage[] = [];
-    let terminalEvent: ExecutionHostStreamEvent | undefined;
+    let terminalEvent: TEvent | undefined;
     let parserError = false;
     const parser = createParser({
       maxBufferSize: MAX_SSE_BUFFER_CHARACTERS,
@@ -127,8 +197,13 @@ export class DirectHttpExecutionHost implements ExecutionHost {
           throw new ExecutionHostProtocolError();
         }
         while (pending.length > 0) {
-          const event = validateEvent(pending.shift()!, state);
-          if (isExecutionHostTerminalEvent(event)) {
+          const event = validateEvent(
+            pending.shift()!,
+            state,
+            schema,
+            isTerminal,
+          );
+          if (isTerminal(event)) {
             terminalEvent = event;
           } else {
             yield event;
@@ -141,8 +216,13 @@ export class DirectHttpExecutionHost implements ExecutionHost {
         throw new ExecutionHostProtocolError();
       }
       while (pending.length > 0) {
-        const event = validateEvent(pending.shift()!, state);
-        if (isExecutionHostTerminalEvent(event)) {
+        const event = validateEvent(
+          pending.shift()!,
+          state,
+          schema,
+          isTerminal,
+        );
+        if (isTerminal(event)) {
           terminalEvent = event;
         } else {
           yield event;
@@ -168,16 +248,7 @@ export class DirectHttpExecutionHost implements ExecutionHost {
     yield terminalEvent;
   }
 
-  async #invoke(
-    input: z.infer<typeof ConversationTurnSchema>,
-  ): Promise<Response> {
-    const body = ExecutionHostConversationTurnRequestSchema.parse({
-      schemaVersion: EXECUTION_CONTRACT_VERSION,
-      kind: CONVERSATION_TURN_WORKFLOW,
-      invocationId: input.invocationId,
-      prompt: input.prompt,
-      ...(input.deadlineAt ? { deadlineAt: input.deadlineAt } : {}),
-    });
+  async #invoke(input: InvocationInput, body: unknown): Promise<Response> {
     try {
       return await this.#fetch(this.#endpoint, {
         method: 'POST',
@@ -200,17 +271,36 @@ type StreamValidationState = {
   terminal: boolean;
 };
 
-function validateEvent(
+type InvocationInput = {
+  invocationId: string;
+  runtimeSessionId: string;
+  executionAssertion: string;
+  mcpCapability?: string;
+  modelApiKey: string;
+  signal?: AbortSignal;
+};
+
+type ValidatedStreamEvent = {
+  kind: string;
+  invocationId: string;
+  runId: string;
+  sequence: number;
+  timestamp: string;
+};
+
+function validateEvent<TEvent extends ValidatedStreamEvent>(
   frame: EventSourceMessage,
   state: StreamValidationState,
-): ExecutionHostStreamEvent {
+  schema: z.ZodType<TEvent>,
+  isTerminal: (event: TEvent) => boolean,
+): TEvent {
   let decoded: unknown;
   try {
     decoded = JSON.parse(frame.data);
   } catch {
     throw new ExecutionHostProtocolError();
   }
-  const parsed = ExecutionHostStreamEventSchema.safeParse(decoded);
+  const parsed = schema.safeParse(decoded);
   if (!parsed.success) {
     throw new ExecutionHostProtocolError();
   }
@@ -234,12 +324,12 @@ function validateEvent(
   }
 
   state.nextSequence += 1;
-  state.terminal = isExecutionHostTerminalEvent(event);
+  state.terminal = isTerminal(event);
   return event;
 }
 
 function createSensitiveHeaders(
-  input: z.infer<typeof ConversationTurnSchema>,
+  input: InvocationInput,
   localToken: string,
 ): Headers {
   const headers = new Headers({

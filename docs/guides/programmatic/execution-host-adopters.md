@@ -10,7 +10,7 @@ The package is currently an experimental public contract and local proving
 surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
-The stable coordinate is `@heddleagent/execution-host-client@6.1.0`. The
+The stable coordinate is `@heddleagent/execution-host-client@6.2.0`. The
 former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers. It does not include the durable
 lifecycle described below.
@@ -75,14 +75,17 @@ Its subpaths separate responsibility:
 - `/conversation` composes assertion/capability issuance, model credentials,
   fixed tool policy, one `ExecutionHost` turn, and the optional durable
   lifecycle over an adopter-implemented store;
+- `/heartbeat` connects Heddle's provider-neutral heartbeat scheduler to one
+  remotely executed agent cycle while keeping durable task authority in the
+  coordinator;
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
 - `/mcp/node` owns a stateless official-SDK Streamable HTTP lifecycle around
   an adopter-defined product toolset;
-- `/http-sse` provides the provider-neutral `ExecutionHost` port and strict
-  direct-development transport;
-- `/agentcore` provides the official AWS SDK/SigV4 implementation of that port
-  for an adopter-provisioned AgentCore Runtime;
+- `/http-sse` provides provider-neutral conversation and heartbeat ports plus
+  the strict direct-development transport;
+- `/agentcore` provides the official AWS SDK/SigV4 implementation of both
+  ports for an adopter-provisioned AgentCore Runtime;
 - `/testing` provides a Node-only loopback v1 fixture for local product/MCP
   integration tests without a model or AWS, plus real-store lifecycle
   conformance.
@@ -161,6 +164,22 @@ an ambiguous streaming invocation. The adopter supplies its AWS region,
 Runtime ARN, optional qualifier, credential environment, IAM policy, and
 Runtime deployment.
 
+## Autonomous heartbeat composition
+
+The `heartbeat-task` workflow is intentionally narrower than a general control
+plane. One long-running coordinator owns the heartbeat PostgreSQL store,
+scheduler, claims, fencing, checkpoints, settlement, recovery, and shutdown.
+It supplies `HostedHeartbeatAgentExecutionTransport` to the runtime scheduler.
+The transport resolves an already-authorized product scope, Runtime session,
+and deadline, then `HostedHeartbeatTaskService` owns assertion issuance, model
+credentials, optional product MCP, AgentCore/direct invocation, ordered
+activity, cancellation, and terminal classification.
+
+Only the nested agent cycle runs in the Execution Host. The Runtime receives
+neither the Heddle database credential nor product database access. Omitting
+the transport preserves the existing local heartbeat runner, so embedded and
+hosted deployments use the same scheduler/task semantics.
+
 ## Progressive Node adoption
 
 Node adopters can start with `NodeExecutionAdopterHttpService`. It handles the
@@ -213,8 +232,9 @@ Execution Host integration test for those properties.
 TypeScript is the first reference implementation, not a requirement for
 adopters. Python, Go, Java, or other backends can implement the same compact
 claim, wire, and optional durable-lifecycle semantics without porting Heddle.
-Canonical OpenAPI 3.1.1, JSON Schema Draft 2020-12, golden event/authority/
-lifecycle fixtures, TypeScript conformance, and one independent Python
+Canonical OpenAPI 3.1.1, JSON Schema Draft 2020-12, golden conversation,
+heartbeat, authority, and lifecycle fixtures, TypeScript conformance, and one
+independent Python
 implementation now form the executable reference.
 
 This is also the deliberate stop line. More languages, generated clients,
@@ -224,10 +244,11 @@ work.
 
 ## Current limits
 
-- v1 supports `conversation-turn`; autonomous/heartbeat workflow contracts are
-  not generalized yet;
+- v1 supports explicit `conversation-turn` and `heartbeat-task` profiles; it is
+  not a general workflow protocol;
 - MCP capability refresh and durable early revocation are not implemented;
-- managed AgentCore transport and isolation evidence live outside this package;
+- the AgentCore transport is public, while Runtime deployment and managed
+  isolation evidence remain adopter/private-host responsibilities;
 - the direct stream has no reconnect/result-lookup protocol;
 - adopters remain responsible for choosing unique invocation IDs, key rotation,
   implementing the lifecycle store, data retention, and idempotent product

@@ -9,9 +9,10 @@ import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import { ToolApprovalPolicies } from '@/core/approvals/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
+import type { AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
 import { HeartbeatRunnerAgent } from '../agent/index.js';
 import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
+import { AgentHeartbeatResultSchema } from '../tasks/schemas.js';
 import type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
@@ -22,6 +23,7 @@ import type {
   HeartbeatTaskRunRecord,
 } from '../tasks/index.js';
 import type {
+  HeartbeatAgentExecutionTransport,
   HeartbeatExecutionContext,
   HeartbeatHandlerOutcome,
   HeartbeatSchedulerEvent,
@@ -42,6 +44,12 @@ import { HeartbeatTaskCancellationPolicy } from './cancellation-policy.js';
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 const CANCELLATION_SUMMARY = 'Heartbeat execution cancelled by its scheduler host.';
+type ResolvedHeartbeatRunnerAgentOptions = Omit<
+  RunAgentHeartbeatOptions,
+  'checkpoint'
+> & {
+  checkpoint?: AgentLoopCheckpoint;
+};
 
 export class HeartbeatTaskRunnerService {
   // Runs one already-selected task and persists its final claim-fenced outcome.
@@ -51,6 +59,7 @@ export class HeartbeatTaskRunnerService {
       | 'handler'
       | 'runner'
       | 'runtime'
+      | 'agentExecutionTransport'
       | 'now'
       | 'onEvent'
       | 'failureRetryMs'
@@ -118,6 +127,7 @@ export class HeartbeatTaskRunnerService {
         handler: options.handler,
         runner: options.runner,
         runtime: options.runtime,
+        agentExecutionTransport: options.agentExecutionTransport,
         onEvent: options.onEvent,
       });
       if (options.signal?.aborted) {
@@ -315,6 +325,7 @@ export class HeartbeatTaskRunnerService {
     handler?: HeartbeatTaskHandler;
     runner?: HeartbeatTaskRunner;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
+    agentExecutionTransport?: HeartbeatAgentExecutionTransport;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
   }): Promise<AgentHeartbeatResult | HeartbeatHandlerOutcome> {
     let active = true;
@@ -338,9 +349,17 @@ export class HeartbeatTaskRunnerService {
           throw new Error('Heartbeat execution context runAgent() may be called only once.');
         }
 
-        agentInvocation = HeartbeatRunnerAgent.run(
-          HeartbeatTaskRunnerService.resolveRunnerAgentOptions({ ...args, options }),
-        );
+        const runnerOptions = HeartbeatTaskRunnerService.resolveRunnerAgentOptions({
+          ...args,
+          options,
+        });
+        agentInvocation = args.agentExecutionTransport
+          ? HeartbeatTaskRunnerService.executeThroughTransport({
+            ...args,
+            runnerOptions,
+            transport: args.agentExecutionTransport,
+          })
+          : HeartbeatRunnerAgent.run(runnerOptions);
         agentResult = await agentInvocation;
         return agentResult;
       },
@@ -444,14 +463,14 @@ export class HeartbeatTaskRunnerService {
 
   private static resolveRunnerAgentOptions(args: {
     task: HeartbeatTask;
-    checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined;
+    checkpoint: AgentLoopCheckpoint | undefined;
     execution: HeartbeatTaskExecution;
     runAt: Date;
     signal: AbortSignal;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
     options?: HeartbeatTaskRunnerAgentOptions;
-  }): RunAgentHeartbeatOptions {
+  }): ResolvedHeartbeatRunnerAgentOptions {
     const model = args.options?.model ?? args.task.runtime?.model ?? args.runtime?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
 
     return {
@@ -491,6 +510,57 @@ export class HeartbeatTaskRunnerService {
         });
       },
     };
+  }
+
+  private static async executeThroughTransport(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    signal: AbortSignal;
+    runnerOptions: ResolvedHeartbeatRunnerAgentOptions;
+    transport: HeartbeatAgentExecutionTransport;
+    onEvent?: (event: HeartbeatSchedulerEvent) => void;
+  }): Promise<AgentHeartbeatResult> {
+    const runContext = args.runnerOptions.runContext;
+    if (!runContext) {
+      throw new Error('Remote heartbeat execution requires a run context.');
+    }
+    const result = await args.transport.execute({
+      request: {
+        taskId: args.task.id,
+        executionId: args.execution.executionId,
+        task: args.runnerOptions.task,
+        ...(args.runnerOptions.checkpoint
+          ? { checkpoint: structuredClone(args.runnerOptions.checkpoint) }
+          : {}),
+        runContext: structuredClone(runContext),
+        ...(args.runnerOptions.model ? { model: args.runnerOptions.model } : {}),
+        ...(args.runnerOptions.reasoningEffort
+          ? { reasoningEffort: args.runnerOptions.reasoningEffort }
+          : {}),
+        ...(args.runnerOptions.maxSteps !== undefined
+          ? { maxSteps: args.runnerOptions.maxSteps }
+          : {}),
+        ...(args.runnerOptions.searchIgnoreDirs
+          ? { searchIgnoreDirs: [...args.runnerOptions.searchIgnoreDirs] }
+          : {}),
+        ...(args.runnerOptions.systemContext
+          ? { systemContext: args.runnerOptions.systemContext }
+          : {}),
+      },
+      signal: args.signal,
+      publishActivity: (activity) => args.onEvent?.({
+        type: 'heartbeat.task.agent_activity',
+        taskId: args.task.id,
+        executionId: args.execution.executionId,
+        activity,
+        timestamp: dayjs().toISOString(),
+      }),
+    });
+    const parsed = AgentHeartbeatResultSchema.safeParse(result);
+    if (!parsed.success) {
+      throw new Error('Heartbeat agent execution transport returned an invalid result.');
+    }
+    return parsed.data as AgentHeartbeatResult;
   }
 
   private static async persistCancellation(args: Pick<RunDueHeartbeatTasksOptions, 'store' | 'now' | 'onEvent' | 'signal'> & {

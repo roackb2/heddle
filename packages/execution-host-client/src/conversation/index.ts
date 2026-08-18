@@ -43,6 +43,7 @@ export { HostedConversationTurnInputSchema } from './types.js';
 export type {
   HostedConversationCredentialContext,
   HostedConversationModelCredentialProvider,
+  HostedModelCredentialProvider,
   HostedConversationTurnInput,
   HostedConversationTurnRunner,
   HostedConversationTurnServiceConfig,

@@ -85,6 +85,7 @@ export class HeartbeatSchedulerService {
     let loopError: unknown;
     const settledLoop = HeartbeatSchedulerService.runLoopWithTaskLifecycle({
       store,
+      agentExecutionTransport: options.agentExecutionTransport,
       handler: options.handler,
       runner: options.runner,
       runtime: {

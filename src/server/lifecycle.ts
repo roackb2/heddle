@@ -263,6 +263,7 @@ function logHeartbeatSchedulerEvent(
     'heartbeat.task.started': 'Heartbeat task started',
     'heartbeat.task.recovered': 'Heartbeat task recovered after interrupted execution',
     'heartbeat.task.agent_event': 'Heartbeat task agent event',
+    'heartbeat.task.agent_activity': 'Heartbeat task remote agent activity',
     'heartbeat.task.finished': 'Heartbeat task finished',
     'heartbeat.task.skipped': 'Heartbeat task skipped because no work was available',
     'heartbeat.task.cancelled': 'Heartbeat task execution cancelled',

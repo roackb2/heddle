@@ -10,6 +10,7 @@ import {
   HeartbeatSchedulerService,
   type AgentHeartbeatResult,
   type HeartbeatExecutionContext,
+  type HeartbeatAgentExecutionTransport,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
   type RunAgentHeartbeatOptions,
@@ -171,6 +172,87 @@ describe('heartbeat execution context', () => {
         result: agentResult,
       },
     }]);
+  });
+
+  it('delegates portable agent work and validates the result before durable settlement', async () => {
+    const dir = createStateRoot('remote-transport');
+    const store = new FileHeartbeatTaskService({ dir });
+    const task: HeartbeatTask = {
+      ...createTask('remote-transport'),
+      runtime: {
+        model: 'gpt-remote',
+        maxSteps: 4,
+        systemContext: 'Use the hosted workspace.',
+      },
+    };
+    const priorCheckpoint = createHeartbeatResult('pause', 'remote-prior').checkpoint;
+    const remoteResult = createHeartbeatResult('continue', 'remote-result');
+    await store.saveTask(task);
+    await store.saveCheckpoint(task, priorCheckpoint);
+    const events: HeartbeatSchedulerEvent[] = [];
+    let received: Parameters<HeartbeatAgentExecutionTransport['execute']>[0] | undefined;
+    const transport: HeartbeatAgentExecutionTransport = {
+      execute: async (input) => {
+        received = input;
+        input.publishActivity({ type: 'assistant_text_delta', text: 'Working.' });
+        return structuredClone(remoteResult);
+      },
+    };
+    const localAgent = vi.spyOn(HeartbeatRunnerAgent, 'run');
+
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      agentExecutionTransport: transport,
+      onEvent: (event) => events.push(event),
+    })).resolves.toMatchObject({ checked: 1, ran: 1, failed: 0 });
+
+    expect(localAgent).not.toHaveBeenCalled();
+    expect(received?.request).toMatchObject({
+      taskId: task.id,
+      executionId: expect.any(String),
+      task: task.task,
+      checkpoint: priorCheckpoint,
+      runContext: {
+        currentDateTime: NOW.toISOString(),
+        intervalMs: task.schedule.intervalMs,
+      },
+      model: 'gpt-remote',
+      maxSteps: 4,
+      systemContext: 'Use the hosted workspace.',
+    });
+    expect(received?.request).not.toHaveProperty('apiKey');
+    expect(received?.request).not.toHaveProperty('tools');
+    expect(received?.request).not.toHaveProperty('workspaceRoot');
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'heartbeat.task.agent_activity',
+      taskId: task.id,
+      activity: { type: 'assistant_text_delta', text: 'Working.' },
+    }));
+    await expect(store.loadCheckpoint(task)).resolves.toEqual(
+      remoteResult.checkpoint,
+    );
+
+    const invalidDir = createStateRoot('invalid-remote-result');
+    const invalidStore = new FileHeartbeatTaskService({ dir: invalidDir });
+    await invalidStore.saveTask(createTask('invalid-remote-result'));
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store: invalidStore,
+      now: () => NOW,
+      agentExecutionTransport: {
+        execute: async () => ({ status: 'pretend-success' }),
+      },
+    })).resolves.toMatchObject({ checked: 1, ran: 0, failed: 1 });
+    await expect(invalidStore.loadCheckpoint(
+      createTask('invalid-remote-result'),
+    )).resolves.toBeUndefined();
+    await expect(invalidStore.requireTask('invalid-remote-result'))
+      .resolves.toMatchObject({
+        state: {
+          status: 'failed',
+          error: 'Heartbeat agent execution transport returned an invalid result.',
+        },
+      });
   });
 
   it('cancels active work, awaits handler settlement, and persists cancellation after a late result', async () => {

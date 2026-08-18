@@ -8,8 +8,11 @@ import {
   EXECUTION_HOST_LOCAL_TOKEN_HEADER,
   ExecutionAssertionClaimsSchema,
   ExecutionHostConversationTurnRequestSchema,
+  ExecutionHostHeartbeatStreamEventSchema,
+  ExecutionHostHeartbeatTaskRequestSchema,
   ExecutionHostStreamEventSchema,
   ExecutionScopeSchema,
+  HEARTBEAT_TASK_WORKFLOW,
   MCP_CAPABILITY_HEADER,
   MCP_CAPABILITY_TYPE,
   MODEL_API_KEY_HEADER,
@@ -47,10 +50,14 @@ export function createContractArtifacts(): ReadonlyMap<string, string> {
       fixtures.durableConversationLifecycle,
     )],
     ['fixtures/valid-request.json', serialize(fixtures.validRequest)],
+    ['fixtures/valid-heartbeat-request.json', serialize(
+      fixtures.validHeartbeatRequest,
+    )],
     ['fixtures/invalid-request-extra-field.json', serialize(
       fixtures.invalidRequestExtraField,
     )],
     ['fixtures/valid-result.sse', fixtures.validStream],
+    ['fixtures/valid-heartbeat-result.sse', fixtures.validHeartbeatStream],
     ['fixtures/cancelled.sse', fixtures.cancelledStream],
     ['fixtures/ambiguous-eof.sse', fixtures.ambiguousEofStream],
     ['fixtures/invalid-sequence-gap.sse', fixtures.invalidSequenceGapStream],
@@ -76,7 +83,7 @@ export function createSchemaBundle(): JsonObject {
 }
 
 export function createOpenApi(validStream: string): JsonObject {
-  const schemas = createExecutionSchemaDefinitions();
+  const schemas = createExecutionSchemaDefinitions('#/components/schemas');
   annotateSemantics(schemas);
   return {
     openapi: '3.1.1',
@@ -95,10 +102,11 @@ export function createOpenApi(validStream: string): JsonObject {
     paths: {
       '/invocations': {
         post: {
-          operationId: 'streamConversationTurn',
-          summary: 'Run one hosted conversation turn',
+          operationId: 'streamExecutionHostInvocation',
+          summary: 'Run one supported Execution Host workflow',
           description: [
-            'Starts one conversation turn and holds one SSE response open until',
+            'Starts one conversation turn or heartbeat task and holds one SSE',
+            'response open until',
             'a terminal event or an ambiguous interruption. A clean HTTP EOF is',
             'required before a terminal frame may be committed as final.',
           ].join(' '),
@@ -107,7 +115,13 @@ export function createOpenApi(validStream: string): JsonObject {
             required: true,
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ConversationTurnRequest' },
+                schema: {
+                  oneOf: [
+                    { $ref: '#/components/schemas/ConversationTurnRequest' },
+                    { $ref: '#/components/schemas/HeartbeatTaskRequest' },
+                  ],
+                  discriminator: { propertyName: 'kind' },
+                },
               },
             },
           },
@@ -151,7 +165,7 @@ export function createOpenApi(validStream: string): JsonObject {
 
 function createSchemaDefinitions(): JsonObject {
   const definitions: JsonObject = {
-    ...createExecutionSchemaDefinitions(),
+    ...createExecutionSchemaDefinitions('#/$defs'),
     HostedConversationPersistenceScope: jsonSchema(
       HostedConversationPersistenceScopeSchema,
     ),
@@ -175,16 +189,48 @@ function createSchemaDefinitions(): JsonObject {
   return definitions;
 }
 
-function createExecutionSchemaDefinitions(): JsonObject {
+function createExecutionSchemaDefinitions(referenceRoot: string): JsonObject {
   return {
-    ExecutionScope: jsonSchema(ExecutionScopeSchema),
-    ConversationTurnRequest: jsonSchema(
-      ExecutionHostConversationTurnRequestSchema,
+    ExecutionScope: componentSchema(
+      'ExecutionScope',
+      ExecutionScopeSchema,
+      referenceRoot,
     ),
-    RuntimePublicResult: jsonSchema(RuntimePublicResultSchema),
-    StreamEvent: jsonSchema(ExecutionHostStreamEventSchema),
-    ExecutionAssertionClaims: jsonSchema(ExecutionAssertionClaimsSchema),
-    McpCapabilityClaims: jsonSchema(McpCapabilityClaimsSchema),
+    ConversationTurnRequest: componentSchema(
+      'ConversationTurnRequest',
+      ExecutionHostConversationTurnRequestSchema,
+      referenceRoot,
+    ),
+    HeartbeatTaskRequest: componentSchema(
+      'HeartbeatTaskRequest',
+      ExecutionHostHeartbeatTaskRequestSchema,
+      referenceRoot,
+    ),
+    RuntimePublicResult: componentSchema(
+      'RuntimePublicResult',
+      RuntimePublicResultSchema,
+      referenceRoot,
+    ),
+    StreamEvent: componentSchema(
+      'StreamEvent',
+      ExecutionHostStreamEventSchema,
+      referenceRoot,
+    ),
+    HeartbeatStreamEvent: componentSchema(
+      'HeartbeatStreamEvent',
+      ExecutionHostHeartbeatStreamEventSchema,
+      referenceRoot,
+    ),
+    ExecutionAssertionClaims: componentSchema(
+      'ExecutionAssertionClaims',
+      ExecutionAssertionClaimsSchema,
+      referenceRoot,
+    ),
+    McpCapabilityClaims: componentSchema(
+      'McpCapabilityClaims',
+      McpCapabilityClaimsSchema,
+      referenceRoot,
+    ),
     ExecutionAssertionProtectedHeader: protectedHeaderSchema(
       EXECUTION_ASSERTION_TYPE,
     ),
@@ -309,6 +355,42 @@ function jsonSchema(schema: z.ZodType): JsonObject {
   return component;
 }
 
+function componentSchema(
+  name: string,
+  schema: z.ZodType,
+  referenceRoot: string,
+): JsonObject {
+  return rewriteNestedSchemaReferences(
+    jsonSchema(schema),
+    `${referenceRoot}/${name}/$defs`,
+  ) as JsonObject;
+}
+
+function rewriteNestedSchemaReferences(
+  value: unknown,
+  nestedDefinitionsPath: string,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      rewriteNestedSchemaReferences(item, nestedDefinitionsPath),
+    );
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      key === '$ref' &&
+      typeof item === 'string' &&
+      item.startsWith('#/$defs/')
+        ? `${nestedDefinitionsPath}/${item.slice('#/$defs/'.length)}`
+        : rewriteNestedSchemaReferences(item, nestedDefinitionsPath),
+    ]),
+  );
+}
+
 function annotateSemantics(definitions: JsonObject): void {
   for (const definitionName of [
     'ExecutionAssertionClaims',
@@ -319,6 +401,9 @@ function annotateSemantics(definitions: JsonObject): void {
     ] = true;
   }
   property(definitions.ConversationTurnRequest, 'prompt')[
+    'x-heddle-trimmed'
+  ] = true;
+  property(definitions.HeartbeatTaskRequest, 'task')[
     'x-heddle-trimmed'
   ] = true;
   const allowedTools = property(
@@ -346,6 +431,27 @@ function createFixtures() {
     ...validRequest,
     tenantId: 'caller-must-not-select-authority-in-body',
   };
+  const validHeartbeatRequest = {
+    schemaVersion: EXECUTION_CONTRACT_VERSION,
+    kind: HEARTBEAT_TASK_WORKFLOW,
+    invocationId: 'heartbeat-execution-001',
+    taskId: 'heartbeat-task-001',
+    task: 'Review the workspace for actionable changes.',
+    checkpoint: {
+      version: 1,
+      createdAt: FIXTURE_TIMESTAMP,
+      state: { runId: 'prior-run-001' },
+    },
+    runContext: {
+      currentDateTime: FIXTURE_TIMESTAMP,
+      intervalMs: 60_000,
+      continuationMode: 'operator',
+      previousRunId: 'prior-run-001',
+    },
+    model: 'openai:gpt-5.6',
+    maxSteps: 24,
+    deadlineAt: '2026-08-10T04:10:00.000Z',
+  };
   const accepted = streamEvent(0, { kind: 'accepted' });
   const activity = streamEvent(1, {
     kind: 'activity',
@@ -358,6 +464,33 @@ function createFixtures() {
       kind: 'result',
       result: { outcome: 'done', summary: 'Complete.' },
     }),
+  ]);
+  const heartbeatAccepted = streamEvent(0, {
+    kind: 'accepted',
+  }, 'heartbeat-execution-001', 'heartbeat-run-001');
+  const validHeartbeatStream = toSse([
+    heartbeatAccepted,
+    streamEvent(1, {
+      kind: 'activity',
+      activity: { type: 'heartbeat.decision', decision: 'continue' },
+    }, 'heartbeat-execution-001', 'heartbeat-run-001'),
+    streamEvent(2, {
+      kind: 'result',
+      result: {
+        decision: 'continue',
+        summary: 'No operator action required.',
+        checkpoint: {
+          version: 1,
+          createdAt: FIXTURE_TIMESTAMP,
+          state: { runId: 'heartbeat-run-001' },
+        },
+        state: {
+          runId: 'heartbeat-run-001',
+          outcome: 'done',
+          summary: 'No operator action required.',
+        },
+      },
+    }, 'heartbeat-execution-001', 'heartbeat-run-001'),
   ]);
   const cancelledStream = toSse([
     accepted,
@@ -375,12 +508,24 @@ function createFixtures() {
     cases: [
       fixtureCase('valid-request', 'valid-request.json', 'json-schema', 'valid'),
       fixtureCase(
+        'valid-heartbeat-request',
+        'valid-heartbeat-request.json',
+        'json-schema',
+        'valid',
+      ),
+      fixtureCase(
         'request-authority-in-body',
         'invalid-request-extra-field.json',
         'json-schema',
         'invalid',
       ),
       fixtureCase('valid-result', 'valid-result.sse', 'sse', 'complete'),
+      fixtureCase(
+        'valid-heartbeat-result',
+        'valid-heartbeat-result.sse',
+        'sse',
+        'complete',
+      ),
       fixtureCase('cancelled', 'cancelled.sse', 'sse', 'cancelled'),
       fixtureCase('ambiguous-eof', 'ambiguous-eof.sse', 'sse', 'interrupted'),
       fixtureCase(
@@ -403,8 +548,10 @@ function createFixtures() {
     authority,
     durableConversationLifecycle,
     validRequest,
+    validHeartbeatRequest,
     invalidRequestExtraField,
     validStream,
+    validHeartbeatStream,
     cancelledStream,
     ambiguousEofStream,
     invalidSequenceGapStream,
@@ -775,11 +922,16 @@ function createAuthorityFixture(): JsonObject {
   };
 }
 
-function streamEvent(sequence: number, body: JsonObject): JsonObject {
+function streamEvent(
+  sequence: number,
+  body: JsonObject,
+  invocationId = 'invocation-001',
+  runId = 'run-001',
+): JsonObject {
   return {
     schemaVersion: EXECUTION_CONTRACT_VERSION,
-    invocationId: 'invocation-001',
-    runId: 'run-001',
+    invocationId,
+    runId,
     sequence,
     timestamp: FIXTURE_TIMESTAMP,
     ...body,

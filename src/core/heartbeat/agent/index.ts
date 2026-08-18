@@ -7,5 +7,6 @@ export type {
   HeartbeatDecision,
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
+  HeartbeatRunnerAgentRunContext,
   RunAgentHeartbeatOptions,
 } from './types.js';

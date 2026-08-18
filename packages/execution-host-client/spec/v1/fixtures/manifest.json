@@ -8,6 +8,12 @@
       "expected": "valid"
     },
     {
+      "id": "valid-heartbeat-request",
+      "file": "valid-heartbeat-request.json",
+      "kind": "json-schema",
+      "expected": "valid"
+    },
+    {
       "id": "request-authority-in-body",
       "file": "invalid-request-extra-field.json",
       "kind": "json-schema",
@@ -16,6 +22,12 @@
     {
       "id": "valid-result",
       "file": "valid-result.sse",
+      "kind": "sse",
+      "expected": "complete"
+    },
+    {
+      "id": "valid-heartbeat-result",
+      "file": "valid-heartbeat-result.sse",
       "kind": "sse",
       "expected": "complete"
     },

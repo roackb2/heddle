@@ -13,7 +13,9 @@ JavaScript or TypeScript.
   safe API errors, and the optional durable conversation-lifecycle profile.
 - `fixtures/` contains executable examples for valid and invalid requests,
   complete and interrupted streams, cancellation, sequence validation, and
-  execution/MCP authority. `durable-conversation-lifecycle.json` supplies the
+  execution/MCP authority. It includes distinct valid request/result examples
+  for `conversation-turn` and `heartbeat-task`.
+  `durable-conversation-lifecycle.json` supplies the
   shared TypeScript/Python terminal and store-transition vectors.
 - `durable-hosted-conversation-lifecycle.md` defines persistence ordering,
   transition fencing, safe projection, interruption, and reconciliation for a
@@ -63,6 +65,11 @@ also enforce these relationships:
    before each operation.
 10. `allowedTools` is unique, contains at most 16 collision-free names, and the
     aggregate tool-name length is at most 512 characters.
+11. The request `kind`, execution assertion `workflow`, optional MCP capability
+    `workflow`, and selected event schema all name the same workflow.
+12. A heartbeat terminal `result` remains JSON on the wire; the Heddle
+    scheduler validates the complete `AgentHeartbeatResult` before durable
+    checkpoint or success settlement.
 
 The optional durable profile adds control-plane semantics around this stream.
 It does not add a database endpoint to the Execution Host or make product
@@ -89,9 +96,12 @@ not adopter-domain contracts.
 
 ## Compatibility and stop line
 
-Version 1 supports `conversation-turn`. New workflows, transports, or identity
-forms require an explicit contract version decision; they are not silently
-added to this surface.
+Version 1 supports the explicit `conversation-turn` and `heartbeat-task`
+profiles. The heartbeat profile is additive: existing conversation requests and
+events are unchanged, while implementations opt into the new discriminator and
+schemas. Any further workflow, transport, incompatible field, or identity form
+requires another explicit contract-version decision; it is not silently added
+to this surface.
 
 The repository deliberately stops after this schema, fixture set, the
 TypeScript implementation, and one Python clean-room reference pass. It does

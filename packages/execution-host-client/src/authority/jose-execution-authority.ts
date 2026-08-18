@@ -10,10 +10,10 @@ import {
 } from 'jose';
 import { z } from 'zod';
 import {
-  CONVERSATION_TURN_WORKFLOW,
   EXECUTION_ASSERTION_TYPE,
   EXECUTION_CONTRACT_VERSION,
   ExecutionScopeSchema,
+  HostedExecutionWorkflowSchema,
   JwtAudienceSchema,
   JwtIssuerSchema,
   MCP_CAPABILITY_TYPE,
@@ -70,7 +70,7 @@ const ExecutionAuthorityIssueInputSchema = z.object({
   scope: ExecutionIssueScopeSchema,
   runtimeSessionId: RuntimeSessionIdSchema,
   invocationId: OpaqueIdSchema,
-  workflow: z.literal(CONVERSATION_TURN_WORKFLOW),
+  workflow: HostedExecutionWorkflowSchema,
   mcp: z.object({
     allowedTools: McpAllowedToolsSchema,
   }).strict().optional(),

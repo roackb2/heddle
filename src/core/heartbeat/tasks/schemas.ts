@@ -99,7 +99,7 @@ export const AgentLoopCheckpointSchema = z.object({
   }).passthrough().describe('Runtime loop state snapshot.'),
 }).passthrough();
 
-const AgentHeartbeatResultSchema = z.object({
+export const AgentHeartbeatResultSchema = z.object({
   decision: HeartbeatDecisionSchema,
   summary: z.string(),
   checkpoint: AgentLoopCheckpointSchema,

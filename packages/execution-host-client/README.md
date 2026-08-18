@@ -5,7 +5,7 @@ products that invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** stable version `6.1.0`. The former
+> **Current availability:** stable version `6.2.0`. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
@@ -30,10 +30,11 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 | `@heddleagent/execution-host-client/contracts` | Runtime-validated v1 request, stream, identity, capability, and header contracts |
 | `@heddleagent/execution-host-client/authority` | ES256 execution assertion and optional MCP capability issuance plus public JWKS projection |
 | `@heddleagent/execution-host-client/conversation` | Turn orchestration across authority, model credentials, optional MCP policy, an `ExecutionHost`, and an optional adopter-implemented durable lifecycle store |
+| `@heddleagent/execution-host-client/heartbeat` | Remote heartbeat orchestration that keeps durable task authority in a coordinator while a compatible Execution Host runs the agent cycle |
 | `@heddleagent/execution-host-client/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
-| `@heddleagent/execution-host-client/http-sse` | Transport-neutral `ExecutionHost` port and strict direct-development HTTP/SSE client |
-| `@heddleagent/execution-host-client/agentcore` | Official AWS AgentCore/SigV4 implementation of the same `ExecutionHost` port |
+| `@heddleagent/execution-host-client/http-sse` | Transport-neutral conversation and heartbeat ports plus the strict direct-development HTTP/SSE client |
+| `@heddleagent/execution-host-client/agentcore` | Official AWS AgentCore/SigV4 implementation of the same conversation and heartbeat ports |
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
@@ -277,6 +278,44 @@ for await (const event of host.streamConversationTurn({
 The client refuses redirects, bounds parser and error bodies, validates ordered
 SSE identity, streams accepted/activity events incrementally, and withholds the
 terminal event until clean EOF. It never retries an ambiguous invocation.
+
+## Delegate heartbeat agent cycles
+
+For autonomous work, keep the durable task store and scheduler in one
+long-running coordinator. Inject the hosted transport only at the point where
+the scheduler would otherwise run the local heartbeat agent:
+
+```ts
+import { HeartbeatSchedulerService } from '@heddleagent/runtime/advanced'
+import {
+  HostedHeartbeatAgentExecutionTransport,
+  HostedHeartbeatTaskService,
+} from '@heddleagent/execution-host-client/heartbeat'
+
+const hostedHeartbeat = new HostedHeartbeatTaskService({
+  authority,
+  executionHost: agentCoreExecutionHost,
+  modelCredentials,
+  mcp: { allowedTools: ['read_workspace_snapshot'] },
+})
+const agentExecutionTransport = new HostedHeartbeatAgentExecutionTransport({
+  runner: hostedHeartbeat,
+  resolveInvocationContext: ({ taskId, executionId, signal }) => (
+    resolveAuthorizedHeartbeatInvocation({ taskId, executionId, signal })
+  ),
+})
+
+const scheduler = HeartbeatSchedulerService.start({
+  store: heddleHeartbeatStore,
+  agentExecutionTransport,
+})
+```
+
+The coordinator still owns task lookup, claims, checkpoint loading, cancellation,
+claim-fenced settlement, history, and recovery. The Runtime receives a bounded
+task/checkpoint request plus invocation-scoped authority and model credentials;
+it receives no Heddle database credential. Omitting `agentExecutionTransport`
+preserves the existing in-process runner.
 
 ## Verify an adopter integration locally
 

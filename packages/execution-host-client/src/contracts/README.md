@@ -6,6 +6,11 @@ ordered SSE events, execution identity claims, MCP capability claims, and the
 fixed header and token-type names shared by adopter backends and Execution Host
 deployments.
 
+The v1 binding has two explicit workflow profiles: `conversation-turn` and
+`heartbeat-task`. They share identity, credential headers, strict stream
+ordering, cancellation, and clean-EOF terminal truth, but keep distinct request,
+activity, and result schemas. A heartbeat request is not disguised as a prompt.
+
 It does not define product authentication, tenant lookup, authorization policy,
 MCP tool behavior, persistence, AWS transport, or the Heddle runtime loop. An
 adopter must derive scope from its authenticated product state before using
