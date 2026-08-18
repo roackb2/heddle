@@ -2,6 +2,7 @@ export { JoseExecutionAuthority } from './jose-execution-authority.js';
 export type {
   ExecutionAuthority,
   ExecutionAuthorityConfig,
+  ExecutionAuthorityIssuer,
   ExecutionAuthorityIssueInput,
   ExecutionAuthorityKeyPair,
   ExecutionAuthorityMcpConfig,
