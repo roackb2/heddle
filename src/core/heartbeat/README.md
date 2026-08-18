@@ -12,6 +12,11 @@ operator-facing heartbeat views.
 - `agent/`: `HeartbeatRunnerAgent` owns one autonomous runner-agent cycle on top of
   `AgentLoopRuntimeService.run`, with prompt and decision policy classes kept
   beside it.
+- `runs/`: `HeartbeatRunService` owns the process-local lifecycle for one
+  explicitly requested heartbeat cycle: run identity, cancellation, ordered
+  activity, and exactly one terminal result, cancellation, or safe error.
+  Hosts provide resolved model/tool/MCP options and consume its handle instead
+  of rebuilding callback-to-stream coordination.
 - `checkpoint/`: `StoredHeartbeatService` and
   `FileHeartbeatCheckpointRepository` own checkpoint-backed one-off heartbeat
   execution.
@@ -65,6 +70,9 @@ operator-facing heartbeat views.
 ## Boundary Notes
 
 - Keep scheduler/task persistence concerns here, not in runtime.
+- `HeartbeatRunService` is an execution primitive, not a scheduler or durable
+  task authority. It must not claim tasks, persist checkpoints, or settle task
+  history.
 - `executionId` is the fencing token for one task attempt. A store must reject
   completion, failure, skip, or cancellation persistence when that execution
   no longer owns the task.

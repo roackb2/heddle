@@ -252,6 +252,14 @@ export type {
   HeartbeatRunnerAgentRunContext,
   RunAgentHeartbeatOptions,
 } from './core/heartbeat/agent/index.js';
+export { HeartbeatRunService } from './core/heartbeat/runs/index.js';
+export type {
+  HeartbeatRunHandle,
+  HeartbeatRunPublicError,
+  HeartbeatRunServiceOptions,
+  HeartbeatRunStreamItem,
+  HeartbeatRunner,
+} from './core/heartbeat/runs/index.js';
 export {
   FileHeartbeatCheckpointRepository,
   StoredHeartbeatService,

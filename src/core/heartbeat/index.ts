@@ -88,6 +88,14 @@ export type {
   HeartbeatRunnerAgentRunContext,
   RunAgentHeartbeatOptions,
 } from './agent/index.js';
+export { HeartbeatRunService } from './runs/index.js';
+export type {
+  HeartbeatRunHandle,
+  HeartbeatRunPublicError,
+  HeartbeatRunServiceOptions,
+  HeartbeatRunStreamItem,
+  HeartbeatRunner,
+} from './runs/index.js';
 export { HeartbeatLucidPresenter, HeartbeatTaskViewProjector } from './views/index.js';
 export type {
   HeartbeatRunView,
