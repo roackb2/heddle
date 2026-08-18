@@ -1,6 +1,11 @@
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
 import type { LlmProvider } from '@/core/llm/types.js';
-import type { AgentHeartbeatEvent, AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
+import type {
+  AgentHeartbeatEvent,
+  AgentHeartbeatResult,
+  HeartbeatRunnerAgentRunContext,
+  RunAgentHeartbeatOptions,
+} from '../agent/index.js';
 export {
   DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
   MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
@@ -75,6 +80,13 @@ export type HeartbeatSchedulerEvent =
       taskId: string;
       executionId: string;
       event: AgentHeartbeatEvent;
+      timestamp: string;
+    }
+  | {
+      type: 'heartbeat.task.agent_activity';
+      taskId: string;
+      executionId: string;
+      activity: unknown;
       timestamp: string;
     }
   | {
@@ -219,8 +231,45 @@ export type HeartbeatTaskRunnerRuntimeOptions = {
   onAgentEvent?: RunAgentHeartbeatOptions['onEvent'];
 };
 
+/**
+ * JSON-safe heartbeat work delegated to another execution process.
+ *
+ * The coordinator deliberately does not send credentials, tools, approval
+ * callbacks, filesystem paths, loggers, or model adapters. Those belong to
+ * the execution process selected by the transport.
+ */
+export type HeartbeatAgentExecutionRequest = {
+  taskId: string;
+  executionId: string;
+  task: string;
+  checkpoint?: AgentLoopCheckpoint;
+  runContext: HeartbeatRunnerAgentRunContext;
+  model?: string;
+  reasoningEffort?: RunAgentHeartbeatOptions['reasoningEffort'];
+  maxSteps?: number;
+  searchIgnoreDirs?: string[];
+  systemContext?: string;
+};
+
+export type HeartbeatAgentExecutionTransportInput = {
+  request: HeartbeatAgentExecutionRequest;
+  signal: AbortSignal;
+  publishActivity: (activity: unknown) => void;
+};
+
+/**
+ * Replaceable execution-plane seam for one heartbeat agent cycle.
+ *
+ * Results cross an untrusted serialization boundary. The scheduler validates
+ * the returned value as an `AgentHeartbeatResult` before durable settlement.
+ */
+export interface HeartbeatAgentExecutionTransport {
+  execute(input: HeartbeatAgentExecutionTransportInput): Promise<unknown>;
+}
+
 export type RunDueHeartbeatTasksOptions = {
   store: HeartbeatTaskStore;
+  agentExecutionTransport?: HeartbeatAgentExecutionTransport;
   handler?: HeartbeatTaskHandler;
   /** @deprecated Use `handler`. */
   runner?: HeartbeatTaskRunner;
@@ -345,6 +394,7 @@ export type StartHeartbeatSchedulerOptions = {
    * exact instance for recovery, wake subscriptions, claims, and settlement.
    */
   store?: HeartbeatTaskStore;
+  agentExecutionTransport?: HeartbeatAgentExecutionTransport;
   preferApiKey?: boolean;
   model?: string;
   maxSteps?: number;

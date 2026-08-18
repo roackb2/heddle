@@ -22,7 +22,7 @@ describe('versioned language-neutral contract artifacts', () => {
       paths: {
         '/invocations': {
           post: {
-            operationId: 'streamConversationTurn',
+            operationId: 'streamExecutionHostInvocation',
             responses: { 200: expect.any(Object) },
           },
         },
@@ -32,7 +32,9 @@ describe('versioned language-neutral contract artifacts', () => {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $defs: {
         ConversationTurnRequest: expect.any(Object),
+        HeartbeatTaskRequest: expect.any(Object),
         StreamEvent: expect.any(Object),
+        HeartbeatStreamEvent: expect.any(Object),
         ExecutionAssertionClaims: expect.any(Object),
         McpCapabilityClaims: expect.any(Object),
       },

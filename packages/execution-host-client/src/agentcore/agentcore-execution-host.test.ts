@@ -12,12 +12,14 @@ import {
   EXECUTION_HOST_LOCAL_TOKEN_HEADER,
   MCP_CAPABILITY_HEADER,
   MODEL_API_KEY_HEADER,
+  type ExecutionHostHeartbeatStreamEvent,
   type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
 import {
   ExecutionHostInvocationCancelledError,
   ExecutionHostStreamInterruptedError,
   type ExecutionHostConversationTurn,
+  type ExecutionHostHeartbeatTask,
 } from '../http-sse/index.js';
 import { AgentCoreExecutionHost } from './agentcore-execution-host.js';
 import type { AgentCoreRuntimeClient } from './types.js';
@@ -114,6 +116,39 @@ describe('AgentCoreExecutionHost', () => {
     await expect(collect(host.streamConversationTurn(input())))
       .rejects.toBeInstanceOf(ExecutionHostStreamInterruptedError);
 
+    host.close();
+  });
+
+  it('invokes the explicit heartbeat workflow through AgentCore', async () => {
+    let requestBody: unknown;
+    const origin = await listen(async (request, response) => {
+      requestBody = JSON.parse(await readBody(request));
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.end(toSse([heartbeatAccepted(), heartbeatResult()]));
+    });
+    const host = new AgentCoreExecutionHost({
+      region: 'us-east-2',
+      runtimeArn: RUNTIME_ARN,
+      client: new BedrockAgentCoreClient({
+        region: 'us-east-2',
+        endpoint: origin.toString(),
+        credentials: {
+          accessKeyId: 'test-access-key',
+          secretAccessKey: 'test-secret-key',
+        },
+        maxAttempts: 1,
+      }),
+    });
+
+    const events = await collect(host.streamHeartbeatTask(heartbeatInput()));
+
+    expect(requestBody).toMatchObject({
+      schemaVersion: 1,
+      kind: 'heartbeat-task',
+      invocationId: heartbeatInput().invocationId,
+      taskId: heartbeatInput().taskId,
+    });
+    expect(events.map(({ kind }) => kind)).toEqual(['accepted', 'result']);
     host.close();
   });
 
@@ -215,7 +250,47 @@ function result(): ExecutionHostStreamEvent {
   };
 }
 
-function toSse(events: ExecutionHostStreamEvent[]): string {
+function heartbeatInput(): ExecutionHostHeartbeatTask {
+  return {
+    invocationId: 'heartbeat_agentcore_test',
+    runtimeSessionId: input().runtimeSessionId,
+    taskId: 'heartbeat-task-001',
+    task: 'Review the workspace.',
+    runContext: {
+      currentDateTime: '2026-08-18T00:00:00.000Z',
+      intervalMs: 60_000,
+    },
+    executionAssertion: input().executionAssertion,
+    modelApiKey: input().modelApiKey,
+  };
+}
+
+function heartbeatAccepted(): ExecutionHostHeartbeatStreamEvent {
+  return {
+    schemaVersion: 1,
+    invocationId: heartbeatInput().invocationId,
+    runId: 'heartbeat-run-001',
+    timestamp: '2026-08-18T00:00:00.000Z',
+    sequence: 0,
+    kind: 'accepted',
+  };
+}
+
+function heartbeatResult(): ExecutionHostHeartbeatStreamEvent {
+  return {
+    schemaVersion: 1,
+    invocationId: heartbeatInput().invocationId,
+    runId: 'heartbeat-run-001',
+    timestamp: '2026-08-18T00:00:01.000Z',
+    sequence: 1,
+    kind: 'result',
+    result: { decision: 'continue', summary: 'Complete.' },
+  };
+}
+
+type StreamEvent = ExecutionHostStreamEvent | ExecutionHostHeartbeatStreamEvent;
+
+function toSse(events: StreamEvent[]): string {
   return events.map((event) => [
     `event: ${event.kind}`,
     `id: ${event.sequence}`,
@@ -226,9 +301,9 @@ function toSse(events: ExecutionHostStreamEvent[]): string {
 }
 
 async function collect(
-  events: AsyncIterable<ExecutionHostStreamEvent>,
-): Promise<ExecutionHostStreamEvent[]> {
-  const collected: ExecutionHostStreamEvent[] = [];
+  events: AsyncIterable<StreamEvent>,
+): Promise<StreamEvent[]> {
+  const collected: StreamEvent[] = [];
   for await (const event of events) {
     collected.push(event);
   }

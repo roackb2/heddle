@@ -8,6 +8,9 @@ export {
 } from './types.js';
 export type {
   CancelHeartbeatTaskOptions,
+  HeartbeatAgentExecutionRequest,
+  HeartbeatAgentExecutionTransport,
+  HeartbeatAgentExecutionTransportInput,
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
   HeartbeatTaskCancellationDisposition,

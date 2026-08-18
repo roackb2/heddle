@@ -14,6 +14,8 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 EXECUTION_CONTRACT_VERSION = 1
 CONVERSATION_TURN_WORKFLOW = "conversation-turn"
+HEARTBEAT_TASK_WORKFLOW = "heartbeat-task"
+SUPPORTED_EXECUTION_WORKFLOWS = frozenset({CONVERSATION_TURN_WORKFLOW, HEARTBEAT_TASK_WORKFLOW})
 EXECUTION_ASSERTION_TYPE = "heddle-execution+jwt"
 MCP_CAPABILITY_TYPE = "heddle-mcp-capability+jwt"
 

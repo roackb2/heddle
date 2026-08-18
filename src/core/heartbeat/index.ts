@@ -15,6 +15,9 @@ export {
 } from './scheduler/index.js';
 export type {
   CancelHeartbeatTaskOptions,
+  HeartbeatAgentExecutionRequest,
+  HeartbeatAgentExecutionTransport,
+  HeartbeatAgentExecutionTransportInput,
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
   HeartbeatTaskCancellationDisposition,
@@ -82,6 +85,7 @@ export type {
   HeartbeatDecision,
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
+  HeartbeatRunnerAgentRunContext,
   RunAgentHeartbeatOptions,
 } from './agent/index.js';
 export { HeartbeatLucidPresenter, HeartbeatTaskViewProjector } from './views/index.js';

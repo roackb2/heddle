@@ -105,7 +105,7 @@ adopter database credential.
 | `@heddleagent/runtime/runs` | That same Node process needs addressable runs, replay, cancel, or reconnect | This is an in-process run service, not the separate Execution Host |
 | `@heddleagent/run-client` | A browser or JavaScript client consumes hosted-run envelopes | It consumes execution; it does not run an agent |
 | `@heddleagent/postgres/heartbeat` | Heddle heartbeat tasks need PostgreSQL leases, checkpoints, and history | It is one explicit adapter subpath, not a general product DB or conversation-history adapter |
-| `@heddleagent/execution-host-client` | A product invokes a separate compatible Execution Host | Authority, transport, turn orchestration, durable lifecycle semantics, Node helpers, and cross-language conformance |
+| `@heddleagent/execution-host-client` | A product or Heddle coordinator invokes a separate compatible Execution Host | Authority, conversation and heartbeat transports, turn orchestration, durable conversation lifecycle semantics, Node helpers, and cross-language conformance |
 | `@heddleagent/postgres/execution-host/conversations` | That product stores the generic lifecycle in PostgreSQL | Official atomic store and ordered migrations; no product history/query policy or pool ownership |
 | v1 OpenAPI, JSON Schema, and fixtures | The adopter backend is Python, Go, Java, or another stack | Implement the network and optional durable-lifecycle profiles; never port Heddle's agent loop |
 
@@ -122,7 +122,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 | --- | --- | --- |
 | `@heddleagent/runtime` and `/runs` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@heddleagent/run-client` | Public | Browser-safe run protocol and optional HTTP/SSE client |
-| `@heddleagent/execution-host-client` | Public | The canonical product-backend integration kit, including durable lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
+| `@heddleagent/execution-host-client` | Public | The canonical backend integration kit, including conversation and heartbeat workflows, durable conversation lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
 | `@heddleagent/postgres/execution-host/conversations` | Public | Official PostgreSQL lifecycle adapter over an adopter-managed database and migration process |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |

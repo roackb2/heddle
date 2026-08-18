@@ -249,6 +249,7 @@ export type {
   HeartbeatDecision,
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
+  HeartbeatRunnerAgentRunContext,
   RunAgentHeartbeatOptions,
 } from './core/heartbeat/agent/index.js';
 export {
@@ -308,6 +309,9 @@ export {
 } from './core/heartbeat/scheduler/index.js';
 export type {
   CancelHeartbeatTaskOptions,
+  HeartbeatAgentExecutionRequest,
+  HeartbeatAgentExecutionTransport,
+  HeartbeatAgentExecutionTransportInput,
   HeartbeatSchedulerHandle,
   HeartbeatSchedulerEvent,
   HeartbeatTaskCancellationDisposition,

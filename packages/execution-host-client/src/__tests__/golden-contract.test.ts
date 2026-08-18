@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { JoseExecutionAuthority } from '../authority/index.js';
 import {
   ExecutionHostConversationTurnRequestSchema,
+  ExecutionHostHeartbeatTaskRequestSchema,
   MCP_CAPABILITY_TYPE,
   type ExecutionAssertionClaims,
   type ExecutionHostStreamEvent,
@@ -46,6 +47,17 @@ describe('language-neutral golden fixtures', () => {
       .toBe(true);
     expect(ExecutionHostConversationTurnRequestSchema.safeParse(invalid).success)
       .toBe(false);
+  });
+
+  it('accepts the portable heartbeat request fixture', async () => {
+    const request = await readJson('valid-heartbeat-request.json');
+
+    expect(ExecutionHostHeartbeatTaskRequestSchema.safeParse(request).success)
+      .toBe(true);
+    expect(ExecutionHostHeartbeatTaskRequestSchema.safeParse({
+      ...request,
+      kind: 'conversation-turn',
+    }).success).toBe(false);
   });
 
   it.each([

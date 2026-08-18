@@ -21,6 +21,15 @@ def test_checked_in_schema_accepts_only_the_authority_free_request() -> None:
         contract.validate("ConversationTurnRequest", invalid)
 
 
+def test_checked_in_schema_accepts_the_heartbeat_request() -> None:
+    contract = ContractBundle.load(SPEC_ROOT / "schema-bundle.json")
+    request = json.loads(
+        (FIXTURE_ROOT / "valid-heartbeat-request.json").read_text(encoding="utf-8")
+    )
+
+    contract.validate("HeartbeatTaskRequest", request)
+
+
 def test_schema_bundle_validates_stream_and_authority_examples(
     authority_fixture: dict[str, object],
 ) -> None:

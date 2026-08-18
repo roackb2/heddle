@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "heartbeat-task",
+  "invocationId": "heartbeat-execution-001",
+  "taskId": "heartbeat-task-001",
+  "task": "Review the workspace for actionable changes.",
+  "checkpoint": {
+    "version": 1,
+    "createdAt": "2026-08-10T04:00:00.000Z",
+    "state": {
+      "runId": "prior-run-001"
+    }
+  },
+  "runContext": {
+    "currentDateTime": "2026-08-10T04:00:00.000Z",
+    "intervalMs": 60000,
+    "continuationMode": "operator",
+    "previousRunId": "prior-run-001"
+  },
+  "model": "openai:gpt-5.6",
+  "maxSteps": 24,
+  "deadlineAt": "2026-08-10T04:10:00.000Z"
+}

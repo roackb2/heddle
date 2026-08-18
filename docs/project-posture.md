@@ -79,9 +79,10 @@ At the distribution boundary:
   run lifecycle and remote-consumption mechanics, not a managed service;
 - `@heddleagent/execution-host-client` defines the public, language-neutral
   boundary for a backend invoking a separate compatible Execution Host. It
-  owns authority, wire, direct and AgentCore transports, base turn, MCP, Node,
-  testing, and the reusable durable-turn lifecycle over an adopter-implemented
-  atomic store, with shared TypeScript/Python lifecycle fixtures. The former
+  owns authority, wire, direct and AgentCore transports, explicit conversation
+  and heartbeat workflows, MCP, Node, testing, and the reusable durable-turn
+  lifecycle over an adopter-implemented atomic store, with shared
+  TypeScript/Python fixtures. The former
   `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
   installable only for existing consumers;
 - `@heddleagent/postgres` is the official PostgreSQL adapter family. Its

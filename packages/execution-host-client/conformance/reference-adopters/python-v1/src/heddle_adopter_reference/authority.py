@@ -19,6 +19,7 @@ from .contracts import (
     EXECUTION_ASSERTION_TYPE,
     EXECUTION_CONTRACT_VERSION,
     MCP_CAPABILITY_TYPE,
+    SUPPORTED_EXECUTION_WORKFLOWS,
     ExecutionScope,
     validate_allowed_tools,
     validate_mcp_server_id,
@@ -77,7 +78,7 @@ class ExecutionAuthorityInput:
     def __post_init__(self) -> None:
         validate_runtime_session_id(self.runtime_session_id)
         validate_opaque_id(self.invocation_id)
-        if self.workflow != CONVERSATION_TURN_WORKFLOW:
+        if self.workflow not in SUPPORTED_EXECUTION_WORKFLOWS:
             raise ValueError("Unsupported execution workflow.")
         if self.allowed_tools is not None:
             object.__setattr__(self, "allowed_tools", validate_allowed_tools(self.allowed_tools))

@@ -30,11 +30,15 @@ export type HostedConversationCredentialContext = Pick<
 >;
 
 /** Resolves model authority without exposing it to HTTP or product data. */
-export interface HostedConversationModelCredentialProvider {
+export interface HostedModelCredentialProvider {
   resolveModelApiKey(
     context: HostedConversationCredentialContext,
   ): Promise<string>;
 }
+
+/** @deprecated Use `HostedModelCredentialProvider`. */
+export type HostedConversationModelCredentialProvider =
+  HostedModelCredentialProvider;
 
 export interface HostedConversationTurnRunner {
   streamTurn(
@@ -45,7 +49,7 @@ export interface HostedConversationTurnRunner {
 export type HostedConversationTurnServiceConfig = {
   authority: ExecutionAuthority;
   executionHost: ExecutionHost;
-  modelCredentials: HostedConversationModelCredentialProvider;
+  modelCredentials: HostedModelCredentialProvider;
   /** Omit this policy when the hosted workflow needs no product MCP tools. */
   mcp?: {
     allowedTools: readonly string[];

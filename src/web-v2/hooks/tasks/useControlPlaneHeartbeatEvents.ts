@@ -163,6 +163,12 @@ function projectHeartbeatTaskEvent(
         progress: describeAgentEvent(event.event),
         runId: 'runId' in event.event && typeof event.event.runId === 'string' ? event.event.runId : base.runId,
       };
+    case 'heartbeat.task.agent_activity':
+      return {
+        ...base,
+        status: 'running',
+        progress: 'Remote heartbeat agent is working...',
+      };
     case 'heartbeat.task.finished':
       return {
         ...base,

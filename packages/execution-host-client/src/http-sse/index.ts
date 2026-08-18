@@ -9,4 +9,6 @@ export type {
   DirectHttpExecutionHostConfig,
   ExecutionHost,
   ExecutionHostConversationTurn,
+  ExecutionHostHeartbeatTask,
+  HeartbeatExecutionHost,
 } from './types.js';

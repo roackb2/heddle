@@ -45,6 +45,10 @@ operator-facing heartbeat views.
   `context.runAgent()` path, so hosts can add domain prompts and tools without
   receiving or translating provider credentials. `context.skip()` records
   explicit no-work without fabricating agent state.
+  An optional provider-neutral `HeartbeatAgentExecutionTransport` replaces only
+  the nested agent call. Task lookup, claim fencing, checkpoint load,
+  cancellation, settlement, history, and recovery remain in this service; when
+  omitted, the existing local `HeartbeatRunnerAgent` remains the default.
 - `views/`: `HeartbeatLucidPresenter` owns Lucid-specific adapter messages.
   `HeartbeatTaskViewProjector` owns provider-neutral task/run views and stable
   task ordering without depending on a persistence adapter.
@@ -73,7 +77,7 @@ operator-facing heartbeat views.
   the same atomic store transition. Saving a projection derived from the
   pre-run snapshot can erase newer run requests or operator control changes.
 - Custom adapters should use the public `HeartbeatTaskStateProjector` exported
-  from `@roackb2/heddle/advanced` for normalization, request, claim,
+  from `@heddleagent/runtime/advanced` for normalization, request, claim,
   settlement, and recovery transitions. The adapter still owns the backend
   transaction and fencing predicate; it must not copy Heddle's transition
   rules into provider-specific persistence code.
@@ -131,7 +135,7 @@ operator-facing heartbeat views.
   invocation never performs recovery or steals another worker's live claim;
   final writes remain fenced after an explicit recovery.
 - Custom remote adapters should run the executable contract scenarios from
-  `@roackb2/heddle/heartbeat/testing` against two fresh store instances sharing
+  `@heddleagent/runtime/heartbeat/testing` against two fresh store instances sharing
   one backend namespace. Required scenarios cover exact lookup, atomic due
   claims, coalesced requests, settlement, recovery, and stale-write fencing;
   history and subscription checks are capability-gated. The harness owns a
@@ -140,6 +144,11 @@ operator-facing heartbeat views.
   effects.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
   Runtime should not import heartbeat.
+- A remote coordinator injects `HeartbeatAgentExecutionTransport` at scheduler
+  composition. The serialized request intentionally excludes API keys, tools,
+  approval callbacks, filesystem paths, loggers, and model adapters. The
+  execution process resolves those locally; the scheduler validates its
+  returned result before committing the new checkpoint or successful state.
 - Local interface adapters should use `FileHeartbeatTaskService` methods or the
   control-plane heartbeat API. Remote operator surfaces should depend on
   `HeartbeatTaskAdministrationService` and keep backend transaction mechanics

@@ -10,12 +10,15 @@ import {
   EXECUTION_HOST_LOCAL_TOKEN_HEADER,
   MCP_CAPABILITY_HEADER,
   MODEL_API_KEY_HEADER,
+  type ExecutionHostHeartbeatStreamEvent,
   type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
 import {
   DirectHttpExecutionHost,
   type ExecutionHost,
   type ExecutionHostConversationTurn,
+  type ExecutionHostHeartbeatTask,
+  type HeartbeatExecutionHost,
 } from '../http-sse/index.js';
 import type {
   AgentCoreExecutionHostConfig,
@@ -44,7 +47,8 @@ const SERVICE_ERROR_CODES = new Map<string, string>([
  * Invokes one compatible Heddle Execution Host through AWS AgentCore while
  * reusing the package's strict request and SSE protocol validation.
  */
-export class AgentCoreExecutionHost implements ExecutionHost {
+export class AgentCoreExecutionHost
+implements ExecutionHost, HeartbeatExecutionHost {
   readonly #client: AgentCoreRuntimeClient;
   readonly #runtimeArn: string;
   readonly #qualifier?: string;
@@ -71,6 +75,13 @@ export class AgentCoreExecutionHost implements ExecutionHost {
   ): AsyncIterable<ExecutionHostStreamEvent> {
     assertAgentCoreRuntimeSessionId(input.runtimeSessionId);
     return this.#wire.streamConversationTurn(input);
+  }
+
+  streamHeartbeatTask(
+    input: ExecutionHostHeartbeatTask,
+  ): AsyncIterable<ExecutionHostHeartbeatStreamEvent> {
+    assertAgentCoreRuntimeSessionId(input.runtimeSessionId);
+    return this.#wire.streamHeartbeatTask(input);
   }
 
   close(): void {

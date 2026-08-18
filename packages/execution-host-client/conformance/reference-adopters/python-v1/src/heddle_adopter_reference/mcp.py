@@ -12,9 +12,9 @@ import jwt
 from mcp.server.auth.provider import AccessToken
 
 from .contracts import (
-    CONVERSATION_TURN_WORKFLOW,
     EXECUTION_CONTRACT_VERSION,
     MCP_CAPABILITY_TYPE,
+    SUPPORTED_EXECUTION_WORKFLOWS,
     validate_allowed_tools,
     validate_mcp_server_id,
     validate_opaque_id,
@@ -199,7 +199,7 @@ class JwtMcpCapabilityVerifier:
             contract_version == EXECUTION_CONTRACT_VERSION
             and adopter_id == self._config.trusted_adopter_id
             and server_id == self._config.server_id
-            and workflow == CONVERSATION_TURN_WORKFLOW
+            and workflow in SUPPORTED_EXECUTION_WORKFLOWS
             and capability_id != invocation_id
             and all(tool in self._supported_tools for tool in allowed_tools)
         )

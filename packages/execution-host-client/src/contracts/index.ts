@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const EXECUTION_CONTRACT_VERSION = 1 as const;
 export const CONVERSATION_TURN_WORKFLOW = 'conversation-turn' as const;
+export const HEARTBEAT_TASK_WORKFLOW = 'heartbeat-task' as const;
 export const EXECUTION_ASSERTION_TYPE = 'heddle-execution+jwt' as const;
 export const MCP_CAPABILITY_TYPE = 'heddle-mcp-capability+jwt' as const;
 
@@ -88,6 +89,38 @@ export const ExecutionHostConversationTurnRequestSchema = z.object({
   deadlineAt: TimestampSchema.optional(),
 }).strict();
 
+export const HeartbeatRunContextSchema = z.object({
+  currentDateTime: TimestampSchema,
+  intervalMs: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  continuationMode: z.enum(['operator', 'agent']).optional(),
+  nextRunAt: TimestampSchema.optional(),
+  previousRunAt: TimestampSchema.optional(),
+  previousRunId: OpaqueIdSchema.optional(),
+}).strict();
+
+export const ExecutionHostHeartbeatTaskRequestSchema = z.object({
+  schemaVersion: z.literal(EXECUTION_CONTRACT_VERSION),
+  kind: z.literal(HEARTBEAT_TASK_WORKFLOW),
+  invocationId: OpaqueIdSchema,
+  taskId: OpaqueIdSchema,
+  task: z.string().trim().min(1).max(200_000),
+  checkpoint: z.record(z.string(), z.json()).optional(),
+  runContext: HeartbeatRunContextSchema,
+  model: z.string().trim().min(1).max(512).optional(),
+  reasoningEffort: z.enum([
+    'none',
+    'low',
+    'medium',
+    'high',
+    'ultrahigh',
+    'max',
+  ]).optional(),
+  maxSteps: z.number().int().positive().max(10_000).optional(),
+  searchIgnoreDirs: z.array(z.string().min(1).max(1_024)).max(1_000).optional(),
+  systemContext: z.string().max(200_000).optional(),
+  deadlineAt: TimestampSchema.optional(),
+}).strict();
+
 export const RuntimePublicResultSchema = z.object({
   outcome: z.enum(['done', 'max_steps', 'error', 'interrupted']),
   summary: z.string().optional(),
@@ -141,6 +174,40 @@ export const ExecutionHostStreamEventSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ]);
 
+export const ExecutionHostHeartbeatStreamEventSchema = z.discriminatedUnion(
+  'kind',
+  [
+    StreamEnvelopeSchema.extend({
+      sequence: z.literal(0),
+      kind: z.literal('accepted'),
+    }).strict(),
+    StreamEnvelopeSchema.extend({
+      kind: z.literal('activity'),
+      activity: z.json(),
+    }).strict(),
+    StreamEnvelopeSchema.extend({
+      kind: z.literal('result'),
+      result: z.record(z.string(), z.json()),
+    }).strict(),
+    StreamEnvelopeSchema.extend({
+      kind: z.literal('cancelled'),
+      reason: z.string(),
+    }).strict(),
+    StreamEnvelopeSchema.extend({
+      kind: z.literal('error'),
+      error: z.object({
+        code: z.string().min(1).max(128).regex(/^[a-z0-9_]+$/),
+        message: z.string().min(1).max(1_600),
+      }).strict(),
+    }).strict(),
+  ],
+);
+
+export const HostedExecutionWorkflowSchema = z.enum([
+  CONVERSATION_TURN_WORKFLOW,
+  HEARTBEAT_TASK_WORKFLOW,
+]);
+
 export const ExecutionAssertionClaimsSchema = z.object({
   iss: JwtIssuerSchema,
   aud: JwtAudienceSchema,
@@ -149,7 +216,7 @@ export const ExecutionAssertionClaimsSchema = z.object({
   tenantId: OpaqueIdSchema,
   productSessionId: OpaqueIdSchema,
   runtimeSessionId: RuntimeSessionIdSchema,
-  workflow: z.literal(CONVERSATION_TURN_WORKFLOW),
+  workflow: HostedExecutionWorkflowSchema,
   sub: OpaqueIdSchema,
   jti: OpaqueIdSchema,
   iat: z.number().int().nonnegative(),
@@ -165,7 +232,7 @@ export const McpCapabilityClaimsSchema = z.object({
   productSessionId: OpaqueIdSchema,
   runtimeSessionId: RuntimeSessionIdSchema,
   invocationId: OpaqueIdSchema,
-  workflow: z.literal(CONVERSATION_TURN_WORKFLOW),
+  workflow: HostedExecutionWorkflowSchema,
   serverId: McpServerIdSchema,
   allowedTools: McpAllowedToolsSchema,
   sub: OpaqueIdSchema,
@@ -178,6 +245,9 @@ export type ExecutionScope = z.infer<typeof ExecutionScopeSchema>;
 export type ExecutionHostConversationTurnRequest = z.infer<
   typeof ExecutionHostConversationTurnRequestSchema
 >;
+export type ExecutionHostHeartbeatTaskRequest = z.infer<
+  typeof ExecutionHostHeartbeatTaskRequestSchema
+>;
 export type RuntimePublicResult = z.infer<typeof RuntimePublicResultSchema>;
 export type ExecutionHostStreamEvent = z.infer<
   typeof ExecutionHostStreamEventSchema
@@ -186,15 +256,32 @@ export type ExecutionHostTerminalEvent = Extract<
   ExecutionHostStreamEvent,
   { kind: 'result' | 'cancelled' | 'error' }
 >;
+export type ExecutionHostHeartbeatStreamEvent = z.infer<
+  typeof ExecutionHostHeartbeatStreamEventSchema
+>;
+export type ExecutionHostHeartbeatTerminalEvent = Extract<
+  ExecutionHostHeartbeatStreamEvent,
+  { kind: 'result' | 'cancelled' | 'error' }
+>;
 export type ExecutionAssertionClaims = z.infer<
   typeof ExecutionAssertionClaimsSchema
 >;
 export type McpCapabilityClaims = z.infer<typeof McpCapabilityClaimsSchema>;
-export type HostedExecutionWorkflow = typeof CONVERSATION_TURN_WORKFLOW;
+export type HostedExecutionWorkflow = z.infer<
+  typeof HostedExecutionWorkflowSchema
+>;
 
 export function isExecutionHostTerminalEvent(
   event: ExecutionHostStreamEvent,
 ): event is ExecutionHostTerminalEvent {
+  return event.kind === 'result'
+    || event.kind === 'cancelled'
+    || event.kind === 'error';
+}
+
+export function isExecutionHostHeartbeatTerminalEvent(
+  event: ExecutionHostHeartbeatStreamEvent,
+): event is ExecutionHostHeartbeatTerminalEvent {
   return event.kind === 'result'
     || event.kind === 'cancelled'
     || event.kind === 'error';

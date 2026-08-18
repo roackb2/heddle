@@ -350,6 +350,13 @@ export type ControlPlaneHeartbeatEvent =
     timestamp: string;
   }
   | {
+    type: 'heartbeat.task.agent_activity';
+    taskId: string;
+    executionId: string;
+    activity: unknown;
+    timestamp: string;
+  }
+  | {
     type: 'heartbeat.task.finished';
     taskId: string;
     executionId: string;
