@@ -278,13 +278,15 @@ function terminalPresentation(event: Exclude<ControlPlaneSessionRunEventEnvelope
       latestUpdate: { label: 'Run cancelled', detail: event.reason, tone: 'warning' as const },
     };
   }
+  const outcome = event.result.outcome;
+  const failed = outcome === 'error';
   return {
     liveStatus: undefined,
     latestUpdate: {
-      label: 'Run finished',
-      detail: event.result.outcome ?? event.result.summary,
-      tone: event.result.outcome
-        ? SessionActivityService.resolveRunOutcomeTone(event.result.outcome)
+      label: failed ? 'Run failed' : 'Run finished',
+      detail: failed ? event.result.summary ?? outcome : outcome ?? event.result.summary,
+      tone: outcome
+        ? SessionActivityService.resolveRunOutcomeTone(outcome)
         : 'success' as const,
     },
   };

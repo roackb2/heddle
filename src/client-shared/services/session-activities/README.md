@@ -11,6 +11,8 @@ after they receive API-provided live events.
 - Shared derived labels for tool-related activities.
 - Shared effects for final-answer, commentary, and reasoning-summary streams;
   each remains a distinct activity so clients can present them independently.
+- Safe latest-status projection for failed runs, preserving the core-provided
+  failure summary instead of reducing it to a generic error outcome.
 - Active plan lifetime at the client edge: `plan.updated` sets the visible plan,
   the first non-empty `assistant.stream` chunk clears it as the final answer
   becomes visible, and `loop.started` or `loop.finished` clear it as lifecycle

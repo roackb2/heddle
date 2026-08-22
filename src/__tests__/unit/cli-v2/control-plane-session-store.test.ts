@@ -1123,6 +1123,33 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('keeps the safe failure summary visible after loop completion', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.finished',
+      runId: 'run-1',
+      outcome: 'error',
+      summary: 'LLM error: Model provider quota or billing limit reached',
+      failure: { source: 'model', code: 'quota' },
+      timestamp: new Date().toISOString(),
+    });
+    fixture.emitRunResult({
+      outcome: 'error',
+      summary: 'LLM error: Model provider quota or billing limit reached\n\nCheck the provider account or switch credentials.',
+    });
+
+    expect(store.getSnapshot().latestUpdate).toEqual({
+      label: 'Run failed',
+      detail: 'LLM error: Model provider quota or billing limit reached\n\nCheck the provider account or switch credentials.',
+      tone: 'error',
+    });
+    store.dispose();
+  });
+
   it('delivers terminal notifications from session live events when configured', async () => {
     const fixture = createClientFixture();
     const notificationService = { deliver: vi.fn() };

@@ -229,8 +229,8 @@ export class ClientSharedSessionActivityService {
       tone: 'warning',
     }),
     'loop.finished': (activity) => ({
-      label: 'Run finished',
-      detail: activity.outcome,
+      label: activity.outcome === 'error' ? 'Run failed' : 'Run finished',
+      detail: activity.outcome === 'error' ? activity.summary : activity.outcome,
       tone: ClientSharedSessionActivityService.resolveRunOutcomeTone(activity.outcome),
     }),
     'compaction.running': (activity) => ({
