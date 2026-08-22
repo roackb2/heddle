@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
-  ExecutionAuthority,
+  ExecutionAuthorityIssuer,
   ExecutionAuthorityIssueInput,
   IssuedExecutionAuthority,
 } from '../authority/index.js';
@@ -113,7 +113,7 @@ describe('hosted conversation turn service', () => {
     const controller = new AbortController();
     controller.abort();
     const service = new HostedConversationTurnService({
-      authority: { issue, publicJwks: () => ({ keys: [] }) },
+      authority: { issue },
       executionHost: {
         streamConversationTurn: async function* () {
           yield accepted();
@@ -136,10 +136,9 @@ function authority(
   issue: (
     input: ExecutionAuthorityIssueInput,
   ) => IssuedExecutionAuthority,
-): ExecutionAuthority {
+): ExecutionAuthorityIssuer {
   return {
     issue: async (input) => issue(input),
-    publicJwks: () => ({ keys: [] }),
   };
 }
 

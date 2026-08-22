@@ -5,7 +5,7 @@ import {
   RuntimeSessionIdSchema,
   type ExecutionHostStreamEvent,
 } from '../contracts/index.js';
-import type { ExecutionAuthority } from '../authority/index.js';
+import type { ExecutionAuthorityIssuer } from '../authority/index.js';
 import type { ExecutionHost } from '../http-sse/index.js';
 
 export const HostedConversationTurnInputSchema = z.object({
@@ -47,7 +47,7 @@ export interface HostedConversationTurnRunner {
 }
 
 export type HostedConversationTurnServiceConfig = {
-  authority: ExecutionAuthority;
+  authority: ExecutionAuthorityIssuer;
   executionHost: ExecutionHost;
   modelCredentials: HostedModelCredentialProvider;
   /** Omit this policy when the hosted workflow needs no product MCP tools. */

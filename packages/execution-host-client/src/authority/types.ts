@@ -58,8 +58,11 @@ export interface IssuedExecutionAuthority {
   toJSON(): IssuedExecutionAuthorityMetadata;
 }
 
-export interface ExecutionAuthority {
+export interface ExecutionAuthorityIssuer {
   issue(input: ExecutionAuthorityIssueInput): Promise<IssuedExecutionAuthority>;
+}
+
+export interface ExecutionAuthority extends ExecutionAuthorityIssuer {
   publicJwks(): JSONWebKeySet;
 }
 

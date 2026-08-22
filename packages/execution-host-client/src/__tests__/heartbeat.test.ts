@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ExecutionAuthority } from '../authority/index.js';
+import type { ExecutionAuthorityIssuer } from '../authority/index.js';
 import {
   EXECUTION_CONTRACT_VERSION,
   HEARTBEAT_TASK_WORKFLOW,
@@ -20,7 +20,7 @@ const RUNTIME_SESSION_ID = `runtime-session-${'a'.repeat(40)}`;
 
 describe('hosted heartbeat execution', () => {
   it('binds authority and credentials while returning activity and the terminal result', async () => {
-    const issue = vi.fn<ExecutionAuthority['issue']>(async (authority) => {
+    const issue = vi.fn<ExecutionAuthorityIssuer['issue']>(async (authority) => {
       const metadata = {
         scope: { adopterId: 'adopter-a', ...authority.scope },
         runtimeSessionId: authority.runtimeSessionId,
@@ -48,7 +48,7 @@ describe('hosted heartbeat execution', () => {
       },
     };
     const service = new HostedHeartbeatTaskService({
-      authority: { issue, publicJwks: () => ({ keys: [] }) },
+      authority: { issue },
       executionHost,
       modelCredentials: {
         resolveModelApiKey: async () => 'model-api-key-value',

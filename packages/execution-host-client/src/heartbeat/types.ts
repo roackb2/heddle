@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ExecutionAuthority } from '../authority/index.js';
+import type { ExecutionAuthorityIssuer } from '../authority/index.js';
 import {
   ExecutionHostHeartbeatTaskRequestSchema,
   ExecutionScopeSchema,
@@ -34,7 +34,7 @@ export interface HostedHeartbeatTaskRunner {
 }
 
 export type HostedHeartbeatTaskServiceConfig = {
-  authority: ExecutionAuthority;
+  authority: ExecutionAuthorityIssuer;
   executionHost: HeartbeatExecutionHost;
   modelCredentials: HostedModelCredentialProvider;
   /** Omit this policy when the heartbeat workflow needs no product MCP tools. */
