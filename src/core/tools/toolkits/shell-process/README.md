@@ -42,7 +42,9 @@ the other. See `../coding-files/README.md`.
 Hosts running untrusted or model-directed workloads should place the whole
 Heddle process inside mature OS isolation (a container, a VM, or a
 least-privilege user account). Approval is a human-judgment gate, not a
-technical containment mechanism.
+technical containment mechanism. Unattended permission mode removes the human
+wait, not this requirement: policy misses are denied, while allowed shell calls
+still inherit the host process authority described above.
 
 ## Two Tools, Two Gates
 

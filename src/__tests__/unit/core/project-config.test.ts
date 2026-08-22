@@ -107,6 +107,20 @@ describe('ProjectConfigService', () => {
     });
   });
 
+  it('persists unattended permission mode as a supported project setting', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
+
+    const updated = ProjectConfigService.update(workspaceRoot, (config) => ({
+      ...config,
+      permissionMode: 'unattended',
+    }));
+
+    expect(updated.permissionMode).toBe('unattended');
+    expect(JSON.parse(readFileSync(ProjectConfigService.resolvePath(workspaceRoot), 'utf8'))).toMatchObject({
+      permissionMode: 'unattended',
+    });
+  });
+
   it('reads legacy root config only when local config is absent', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
     // Legacy-only fixture: root-level config existed before config moved under

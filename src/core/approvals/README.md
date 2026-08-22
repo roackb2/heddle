@@ -43,9 +43,10 @@ Approval behavior currently exists in these places:
   agent-scoped policy to the ordinary ordered policy chain; it does not own
   host UI or tool execution.
 - `autonomy/`: autopilot profile normalization, tool policy evaluation,
-  computed policy facts, postflight audit objects, and autonomy trace event
-  construction. This subdomain owns approval decisions for long-running agent
-  mode, not tool execution or host presentation.
+  resolved permission grants, computed policy facts, postflight audit objects,
+  and autonomy trace event construction. This subdomain owns approval decisions
+  and prompt-vs-deny boundary behavior for long-running agent mode, not tool
+  execution or host presentation.
 - `remembered-rules/`: project approval rule service, repository, codec,
   schemas, and types. The repository is an internal storage boundary for
   `ToolApprovalService`; host/controller code must not import it directly.
@@ -63,6 +64,10 @@ AgentToolDispatcher
   -> ToolApprovalService.resolveUserDecision(...)
   -> tool execution continues or receives an approval-denied tool result
 ```
+
+Unattended mode follows the same dispatcher path but resolves a policy boundary
+to `deny`, never `request`. No pending promise or host approval surface is
+created for those calls.
 
 `ToolApprovalService` owns the host-neutral request shape. A request includes
 the tool name, call id, raw input, requested timestamp, compact summary, policy

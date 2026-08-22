@@ -63,7 +63,12 @@ export type RunAgentOptions = {
   systemContext?: string;
   onEvent?: (event: AgentRunEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
-  approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
+  approveToolCall?: (
+    call: ToolCall,
+    tool: ToolDefinition,
+    autonomyEvaluation?: AutonomyEvaluation,
+    reason?: string,
+  ) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
   /**

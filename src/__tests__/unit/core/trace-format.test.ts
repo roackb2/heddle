@@ -103,6 +103,7 @@ describe('TraceConsoleFormatter', () => {
         evaluation: {
           call: { id: 'call-1', tool: 'edit_file', input: { path: 'src/generated.ts' } },
           profileMode: 'autopilot',
+          boundaryBehavior: 'request',
           envelope: {
             operations: ['write'],
             intent: 'Create a generated source file.',

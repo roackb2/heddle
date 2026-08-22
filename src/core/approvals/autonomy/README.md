@@ -49,15 +49,23 @@ Autonomy evaluates that contract against configured roots and hard-deny facts.
 
 ## How The Model Fits Together
 
-There is one policy object at decision time: the effective `AutopilotProfile`.
-Mode/config fields are only inputs for building that profile.
+There is one resolved `AutonomyPermissionGrant` at the host boundary. It keeps
+two independent questions explicit:
+
+- `boundaryBehavior`: should a policy miss request a person or be denied?
+- `authority`: is the run using ordinary approval behavior or a bounded
+  `AutopilotProfile`?
+
+The evaluator still receives one effective `AutopilotProfile`; the grant tells
+the approval policy whether a profile miss becomes `request` or `deny`.
 
 User-facing mental model:
 
 ```text
 Auto = agent can do normal local coding work by itself in trusted repos.
+Unattended = same authority as Auto, but never pause for approval.
 Trusted repos = current repo + repos the user explicitly trusted.
-Dangerous or unclear actions still stop.
+Dangerous or unclear actions request approval in Auto and are denied in Unattended.
 ```
 
 The approval UI should teach that model with `Approve once`, `Trust this repo`,
@@ -72,7 +80,12 @@ permissionMode: default
 permissionMode: auto
   -> generated Auto profile
   -> plus autoTrustedRoots
-  -> effective AutopilotProfile { preset: "auto" }
+  -> permission grant { boundaryBehavior: "request", authority: AutopilotProfile }
+
+permissionMode: unattended
+  -> generated Auto profile
+  -> plus autoTrustedRoots
+  -> permission grant { boundaryBehavior: "deny", authority: AutopilotProfile }
 
 permissionMode: custom
   -> hand-authored config.autopilot
@@ -89,8 +102,8 @@ expanding the generated Auto preset:
 }
 ```
 
-At runtime, `AutonomyPermissionModeService.resolveEffectiveProfile(...)`
-produces:
+At runtime, `AutonomyPermissionModeService.resolveGrant(...)` produces a grant
+whose Auto or Unattended authority contains:
 
 ```ts
 {
@@ -106,8 +119,9 @@ produces:
 }
 ```
 
-The evaluator only consumes that final profile. It does not separately inspect
-`permissionMode`, `autoTrustedRoots`, or UI approval choices.
+The evaluator consumes that final profile plus the resolved boundary behavior.
+It does not separately inspect `permissionMode`, `autoTrustedRoots`, or UI
+approval choices.
 
 For each tool call:
 
@@ -225,8 +239,8 @@ many-file deletion/edit scopes.
 ## Permission Modes
 
 `AutonomyPermissionModeService` owns the product mapping from user-facing
-permission modes to effective autonomy profiles. Hosts should not build their
-own profile templates or reinterpret mode names.
+permission modes to resolved grants. Hosts should not build their own profile
+templates, choose boundary behavior, or reinterpret mode names.
 
 - `default`: no autopilot profile is active. Heddle uses the normal approval
   flow.
@@ -235,6 +249,11 @@ own profile templates or reinterpret mode names.
   dependency, and git-stage capabilities under the current workspace root and
   any user-approved Auto roots while keeping the home directory manual-only and
   denying device/volume roots.
+- `unattended`: Heddle uses the same generated local coding authority as Auto,
+  but it never creates a pending approval. A call that Auto would ask about is
+  denied, traced, and returned to the model as a tool failure. This includes
+  network operations, production-like environments, manual-only or
+  unconfigured roots, missing capabilities, and unclear policy envelopes.
 - `custom`: Heddle uses the workspace's hand-authored `autopilot` profile.
   This is selectable only when a hand-authored profile exists with
   `mode: "autopilot"` and differs from Heddle's generated Auto profile. An
@@ -242,7 +261,7 @@ own profile templates or reinterpret mode names.
   not Custom. The full custom profile editor is a later UI/TUI slice.
 
 Project config stores `permissionMode` separately from the hand-authored
-`autopilot` profile. This lets a user switch Default/Auto/Custom without
+`autopilot` profile. This lets a user switch Default/Auto/Unattended/Custom without
 deleting a custom profile. Auto-specific user expansions live in
 `autoTrustedRoots`, not in the custom `autopilot` object:
 
@@ -253,9 +272,10 @@ deleting a custom profile. Auto-specific user expansions live in
 }
 ```
 
-`AutonomyPermissionModeService.resolveEffectiveProfile(...)` converts that
-config into one concrete `AutopilotProfile` with `preset: "auto"`. Downstream
-approval policy does not read `autoTrustedRoots` directly.
+`AutonomyPermissionModeService.resolveGrant(...)` converts that config into one
+concrete permission grant. Auto and Unattended both carry an
+`AutopilotProfile` with `preset: "auto"`; only their boundary behavior differs.
+Downstream approval policy does not read `autoTrustedRoots` directly.
 
 ## Approval-Driven Auto Expansion
 
@@ -379,7 +399,7 @@ Decision rules:
 - `deny`: hard-denied root, root/home recursive delete, workspace-wide
   recursive delete, wildcard recursive delete, privilege escalation, hard git
   reset, force push, disk formatting, device writes, or `terraform destroy`.
-- `request`: missing envelope for approval-gated mutating tools,
+- `request` in Auto/Custom, or `deny` in Unattended: missing envelope for approval-gated mutating tools,
   `unknown`/low-confidence intent, disallowed environment, manual-only root,
   unconfigured root, missing capability, or network operation. Root checks run
   even for read/list/search calls that do not require an envelope.
@@ -433,7 +453,9 @@ policy hints together.
 This service is the core policy foundation. Workspace config may provide a
 `permissionMode` and optional `autopilot` profile through `.heddle/config.json`;
 project-config validates the persisted shape, and control-plane request context
-passes the resolved effective profile into this approval policy. Postflight
+passes the resolved permission grant into this approval policy. Postflight
 audit now records observed structured effects after unattended autopilot
-execution. Richer custom profile editing and richer shell
-effect observation remain follow-up slices.
+execution. Unattended is deliberately not an unrestricted host-user bypass and
+is not a sandbox. Richer custom profile editing, explicit remote-service
+capabilities, OS isolation, and richer shell effect observation remain
+follow-up slices.

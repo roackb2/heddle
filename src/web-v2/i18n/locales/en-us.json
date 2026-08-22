@@ -113,7 +113,7 @@
     },
     "permissionMode": {
       "auto": {
-        "description": "Approve trusted local coding actions.",
+        "description": "Run trusted local coding actions without routine approval.",
         "label": "Auto"
       },
       "custom": {
@@ -123,6 +123,10 @@
       "default": {
         "description": "Use the default permission behavior.",
         "label": "Default"
+      },
+      "unattended": {
+        "description": "Never prompt; deny actions outside trusted local coding policy.",
+        "label": "Unattended"
       },
       "statusPrefix": "Mode",
       "title": "Permission mode"

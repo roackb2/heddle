@@ -5,6 +5,7 @@ import type {
   AutonomyPermissionMode,
   AutonomyPermissionModeConfig,
   AutonomyPermissionModeOption,
+  AutonomyPermissionGrant,
   AutopilotCapability,
   AutopilotProfile,
 } from './types.js';
@@ -30,8 +31,8 @@ const AUTO_ROOT_POLICY = {
 /**
  * Owns the product-level permission mode mapping for autonomy.
  *
- * UI surfaces should select Default/Auto/Custom only. This service maps those
- * modes to the effective autopilot profile so hosts do not duplicate policy.
+ * UI surfaces should select Default/Auto/Unattended/Custom only. This service
+ * maps those modes to one permission grant so hosts do not duplicate policy.
  */
 export class AutonomyPermissionModeService {
   static buildAutoProfile(args: { trustedRoots?: string[] } = {}): AutopilotProfile {
@@ -100,18 +101,62 @@ export class AutonomyPermissionModeService {
     config: AutonomyPermissionModeConfig;
     workspaceRoot: string;
   }): AutopilotProfile | undefined {
+    const grant = AutonomyPermissionModeService.resolveGrant(args);
+    return grant.authority.kind === 'autopilot' ? grant.authority.profile : undefined;
+  }
+
+  static resolveGrant(args: {
+    config: AutonomyPermissionModeConfig;
+    workspaceRoot: string;
+  }): AutonomyPermissionGrant {
     const mode = AutonomyPermissionModeService.resolveMode(args);
     if (mode === 'default') {
-      return undefined;
+      return {
+        mode,
+        boundaryBehavior: 'request',
+        authority: { kind: 'default' },
+      };
     }
 
     if (mode === 'auto') {
-      return AutonomyPermissionModeService.buildAutoProfile({
-        trustedRoots: args.config.autoTrustedRoots,
-      });
+      return {
+        mode,
+        boundaryBehavior: 'request',
+        authority: {
+          kind: 'autopilot',
+          profile: AutonomyPermissionModeService.buildAutoProfile({
+            trustedRoots: args.config.autoTrustedRoots,
+          }),
+        },
+      };
     }
 
-    return args.config.autopilot?.mode === 'autopilot' ? args.config.autopilot : undefined;
+    if (mode === 'unattended') {
+      return {
+        mode,
+        boundaryBehavior: 'deny',
+        authority: {
+          kind: 'autopilot',
+          profile: AutonomyPermissionModeService.buildAutoProfile({
+            trustedRoots: args.config.autoTrustedRoots,
+          }),
+        },
+      };
+    }
+
+    const customProfile = args.config.autopilot;
+    if (!customProfile || customProfile.mode !== 'autopilot') {
+      throw new Error('Resolved custom permission mode without a valid autopilot profile.');
+    }
+
+    return {
+      mode,
+      boundaryBehavior: 'request',
+      authority: {
+        kind: 'autopilot',
+        profile: customProfile,
+      },
+    };
   }
 
   static buildOptions(args: {
@@ -130,6 +175,11 @@ export class AutonomyPermissionModeService {
         id: 'auto',
         label: 'Auto',
         description: 'Run trusted local coding actions without routine approval.',
+      },
+      {
+        id: 'unattended',
+        label: 'Unattended',
+        description: 'Never prompt; deny actions outside the trusted local coding policy.',
       },
       {
         id: 'custom',
@@ -203,6 +253,14 @@ export class AutonomyPermissionModeService {
 
   static autoRootCapabilities(): AutopilotCapability[] {
     return [...AUTO_CAPABILITIES];
+  }
+
+  static resolveAutoRootTrustProfile(grant: AutonomyPermissionGrant | undefined): AutopilotProfile | undefined {
+    return grant?.mode === 'auto'
+      && grant.authority.kind === 'autopilot'
+      && grant.authority.profile.preset === 'auto'
+      ? grant.authority.profile
+      : undefined;
   }
 
   private static isGeneratedAutoProfile(args: {

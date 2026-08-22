@@ -43,6 +43,7 @@ describe('trace summarizers', () => {
         evaluation: {
           call: { id: 'call-auto-1', tool: 'edit_file', input: { path: 'src/generated.ts' } },
           profileMode: 'autopilot',
+          boundaryBehavior: 'request',
           facts: {
             tool: 'edit_file',
             operations: ['write'],

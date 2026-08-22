@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { TRPCError } from '@trpc/server';
 import type { Logger } from 'pino';
-import { AutonomyPermissionModeService, type AutopilotProfile } from '@/core/approvals/index.js';
+import { AutonomyPermissionModeService, type AutonomyPermissionGrant } from '@/core/approvals/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
@@ -30,7 +30,7 @@ export type ControlPlaneRequestWorkspace = {
     credentialStorePath: string;
     preferApiKey: boolean;
     workspaceId: string;
-    autopilot?: AutopilotProfile;
+    permissionGrant: AutonomyPermissionGrant;
   };
 };
 
@@ -112,7 +112,7 @@ export function resolveControlPlaneRequestWorkspace(
 ): ControlPlaneRequestWorkspace {
   const workspace = resolveWorkspaceDescriptor(ctx, input?.workspaceId);
   const projectConfig = ProjectConfigService.read(workspace.workspaceRoot);
-  const autopilot = AutonomyPermissionModeService.resolveEffectiveProfile({
+  const permissionGrant = AutonomyPermissionModeService.resolveGrant({
     config: projectConfig,
     workspaceRoot: workspace.workspaceRoot,
   });
@@ -127,7 +127,7 @@ export function resolveControlPlaneRequestWorkspace(
       credentialStorePath: ProviderCredentialRepository.resolveStorePath(workspace.stateRoot),
       preferApiKey: ctx.preferApiKey,
       workspaceId: workspace.id,
-      autopilot,
+      permissionGrant,
     },
   };
 }

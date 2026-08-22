@@ -113,7 +113,7 @@
     },
     "permissionMode": {
       "auto": {
-        "description": "自动批准可信的本地 coding 操作。",
+        "description": "无需常规批准即可执行受信任的本地编码操作。",
         "label": "Auto"
       },
       "custom": {
@@ -123,6 +123,10 @@
       "default": {
         "description": "使用默认权限行为。",
         "label": "Default"
+      },
+      "unattended": {
+        "description": "不显示批准提示；拒绝超出受信任本地编码策略的操作。",
+        "label": "无人值守"
       },
       "statusPrefix": "模式",
       "title": "权限模式"

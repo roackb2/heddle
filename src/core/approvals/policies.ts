@@ -9,7 +9,12 @@ import {
   WorkspacePathPolicy,
 } from '@/core/tools/toolkits/coding-files/workspace-path-policy.js';
 import type { ToolApprovalPolicy, ToolApprovalPolicyContext, ToolApprovalSurface } from './types.js';
-import { AutonomyPolicyService, type AutopilotProfile } from './autonomy/index.js';
+import {
+  AutonomyPolicyService,
+  type AutonomyBoundaryBehavior,
+  type AutonomyPermissionGrant,
+  type AutopilotProfile,
+} from './autonomy/index.js';
 
 /**
  * Owns reusable approval policy constructors and the default policy chain.
@@ -92,7 +97,19 @@ export class ToolApprovalPolicies {
     };
   }
 
-  static autopilot(args: { profile: AutopilotProfile }): ToolApprovalPolicy {
+  static forPermissionGrant(grant: AutonomyPermissionGrant): ToolApprovalPolicy[] {
+    return grant.authority.kind === 'autopilot'
+      ? [ToolApprovalPolicies.autopilot({
+          profile: grant.authority.profile,
+          boundaryBehavior: grant.boundaryBehavior,
+        })]
+      : [];
+  }
+
+  static autopilot(args: {
+    profile: AutopilotProfile;
+    boundaryBehavior?: AutonomyBoundaryBehavior;
+  }): ToolApprovalPolicy {
     return async (context) => {
       let canonicalTargetPaths: string[] | undefined;
       try {
@@ -112,6 +129,7 @@ export class ToolApprovalPolicies {
         AutonomyPolicyService.evaluate({
           context: canonicalTargetPaths ? { ...context, canonicalTargetPaths } : context,
           profile: args.profile,
+          boundaryBehavior: args.boundaryBehavior,
         }),
       );
     };

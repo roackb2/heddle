@@ -15,7 +15,7 @@ import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { readStoredChatSession } from '@/__tests__/helpers/chat-session-repository.js';
 import * as agentLoopModule from '@/core/runtime/loop/index.js';
-import type { AutopilotProfile } from '@/core/approvals/index.js';
+import type { AutonomyPermissionGrant, AutopilotProfile } from '@/core/approvals/index.js';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { RunResult, ToolCall, ToolDefinition } from '@/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
@@ -233,11 +233,16 @@ describe('control-plane session runtime integration', () => {
         requireApproval: ['staging', 'production', 'unknown'],
       },
     };
+    const permissionGrant: AutonomyPermissionGrant = {
+      mode: 'custom',
+      boundaryBehavior: 'request',
+      authority: { kind: 'autopilot', profile: autopilot },
+    };
     const session = await controlPlaneChatSessionsController.createSession({
       ...engineArgs,
       suggestedName: 'Autopilot policy order test',
       model: 'gpt-5.4',
-      autopilot,
+      permissionGrant,
     });
     const loopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
       workspaceRoot: engineArgs.workspaceRoot,
@@ -249,7 +254,7 @@ describe('control-plane session runtime integration', () => {
       ...engineArgs,
       sessionId: session.id,
       prompt: 'Run safely.',
-      autopilot,
+      permissionGrant,
       apiKey: 'test-openai-key',
       leaseOwner: {
         ownerKind: 'daemon',

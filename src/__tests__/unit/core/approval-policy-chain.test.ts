@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AutonomyPermissionModeService,
   AutonomyPolicyService,
   ToolApprovalProfileService,
   ToolApprovalPolicies,
@@ -314,6 +315,38 @@ describe('approval policy chain', () => {
       reason: 'allowed by autopilot profile and declared policy envelope',
       autonomyEvaluation: expect.objectContaining({
         decision: expect.objectContaining({ type: 'allow' }),
+      }),
+    }));
+    expect(human).not.toHaveBeenCalled();
+  });
+
+  it('denies unattended boundary misses without invoking the human approval surface', async () => {
+    const service = new ToolApprovalService();
+    const human = vi.fn(async () => ({ approved: true, reason: 'should not request human approval' }));
+    const grant = AutonomyPermissionModeService.resolveGrant({
+      config: { permissionMode: 'unattended' },
+      workspaceRoot: '/workspace',
+    });
+
+    await expect(service.resolve({
+      policies: [
+        ...ToolApprovalPolicies.default(),
+        ...ToolApprovalPolicies.forPermissionGrant(grant),
+      ],
+      context: context({
+        call: {
+          id: 'call-gh',
+          tool: 'run_shell_mutate',
+          input: { command: 'gh run view 123 --log-failed' },
+        },
+      }),
+      requestHumanApproval: human,
+    })).resolves.toEqual(expect.objectContaining({
+      approved: false,
+      reason: 'unattended permission boundary denied: tool call needs a declared policy envelope',
+      autonomyEvaluation: expect.objectContaining({
+        boundaryBehavior: 'deny',
+        decision: expect.objectContaining({ type: 'deny' }),
       }),
     }));
     expect(human).not.toHaveBeenCalled();

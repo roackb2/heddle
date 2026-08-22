@@ -14,9 +14,11 @@ export {
 export type { ToolApprovalServiceOptions } from './service.js';
 export type { ToolApprovalProfile } from './profiles/index.js';
 export type {
+  AutonomyBoundaryBehavior,
   AutonomyEvaluation,
   AutonomyPermissionMode,
   AutonomyPermissionModeConfig,
+  AutonomyPermissionGrant,
   AutonomyPermissionModeOption,
   AutonomyPolicyHint,
   AutonomyPostflightAudit,

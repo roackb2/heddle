@@ -29,7 +29,10 @@ export type ToolApprovalPolicy = (
 ) => ToolApprovalPolicyDecision | undefined | Promise<ToolApprovalPolicyDecision | undefined>;
 
 export type ToolApprovalSurface = (
-  context: ToolApprovalPolicyContext & { autonomyEvaluation?: AutonomyEvaluation },
+  context: ToolApprovalPolicyContext & {
+    reason?: string;
+    autonomyEvaluation?: AutonomyEvaluation;
+  },
 ) => Promise<ToolApprovalDecision>;
 
 export type EvaluateToolApprovalPoliciesArgs = {

@@ -20,7 +20,7 @@ import {
   AutonomyPermissionModeService,
   ToolApprovalPolicies,
   ToolApprovalService,
-  type AutopilotProfile,
+  type AutonomyPermissionGrant,
   type ToolApprovalRequest,
   type ToolApprovalPolicy,
   type ToolApprovalUserDecision,
@@ -72,7 +72,7 @@ type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'wor
   model?: string;
   sessionStoragePath: string;
   workspaceId: string;
-  autopilot?: AutopilotProfile;
+  permissionGrant?: AutonomyPermissionGrant;
 };
 
 type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
@@ -838,14 +838,14 @@ export class ControlPlaneChatSessionsController {
   }
 
   private createEngine(args: ControlPlaneSessionReadArgs): ConversationEngine {
-    const { autopilot, ...engineArgs } = args;
+    const { permissionGrant, ...engineArgs } = args;
     const approvalService = this.createApprovalService(args);
     return createConversationEngine({
       ...engineArgs,
       model: args.model ?? DEFAULT_OPENAI_MODEL,
       approvalPolicies: this.createApprovalPolicies({
         approvalPolicies: args.approvalPolicies,
-        autopilot,
+        permissionGrant,
         approvalService,
       }),
     });
@@ -853,11 +853,11 @@ export class ControlPlaneChatSessionsController {
 
   private createApprovalPolicies(args: {
     approvalPolicies?: ToolApprovalPolicy[];
-    autopilot?: AutopilotProfile;
+    permissionGrant?: AutonomyPermissionGrant;
     approvalService: ToolApprovalService;
   }): ToolApprovalPolicy[] {
     return [
-      ...(args.autopilot ? [ToolApprovalPolicies.autopilot({ profile: args.autopilot })] : []),
+      ...(args.permissionGrant ? ToolApprovalPolicies.forPermissionGrant(args.permissionGrant) : []),
       ...(args.approvalPolicies ?? []),
       ToolApprovalPolicies.rememberedProjectRule({
         isApproved: (context) => args.approvalService.isApprovedByRememberedProjectRule(context),
@@ -873,11 +873,12 @@ export class ControlPlaneChatSessionsController {
         onActivity: publisher.publishActivity,
       },
       approvals: {
-        requestToolApproval: async ({ call, tool, autonomyEvaluation }) => {
+        requestToolApproval: async ({ call, tool, reason, autonomyEvaluation }) => {
           const decision = await approvalService.requestHumanApproval({
             call,
             tool,
             workspaceRoot: args.workspaceRoot,
+            reason,
             autonomyEvaluation,
             storePending: ({ request, resolve }) => {
               // Keep the resolver in memory while the browser renders the
@@ -916,9 +917,9 @@ export class ControlPlaneChatSessionsController {
     if (input.decision.type !== 'approve_and_trust_autopilot_root') {
       return input.decision;
     }
-
     const rootApproval = input.request.autopilotRootApproval;
-    if (!rootApproval || input.engineArgs.autopilot?.preset !== 'auto') {
+    const profile = AutonomyPermissionModeService.resolveAutoRootTrustProfile(input.engineArgs.permissionGrant);
+    if (!rootApproval || !profile) {
       return {
         type: 'deny',
         reason: 'No Auto repo root is available for this approval.',
@@ -934,7 +935,7 @@ export class ControlPlaneChatSessionsController {
         })
       ));
       AutonomyPermissionModeService.addTrustedRootToProfile({
-        profile: input.engineArgs.autopilot,
+        profile,
         workspaceRoot: input.engineArgs.workspaceRoot,
         root: rootApproval.root,
       });

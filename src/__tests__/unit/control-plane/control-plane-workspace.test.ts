@@ -33,16 +33,23 @@ describe('resolveControlPlaneRequestWorkspace', () => {
 
     const resolved = resolveControlPlaneRequestWorkspace(createContext(workspace));
 
-    expect(resolved.sessionEngineArgs.autopilot).toEqual({
-      mode: 'autopilot',
-      roots: [{
-        path: '.',
-        access: 'autopilot',
-        allow: ['read', 'write', 'execute'],
-      }],
-      environments: {
-        allow: ['local', 'dev'],
-        requireApproval: ['staging', 'production', 'unknown'],
+    expect(resolved.sessionEngineArgs.permissionGrant).toEqual({
+      mode: 'custom',
+      boundaryBehavior: 'request',
+      authority: {
+        kind: 'autopilot',
+        profile: {
+          mode: 'autopilot',
+          roots: [{
+            path: '.',
+            access: 'autopilot',
+            allow: ['read', 'write', 'execute'],
+          }],
+          environments: {
+            allow: ['local', 'dev'],
+            requireApproval: ['staging', 'production', 'unknown'],
+          },
+        },
       },
     });
     expect(resolved.sessionEngineArgs.credentialStorePath).toBe(join(stateRoot, 'auth.json'));
