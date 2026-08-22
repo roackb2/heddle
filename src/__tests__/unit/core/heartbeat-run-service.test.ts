@@ -43,6 +43,32 @@ describe('HeartbeatRunService', () => {
     expect(run.cancel()).toBe(false);
   });
 
+  it('projects stream payloads onto a JSON-compatible boundary', async () => {
+    const activity = {
+      ...heartbeatActivity(),
+      optionalDetail: undefined,
+    } as AgentHeartbeatEvent;
+    const heartbeatResult = result();
+    heartbeatResult.state.usage = undefined;
+    const runner = vi.fn(async (options: RunAgentHeartbeatOptions) => {
+      options.onEvent?.(activity);
+      return heartbeatResult;
+    });
+    const service = new HeartbeatRunService({
+      createRunId: () => 'heartbeat-run-json',
+      now: () => '2026-08-18T12:00:00.000Z',
+      runner,
+    });
+
+    const run = service.start({ task: 'Review the workspace.' });
+    await run.result;
+    const events = await collect(run.events());
+
+    expect(events).toEqual(JSON.parse(JSON.stringify(events)));
+    expect(events[0]).not.toHaveProperty('activity.optionalDetail');
+    expect(events[1]).not.toHaveProperty('result.state.usage');
+  });
+
   it('aborts an active runner and publishes cancellation as the terminal', async () => {
     let markStarted: (() => void) | undefined;
     const started = new Promise<void>((resolve) => {
