@@ -59,6 +59,24 @@ describe('ClientSharedSessionActivityService', () => {
     expect(effects).toEqual(['finished:Run finished: done', 'workspace changed']);
   });
 
+  it('projects the safe run summary for failed lifecycle activities', () => {
+    const latestUpdate = ClientSharedSessionActivityService.resolveLatestUpdate({
+      type: 'loop.finished',
+      outcome: 'error',
+      runId: 'run-1',
+      source: 'agent-loop',
+      summary: 'LLM error: Model provider quota or billing limit reached',
+      failure: { source: 'model', code: 'quota' },
+      timestamp: new Date().toISOString(),
+    } as ControlPlaneSessionActivity);
+
+    expect(latestUpdate).toEqual({
+      label: 'Run failed',
+      detail: 'LLM error: Model provider quota or billing limit reached',
+      tone: 'error',
+    });
+  });
+
   it('applies run effects for direct shell activities', () => {
     const effects: string[] = [];
 

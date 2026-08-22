@@ -34,13 +34,18 @@ describe('AgentModelTurnRetryService', () => {
     expect(JSON.stringify(decision.failure)).not.toContain('secret-value');
   });
 
-  it.each([undefined, 429])(
-    'classifies structured insufficient_quota as non-retryable before status %s',
-    (status) => {
+  it.each([
+    ['insufficient_quota', undefined],
+    ['insufficient_quota', 429],
+    ['credit_balance_exhausted', undefined],
+    ['credit_balance_exhausted', 429],
+  ] as const)(
+    'classifies structured quota code %s as non-retryable before status %s',
+    (code, status) => {
       const decision = AgentModelTurnRetryService.resolve({
         kind: 'error',
         error: Object.assign(new Error('provider message'), {
-          code: 'insufficient_quota',
+          code,
           ...(status === undefined ? {} : { status }),
         }),
       });

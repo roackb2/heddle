@@ -28,6 +28,7 @@ const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 const NON_RETRYABLE_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
 const MODEL_FAILURE_BY_PROVIDER_CODE = new Map<string, ModelRunFailureCode>([
   ['insufficient_quota', 'quota'],
+  ['credit_balance_exhausted', 'quota'],
   ['context_length_exceeded', 'context_window'],
   ['context_window_exceeded', 'context_window'],
   ['max_context_length_exceeded', 'context_window'],

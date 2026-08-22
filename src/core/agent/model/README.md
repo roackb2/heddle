@@ -32,11 +32,12 @@ structured adapter errors. Product-specific copy and HTTP/API error mapping
 belong in the consuming host.
 
 Structured provider error codes take precedence over HTTP status when they
-carry more precise recovery semantics. For example, OpenAI's
-`insufficient_quota` is exposed as `{ source: 'model', code: 'quota' }` and is
-non-retryable, even if the provider also reports HTTP 429. An ordinary HTTP 429
-remains the retryable `rate_limit` category. Add future provider codes to this
-single classifier; never infer quota state from provider message text.
+carry more precise recovery semantics. For example, OpenAI quota failures can
+surface as `insufficient_quota` or `credit_balance_exhausted`; both are exposed
+as `{ source: 'model', code: 'quota' }` and are non-retryable, even if the
+provider also reports HTTP 429. An ordinary HTTP 429 remains the retryable
+`rate_limit` category. Add future provider codes to this single classifier;
+never infer quota state from provider message text.
 
 ## Adjacent Owners
 
