@@ -51,11 +51,12 @@ export class HeartbeatRunService {
         return;
       }
 
-      const isTerminal = item.kind !== 'activity';
+      const projected = toJsonCompatible(item);
+      const isTerminal = projected.kind !== 'activity';
       terminal = isTerminal;
       sequence += 1;
       stream.sink.push({
-        ...item,
+        ...projected,
         runId,
         sequence,
         timestamp: this.now(),
@@ -117,4 +118,14 @@ export class HeartbeatRunService {
       ? signal.reason
       : new Error(HEARTBEAT_CANCELLED_MESSAGE);
   }
+}
+
+/**
+ * Projects rich in-process events onto the same JSON value boundary used by
+ * durable heartbeat stores and Execution Host transports. This removes
+ * optional `undefined` properties without making every host rebuild the
+ * serialization step that Heddle's run service promises to own.
+ */
+function toJsonCompatible<Value>(value: Value): Value {
+  return JSON.parse(JSON.stringify(value)) as Value;
 }
