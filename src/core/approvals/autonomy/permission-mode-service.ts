@@ -31,8 +31,9 @@ const AUTO_ROOT_POLICY = {
 /**
  * Owns the product-level permission mode mapping for autonomy.
  *
- * UI surfaces should select Default/Auto/Unattended/Custom only. This service
- * maps those modes to one permission grant so hosts do not duplicate policy.
+ * UI surfaces should select Default/Auto/Unattended/Unrestricted/Custom only.
+ * This service maps those modes to one permission grant so hosts do not
+ * duplicate policy.
  */
 export class AutonomyPermissionModeService {
   static buildAutoProfile(args: { trustedRoots?: string[] } = {}): AutopilotProfile {
@@ -144,6 +145,14 @@ export class AutonomyPermissionModeService {
       };
     }
 
+    if (mode === 'unrestricted') {
+      return {
+        mode,
+        boundaryBehavior: 'allow',
+        authority: { kind: 'unrestricted' },
+      };
+    }
+
     const customProfile = args.config.autopilot;
     if (!customProfile || customProfile.mode !== 'autopilot') {
       throw new Error('Resolved custom permission mode without a valid autopilot profile.');
@@ -180,6 +189,11 @@ export class AutonomyPermissionModeService {
         id: 'unattended',
         label: 'Unattended',
         description: 'Never prompt; deny actions outside the trusted local coding policy.',
+      },
+      {
+        id: 'unrestricted',
+        label: 'Unrestricted',
+        description: 'Skip approval prompts and checks. Use only in an isolated environment.',
       },
       {
         id: 'custom',

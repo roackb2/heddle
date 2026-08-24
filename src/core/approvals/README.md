@@ -69,6 +69,13 @@ Unattended mode follows the same dispatcher path but resolves a policy boundary
 to `deny`, never `request`. No pending promise or host approval surface is
 created for those calls.
 
+Unrestricted mode appends a terminal `allow` fallback after explicit host deny
+policies. Earlier denies remain authoritative, requests fall through without a
+pending promise, and tool-owned validation still runs when the approved call is
+executed. Hosts composing `ToolApprovalPolicies.forPermissionGrant(...)`
+directly should pass non-bypassable policies as its second argument so the
+service preserves that ordering.
+
 `ToolApprovalService` owns the host-neutral request shape. A request includes
 the tool name, call id, raw input, requested timestamp, compact summary, policy
 reason, optional edit preview, and optional remembered project approval metadata.

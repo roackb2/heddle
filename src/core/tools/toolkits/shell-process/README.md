@@ -46,6 +46,12 @@ technical containment mechanism. Unattended permission mode removes the human
 wait, not this requirement: policy misses are denied, while allowed shell calls
 still inherit the host process authority described above.
 
+Unrestricted permission mode bypasses the approval gate for
+`run_shell_mutate`, so arbitrary commands can use that full host authority
+without prompting. The tool-owned catastrophic home/root/disk guard still runs
+at execution time. Use Unrestricted only inside an isolated container or VM
+with least-privilege credentials and constrained network access.
+
 ## Two Tools, Two Gates
 
 | Tool | Policy | Approval | Control operators |

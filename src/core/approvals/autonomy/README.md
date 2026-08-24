@@ -52,20 +52,25 @@ Autonomy evaluates that contract against configured roots and hard-deny facts.
 There is one resolved `AutonomyPermissionGrant` at the host boundary. It keeps
 two independent questions explicit:
 
-- `boundaryBehavior`: should a policy miss request a person or be denied?
-- `authority`: is the run using ordinary approval behavior or a bounded
-  `AutopilotProfile`?
+- `boundaryBehavior`: should a policy miss request a person, be denied, or be
+  allowed without prompting?
+- `authority`: is the run using ordinary approval behavior, a bounded
+  `AutopilotProfile`, or an explicit unrestricted bypass?
 
-The evaluator still receives one effective `AutopilotProfile`; the grant tells
-the approval policy whether a profile miss becomes `request` or `deny`.
+Bounded modes still send one effective `AutopilotProfile` to the evaluator; the
+grant tells the approval policy whether a profile miss becomes `request` or
+`deny`. Unrestricted authority skips that bounded evaluator and becomes a
+terminal `allow` fallback after explicit deny policies.
 
 User-facing mental model:
 
 ```text
 Auto = agent can do normal local coding work by itself in trusted repos.
 Unattended = same authority as Auto, but never pause for approval.
+Unrestricted = approve every call that is not blocked by an earlier explicit deny.
 Trusted repos = current repo + repos the user explicitly trusted.
 Dangerous or unclear actions request approval in Auto and are denied in Unattended.
+Tool-owned validation and catastrophic shell guards still run in Unrestricted.
 ```
 
 The approval UI should teach that model with `Approve once`, `Trust this repo`,
@@ -86,6 +91,11 @@ permissionMode: unattended
   -> generated Auto profile
   -> plus autoTrustedRoots
   -> permission grant { boundaryBehavior: "deny", authority: AutopilotProfile }
+
+permissionMode: unrestricted
+  -> no AutopilotProfile
+  -> permission grant { boundaryBehavior: "allow", authority: "unrestricted" }
+  -> terminal allow fallback after explicit host deny policies
 
 permissionMode: custom
   -> hand-authored config.autopilot
@@ -254,6 +264,12 @@ templates, choose boundary behavior, or reinterpret mode names.
   denied, traced, and returned to the model as a tool failure. This includes
   network operations, production-like environments, manual-only or
   unconfigured roots, missing capabilities, and unclear policy envelopes.
+- `unrestricted`: Heddle skips approval prompts and approval-policy checks for
+  every call that reaches the terminal unrestricted fallback. Explicit host or
+  agent deny policies placed before the fallback still win. Tool-owned schema,
+  path-containment, and catastrophic shell-command validation also still runs
+  during execution. Use this mode only inside an isolated container or VM with
+  least-privilege credentials and constrained network access.
 - `custom`: Heddle uses the workspace's hand-authored `autopilot` profile.
   This is selectable only when a hand-authored profile exists with
   `mode: "autopilot"` and differs from Heddle's generated Auto profile. An
@@ -261,8 +277,9 @@ templates, choose boundary behavior, or reinterpret mode names.
   not Custom. The full custom profile editor is a later UI/TUI slice.
 
 Project config stores `permissionMode` separately from the hand-authored
-`autopilot` profile. This lets a user switch Default/Auto/Unattended/Custom without
-deleting a custom profile. Auto-specific user expansions live in
+`autopilot` profile. This lets a user switch
+Default/Auto/Unattended/Unrestricted/Custom without deleting a custom profile.
+Auto-specific user expansions live in
 `autoTrustedRoots`, not in the custom `autopilot` object:
 
 ```json
@@ -275,6 +292,7 @@ deleting a custom profile. Auto-specific user expansions live in
 `AutonomyPermissionModeService.resolveGrant(...)` converts that config into one
 concrete permission grant. Auto and Unattended both carry an
 `AutopilotProfile` with `preset: "auto"`; only their boundary behavior differs.
+Unrestricted carries explicit unrestricted authority instead of a profile.
 Downstream approval policy does not read `autoTrustedRoots` directly.
 
 ## Approval-Driven Auto Expansion
@@ -407,6 +425,11 @@ Decision rules:
   capabilities match, environment is allowed when an envelope is present, and
   no hard-deny or approval reason is present.
 
+Unrestricted does not run this bounded evaluator. Its terminal approval policy
+allows the call after earlier explicit denies have had a chance to stop it.
+Normal tool execution and trace events still occur, including deterministic
+tool-owned validation failures.
+
 ## Trace Contract
 
 Autonomy trace exists so later sessions can understand why a long-running agent
@@ -455,7 +478,7 @@ This service is the core policy foundation. Workspace config may provide a
 project-config validates the persisted shape, and control-plane request context
 passes the resolved permission grant into this approval policy. Postflight
 audit now records observed structured effects after unattended autopilot
-execution. Unattended is deliberately not an unrestricted host-user bypass and
-is not a sandbox. Richer custom profile editing, explicit remote-service
-capabilities, OS isolation, and richer shell effect observation remain
-follow-up slices.
+execution. Unattended is deliberately not an unrestricted host-user bypass.
+Unrestricted is that explicit approval bypass, but it is still not a sandbox.
+Richer custom profile editing, explicit remote-service capabilities, OS
+isolation, and richer shell effect observation remain follow-up slices.

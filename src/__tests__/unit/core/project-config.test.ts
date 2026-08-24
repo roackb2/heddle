@@ -107,17 +107,17 @@ describe('ProjectConfigService', () => {
     });
   });
 
-  it('persists unattended permission mode as a supported project setting', () => {
+  it.each(['unattended', 'unrestricted'] as const)('persists %s permission mode as a supported project setting', (permissionMode) => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
 
     const updated = ProjectConfigService.update(workspaceRoot, (config) => ({
       ...config,
-      permissionMode: 'unattended',
+      permissionMode,
     }));
 
-    expect(updated.permissionMode).toBe('unattended');
+    expect(updated.permissionMode).toBe(permissionMode);
     expect(JSON.parse(readFileSync(ProjectConfigService.resolvePath(workspaceRoot), 'utf8'))).toMatchObject({
-      permissionMode: 'unattended',
+      permissionMode,
     });
   });
 

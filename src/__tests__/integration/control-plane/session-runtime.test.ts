@@ -298,6 +298,50 @@ describe('control-plane session runtime integration', () => {
       reason: expect.stringContaining('root/home recursive deletion is blocked'),
     }));
   });
+
+  it('places the unrestricted fallback after explicit control-plane policies', async () => {
+    const engineArgs = createControlPlaneSessionEngineArgs();
+    const permissionGrant: AutonomyPermissionGrant = {
+      mode: 'unrestricted',
+      boundaryBehavior: 'allow',
+      authority: { kind: 'unrestricted' },
+    };
+    const explicitDeny: ToolApprovalPolicy = () => ({
+      type: 'deny',
+      reason: 'Blocked by explicit host policy',
+    });
+    const session = await controlPlaneChatSessionsController.createSession({
+      ...engineArgs,
+      suggestedName: 'Unrestricted policy order test',
+      model: 'gpt-5.4',
+      permissionGrant,
+      approvalPolicies: [explicitDeny],
+    });
+    const loopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: engineArgs.workspaceRoot,
+      prompt: 'Run without prompts.',
+      summary: 'Done.',
+    }) as never);
+
+    await controlPlaneChatSessionsController.submitPrompt({
+      ...engineArgs,
+      sessionId: session.id,
+      prompt: 'Run without prompts.',
+      permissionGrant,
+      approvalPolicies: [explicitDeny],
+      apiKey: 'test-openai-key',
+      leaseOwner: {
+        ownerKind: 'daemon',
+        hostId: 'test-host',
+        ownerId: 'daemon-test',
+        clientLabel: 'control plane',
+      },
+    });
+
+    const policies = loopSpy.mock.calls[0]?.[0].approvalPolicies ?? [];
+    expect(policies).toHaveLength(3);
+    expect(policies[0]).toBe(explicitDeny);
+  });
 });
 
 describe('conversation turn lifecycle', () => {

@@ -15,6 +15,7 @@
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { join } from 'node:path';
+import omit from 'lodash/omit.js';
 import type { Logger } from 'pino';
 import {
   AutonomyPermissionModeService,
@@ -596,7 +597,8 @@ export class ControlPlaneChatSessionsController {
           })
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
-              ...args,
+              // Engine config already owns the composed permission chain.
+              ...omit(args, ['approvalPolicies', 'permissionGrant']),
               agentProfileId: args.agentProfileId,
               agentSnapshot: args.agentSnapshot,
               host,
@@ -856,15 +858,13 @@ export class ControlPlaneChatSessionsController {
     permissionGrant?: AutonomyPermissionGrant;
     approvalService: ToolApprovalService;
   }): ToolApprovalPolicy[] {
-    return [
-      ...(args.permissionGrant ? ToolApprovalPolicies.forPermissionGrant(args.permissionGrant) : []),
+    return ToolApprovalPolicies.forPermissionGrant(args.permissionGrant, [
       ...(args.approvalPolicies ?? []),
       ToolApprovalPolicies.rememberedProjectRule({
         isApproved: (context) => args.approvalService.isApprovedByRememberedProjectRule(context),
       }),
-    ];
+    ]);
   }
-
   private createEngineHost(args: ControlPlaneSessionReadArgs & ControlPlaneSessionAddress, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
     const approvalService = this.createApprovalService(args);
 

@@ -97,13 +97,34 @@ export class ToolApprovalPolicies {
     };
   }
 
-  static forPermissionGrant(grant: AutonomyPermissionGrant): ToolApprovalPolicy[] {
-    return grant.authority.kind === 'autopilot'
-      ? [ToolApprovalPolicies.autopilot({
-          profile: grant.authority.profile,
-          boundaryBehavior: grant.boundaryBehavior,
-        })]
-      : [];
+  static unrestricted(): ToolApprovalPolicy {
+    return () => ({
+      type: 'allow',
+      reason: 'Allowed by unrestricted permission mode',
+    });
+  }
+
+  /** Composes bounded gates before host policies and Unrestricted after them. */
+  static forPermissionGrant(
+    grant: AutonomyPermissionGrant | undefined,
+    policies: ToolApprovalPolicy[] = [],
+  ): ToolApprovalPolicy[] {
+    if (!grant) {
+      return policies;
+    }
+
+    if (grant.mode === 'unrestricted') {
+      return [...policies, ToolApprovalPolicies.unrestricted()];
+    }
+
+    if (grant.authority.kind !== 'autopilot') {
+      return policies;
+    }
+
+    return [ToolApprovalPolicies.autopilot({
+      profile: grant.authority.profile,
+      boundaryBehavior: grant.boundaryBehavior,
+    }), ...policies];
   }
 
   static autopilot(args: {

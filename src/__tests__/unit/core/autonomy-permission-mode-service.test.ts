@@ -83,6 +83,30 @@ describe('AutonomyPermissionModeService', () => {
     expect(AutonomyPermissionModeService.resolveAutoRootTrustProfile(grant)).toBeUndefined();
   });
 
+  it('maps unrestricted mode to prompt-free bypass authority without an Auto profile', () => {
+    const config = { permissionMode: 'unrestricted' as const };
+
+    expect(AutonomyPermissionModeService.resolveGrant({
+      config,
+      workspaceRoot,
+    })).toEqual({
+      mode: 'unrestricted',
+      boundaryBehavior: 'allow',
+      authority: { kind: 'unrestricted' },
+    });
+    expect(AutonomyPermissionModeService.resolveEffectiveProfile({
+      config,
+      workspaceRoot,
+    })).toBeUndefined();
+    expect(AutonomyPermissionModeService.buildOptions({
+      config,
+      workspaceRoot,
+    })).toContainEqual(expect.objectContaining({
+      id: 'unrestricted',
+      label: 'Unrestricted',
+    }));
+  });
+
   it('keeps auto mode when user-trusted repo roots extend the generated profile', () => {
     const config = AutonomyPermissionModeService.trustAutoRoot({
       config: { permissionMode: 'auto' },

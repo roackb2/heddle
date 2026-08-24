@@ -352,6 +352,58 @@ describe('approval policy chain', () => {
     expect(human).not.toHaveBeenCalled();
   });
 
+  it('allows unrestricted calls without invoking the human approval surface', async () => {
+    const service = new ToolApprovalService();
+    const human = vi.fn(async () => ({ approved: false, reason: 'should not request human approval' }));
+    const grant = AutonomyPermissionModeService.resolveGrant({
+      config: { permissionMode: 'unrestricted' },
+      workspaceRoot: '/workspace',
+    });
+
+    await expect(service.resolve({
+      policies: [
+        ...ToolApprovalPolicies.default(),
+        ...ToolApprovalPolicies.forPermissionGrant(grant),
+      ],
+      context: context({
+        call: {
+          id: 'call-gh',
+          tool: 'run_shell_mutate',
+          input: { command: 'gh run view 123 --log-failed' },
+        },
+      }),
+      requestHumanApproval: human,
+    })).resolves.toEqual({
+      approved: true,
+      reason: 'Allowed by unrestricted permission mode',
+    });
+    expect(human).not.toHaveBeenCalled();
+  });
+
+  it('keeps explicit denials authoritative before the unrestricted fallback', async () => {
+    const service = new ToolApprovalService();
+    const human = vi.fn(async () => ({ approved: true, reason: 'should not request human approval' }));
+    const grant = AutonomyPermissionModeService.resolveGrant({
+      config: { permissionMode: 'unrestricted' },
+      workspaceRoot: '/workspace',
+    });
+
+    await expect(service.resolve({
+      policies: [
+        ...ToolApprovalPolicies.default(),
+        ...ToolApprovalPolicies.forPermissionGrant(grant, [
+          () => ({ type: 'deny', reason: 'Blocked by explicit host policy' }),
+        ]),
+      ],
+      context: context(),
+      requestHumanApproval: human,
+    })).resolves.toEqual({
+      approved: false,
+      reason: 'Blocked by explicit host policy',
+    });
+    expect(human).not.toHaveBeenCalled();
+  });
+
   it('evaluates Auto access against a symlink target canonicalized outside the workspace', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-auto-symlink-root-'));
     const outsideRoot = mkdtempSync(join(tmpdir(), 'heddle-auto-symlink-outside-'));

@@ -128,6 +128,10 @@
         "description": "不显示批准提示；拒绝超出受信任本地编码策略的操作。",
         "label": "无人值守"
       },
+      "unrestricted": {
+        "description": "跳过批准提示和检查。仅在隔离环境中使用。",
+        "label": "不受限"
+      },
       "statusPrefix": "模式",
       "title": "权限模式"
     },

@@ -128,6 +128,10 @@
         "description": "不顯示核准提示；拒絕超出受信任本機程式設計政策的動作。",
         "label": "無人值守"
       },
+      "unrestricted": {
+        "description": "略過核准提示與檢查。僅在隔離環境中使用。",
+        "label": "不受限制"
+      },
       "statusPrefix": "模式",
       "title": "權限模式"
     },

@@ -128,6 +128,10 @@
         "description": "Never prompt; deny actions outside trusted local coding policy.",
         "label": "Unattended"
       },
+      "unrestricted": {
+        "description": "Skip approval prompts and checks. Use only in an isolated environment.",
+        "label": "Unrestricted"
+      },
       "statusPrefix": "Mode",
       "title": "Permission mode"
     },
