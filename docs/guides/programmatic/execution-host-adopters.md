@@ -10,7 +10,7 @@ The package is currently an experimental public contract and local proving
 surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
-The stable coordinate is `@heddleagent/execution-host-client@6.3.0`. The
+The stable coordinate is `@heddleagent/execution-host-client@6.4.0`. The
 former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers. It does not include the durable
 lifecycle described below.
