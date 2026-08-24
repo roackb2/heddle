@@ -45,9 +45,11 @@ export type AutopilotProfile = {
   };
 };
 
-export const AUTONOMY_PERMISSION_MODES = ['default', 'auto', 'custom'] as const;
+export const AUTONOMY_PERMISSION_MODES = ['default', 'auto', 'unattended', 'unrestricted', 'custom'] as const;
 
 export type AutonomyPermissionMode = typeof AUTONOMY_PERMISSION_MODES[number];
+
+export type AutonomyBoundaryBehavior = 'request' | 'deny';
 
 export type AutonomyPermissionModeConfig = {
   permissionMode?: AutonomyPermissionMode;
@@ -70,6 +72,35 @@ export type AutonomyPermissionModeOption = {
   disabled?: boolean;
   disabledReason?: string;
 };
+
+/**
+ * One resolved permission contract for a run.
+ *
+ * `boundaryBehavior` controls interactivity; `authority` controls what may run.
+ * Keeping those dimensions separate prevents bounded prompt-free execution
+ * from silently becoming an unrestricted host-user capability grant.
+ */
+export type AutonomyPermissionGrant =
+  | {
+      mode: 'default';
+      boundaryBehavior: 'request';
+      authority: { kind: 'default' };
+    }
+  | {
+      mode: 'auto' | 'custom';
+      boundaryBehavior: 'request';
+      authority: { kind: 'autopilot'; profile: AutopilotProfile };
+    }
+  | {
+      mode: 'unattended';
+      boundaryBehavior: 'deny';
+      authority: { kind: 'autopilot'; profile: AutopilotProfile };
+    }
+  | {
+      mode: 'unrestricted';
+      boundaryBehavior: 'allow';
+      authority: { kind: 'unrestricted' };
+    };
 
 export type NormalizedAutopilotRootPolicy = AutopilotRootPolicy & {
   path: string;
@@ -117,6 +148,7 @@ export type AutonomyEvaluation = {
   call: ToolCall;
   profileMode: AutopilotProfile['mode'];
   profilePreset?: AutopilotProfilePreset;
+  boundaryBehavior: AutonomyBoundaryBehavior;
   /** Proposed, host-owned, and effective fields retained for policy audit. */
   policy: ToolPolicyReconciliation;
   /** Effective envelope retained for compatibility with existing consumers. */

@@ -107,6 +107,20 @@ describe('ProjectConfigService', () => {
     });
   });
 
+  it.each(['unattended', 'unrestricted'] as const)('persists %s permission mode as a supported project setting', (permissionMode) => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
+
+    const updated = ProjectConfigService.update(workspaceRoot, (config) => ({
+      ...config,
+      permissionMode,
+    }));
+
+    expect(updated.permissionMode).toBe(permissionMode);
+    expect(JSON.parse(readFileSync(ProjectConfigService.resolvePath(workspaceRoot), 'utf8'))).toMatchObject({
+      permissionMode,
+    });
+  });
+
   it('reads legacy root config only when local config is absent', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
     // Legacy-only fixture: root-level config existed before config moved under

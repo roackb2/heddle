@@ -9,6 +9,7 @@ import {
   type ToolPolicyReconciliation,
 } from '@/core/tools/index.js';
 import type {
+  AutonomyBoundaryBehavior,
   AutonomyEvaluation,
   AutonomyPolicyHint,
   AutopilotCapability,
@@ -29,6 +30,7 @@ export class AutonomyPolicyService {
   static evaluate(args: {
     context: ToolApprovalPolicyContext;
     profile: AutopilotProfile;
+    boundaryBehavior?: AutonomyBoundaryBehavior;
   }): AutonomyEvaluation {
     const workspaceRoot = resolve(args.context.workspaceRoot ?? process.cwd());
     const profile = AutopilotProfileService.normalize({
@@ -55,12 +57,14 @@ export class AutonomyPolicyService {
       envelope,
       facts,
       profile,
+      boundaryBehavior: args.boundaryBehavior ?? 'request',
     });
 
     return {
       call: args.context.call,
       profileMode: profile.mode,
       profilePreset: profile.preset,
+      boundaryBehavior: args.boundaryBehavior ?? 'request',
       policy: resolution.reconciliation,
       envelope,
       facts,
@@ -86,11 +90,16 @@ export class AutonomyPolicyService {
     envelope?: ToolPolicyEnvelope;
     facts: ToolPolicyFacts;
     profile: NormalizedAutopilotProfile;
+    boundaryBehavior: AutonomyBoundaryBehavior;
   }): AutopilotDecision {
     const { context, envelope, facts, profile } = args;
 
     if (profile.mode !== 'autopilot') {
-      return { type: 'request', reason: 'interactive approval mode', facts };
+      return AutonomyPolicyService.boundaryDecision({
+        behavior: args.boundaryBehavior,
+        reason: 'interactive approval mode',
+        facts,
+      });
     }
 
     if (facts.hardDenyReasons.length > 0) {
@@ -98,20 +107,36 @@ export class AutonomyPolicyService {
     }
 
     if (AutonomyPolicyService.requiresPolicyEnvelope(context) && !envelope) {
-      return { type: 'request', reason: 'tool call needs a declared policy envelope', facts };
+      return AutonomyPolicyService.boundaryDecision({
+        behavior: args.boundaryBehavior,
+        reason: 'tool call needs a declared policy envelope',
+        facts,
+      });
     }
 
     if (facts.approvalReasons.length > 0) {
-      return { type: 'request', reason: facts.approvalReasons.join('; '), facts };
+      return AutonomyPolicyService.boundaryDecision({
+        behavior: args.boundaryBehavior,
+        reason: facts.approvalReasons.join('; '),
+        facts,
+      });
     }
 
     if (envelope && (envelope.confidence === 'low' || envelope.operations.includes('unknown'))) {
-      return { type: 'request', reason: 'policy envelope is not specific enough for autopilot', facts };
+      return AutonomyPolicyService.boundaryDecision({
+        behavior: args.boundaryBehavior,
+        reason: 'policy envelope is not specific enough for autopilot',
+        facts,
+      });
     }
 
     const hasEnvironmentClaim = envelope !== undefined || facts.environment !== 'unknown';
     if (hasEnvironmentClaim && !profile.environments.allow.includes(facts.environment as 'local' | 'dev')) {
-      return { type: 'request', reason: 'environment is not allowed for unattended execution', facts };
+      return AutonomyPolicyService.boundaryDecision({
+        behavior: args.boundaryBehavior,
+        reason: 'environment is not allowed for unattended execution',
+        facts,
+      });
     }
 
     if (!envelope) {
@@ -119,6 +144,20 @@ export class AutonomyPolicyService {
     }
 
     return { type: 'allow', reason: 'allowed by autopilot profile and declared policy envelope', facts };
+  }
+
+  private static boundaryDecision(args: {
+    behavior: AutonomyBoundaryBehavior;
+    reason: string;
+    facts: ToolPolicyFacts;
+  }): AutopilotDecision {
+    return args.behavior === 'deny'
+      ? {
+          type: 'deny',
+          reason: `unattended permission boundary denied: ${args.reason}`,
+          facts: args.facts,
+        }
+      : { type: 'request', reason: args.reason, facts: args.facts };
   }
 
   private static computeFacts(args: {

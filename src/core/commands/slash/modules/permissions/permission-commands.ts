@@ -14,7 +14,7 @@ export function createPermissionsSlashCommandModule(): SlashCommandModule<SlashC
     hints: [
       { command: '/permissions', description: 'show the active permission mode' },
       { command: '/permissions set [query]', description: 'pick permission mode with filtering' },
-      { command: '/permissions <default|auto|custom>', description: 'set the workspace permission mode' },
+      { command: '/permissions <default|auto|unattended|unrestricted|custom>', description: 'set the workspace permission mode' },
     ],
     commands: [
       {
@@ -33,7 +33,7 @@ export function createPermissionsSlashCommandModule(): SlashCommandModule<SlashC
       },
       {
         id: 'permissions.set',
-        syntax: '/permissions <default|auto|custom>',
+        syntax: '/permissions <default|auto|unattended|unrestricted|custom>',
         description: 'set the workspace permission mode',
         match: SlashCommandParser.matchesPrefix('/permissions'),
         run: (context, input) => setPermissionMode(context, argumentAfterPrefix(input, '/permissions')),
@@ -53,7 +53,7 @@ function setPermissionMode(
 
   const selected = normalized.startsWith('set ') ? normalized.slice('set '.length).trim() : normalized;
   if (!isPermissionMode(selected)) {
-    return slashMessageResult('Usage: /permissions set <query> or /permissions <default|auto|custom>');
+    return slashMessageResult('Usage: /permissions set <query> or /permissions <default|auto|unattended|unrestricted|custom>');
   }
 
   const next = context.permissions.set(selected);

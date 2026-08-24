@@ -98,7 +98,7 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
 function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): SlashCommandExecutionContext {
   let activeModel = 'gpt-5.4';
   let driftEnabled = false;
-  let permissionMode: 'default' | 'auto' | 'custom' = 'default';
+  let permissionMode: 'default' | 'auto' | 'unattended' | 'unrestricted' | 'custom' = 'default';
   const sessions = [
     testSession({ id: 'session-a', name: 'Alpha' }),
     testSession({ id: 'session-b', name: 'Beta', updatedAt: '2024-01-02' }),
@@ -312,13 +312,21 @@ describe('core slash command modules', () => {
       kind: 'message',
       message: 'Current permission mode: auto',
     });
+    await expect(registry.run(context, '/permissions unattended')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Set permission mode to unattended.',
+    });
+    await expect(registry.run(context, '/permissions unrestricted')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Set permission mode to unrestricted.',
+    });
     await expect(registry.run(context, '/permissions set')).resolves.toMatchObject({
       kind: 'message',
       message: 'Use /permissions set <query> to filter permission modes, then use arrows and Enter to choose one.',
     });
     await expect(registry.run(context, '/permissions nope')).resolves.toMatchObject({
       kind: 'message',
-      message: 'Usage: /permissions set <query> or /permissions <default|auto|custom>',
+      message: 'Usage: /permissions set <query> or /permissions <default|auto|unattended|unrestricted|custom>',
     });
   });
 

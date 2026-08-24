@@ -14,9 +14,11 @@ export {
   AutopilotRootSourceSchema,
 } from './schemas.js';
 export type {
+  AutonomyBoundaryBehavior,
   AutonomyEvaluation,
   AutonomyPermissionMode,
   AutonomyPermissionModeConfig,
+  AutonomyPermissionGrant,
   AutonomyPermissionModeOption,
   AutonomyPolicyHint,
   AutonomyPostflightAudit,

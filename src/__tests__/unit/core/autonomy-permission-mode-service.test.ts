@@ -16,6 +16,14 @@ describe('AutonomyPermissionModeService', () => {
       config: {},
       workspaceRoot,
     })).toBeUndefined();
+    expect(AutonomyPermissionModeService.resolveGrant({
+      config: {},
+      workspaceRoot,
+    })).toEqual({
+      mode: 'default',
+      boundaryBehavior: 'request',
+      authority: { kind: 'default' },
+    });
   });
 
   it('maps auto mode to the generated local coding profile', () => {
@@ -29,6 +37,74 @@ describe('AutonomyPermissionModeService', () => {
       path: '.',
       access: 'autopilot',
     });
+    expect(AutonomyPermissionModeService.resolveGrant({
+      config: { permissionMode: 'auto' },
+      workspaceRoot,
+    })).toMatchObject({
+      mode: 'auto',
+      boundaryBehavior: 'request',
+      authority: {
+        kind: 'autopilot',
+        profile: { preset: 'auto' },
+      },
+    });
+  });
+
+  it('maps unattended mode to Auto authority with deny-on-boundary behavior', () => {
+    const grant = AutonomyPermissionModeService.resolveGrant({
+      config: {
+        permissionMode: 'unattended',
+        autoTrustedRoots: ['../trusted-repo'],
+      },
+      workspaceRoot,
+    });
+
+    expect(grant).toMatchObject({
+      mode: 'unattended',
+      boundaryBehavior: 'deny',
+      authority: {
+        kind: 'autopilot',
+        profile: {
+          mode: 'autopilot',
+          preset: 'auto',
+          roots: expect.arrayContaining([
+            expect.objectContaining({ path: '../trusted-repo', access: 'autopilot' }),
+          ]),
+        },
+      },
+    });
+    expect(AutonomyPermissionModeService.buildOptions({
+      config: { permissionMode: 'unattended' },
+      workspaceRoot,
+    })).toContainEqual(expect.objectContaining({
+      id: 'unattended',
+      label: 'Unattended',
+    }));
+    expect(AutonomyPermissionModeService.resolveAutoRootTrustProfile(grant)).toBeUndefined();
+  });
+
+  it('maps unrestricted mode to prompt-free bypass authority without an Auto profile', () => {
+    const config = { permissionMode: 'unrestricted' as const };
+
+    expect(AutonomyPermissionModeService.resolveGrant({
+      config,
+      workspaceRoot,
+    })).toEqual({
+      mode: 'unrestricted',
+      boundaryBehavior: 'allow',
+      authority: { kind: 'unrestricted' },
+    });
+    expect(AutonomyPermissionModeService.resolveEffectiveProfile({
+      config,
+      workspaceRoot,
+    })).toBeUndefined();
+    expect(AutonomyPermissionModeService.buildOptions({
+      config,
+      workspaceRoot,
+    })).toContainEqual(expect.objectContaining({
+      id: 'unrestricted',
+      label: 'Unrestricted',
+    }));
   });
 
   it('keeps auto mode when user-trusted repo roots extend the generated profile', () => {
@@ -61,6 +137,9 @@ describe('AutonomyPermissionModeService', () => {
         source: 'user-trusted-repo',
       }),
     ]));
+    expect(AutonomyPermissionModeService.resolveAutoRootTrustProfile(
+      AutonomyPermissionModeService.resolveGrant({ config, workspaceRoot }),
+    )).toBeDefined();
   });
 
   it('preserves custom profiles when switching away from custom mode', () => {

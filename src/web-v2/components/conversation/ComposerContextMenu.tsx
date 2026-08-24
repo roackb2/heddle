@@ -54,12 +54,16 @@ const driftLevelMessageKeys = {
 const permissionModeLabelKeys = {
   default: 'composer.permissionMode.default.label',
   auto: 'composer.permissionMode.auto.label',
+  unattended: 'composer.permissionMode.unattended.label',
+  unrestricted: 'composer.permissionMode.unrestricted.label',
   custom: 'composer.permissionMode.custom.label',
 } as const satisfies Record<ControlPlanePermissionMode, I18nMessageKey>;
 
 const permissionModeDescriptionKeys = {
   default: 'composer.permissionMode.default.description',
   auto: 'composer.permissionMode.auto.description',
+  unattended: 'composer.permissionMode.unattended.description',
+  unrestricted: 'composer.permissionMode.unrestricted.description',
   custom: 'composer.permissionMode.custom.description',
 } as const satisfies Record<ControlPlanePermissionMode, I18nMessageKey>;
 

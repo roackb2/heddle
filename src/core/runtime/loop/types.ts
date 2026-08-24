@@ -107,7 +107,12 @@ export type RunAgentLoopOptions = {
   onEvent?: (event: AgentLoopEvent) => void;
   onTraceEvent?: (event: TraceEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
-  approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
+  approveToolCall?: (
+    call: ToolCall,
+    tool: ToolDefinition,
+    autonomyEvaluation?: AutonomyEvaluation,
+    reason?: string,
+  ) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
   recoverModelContext?: AgentModelContextRecovery;

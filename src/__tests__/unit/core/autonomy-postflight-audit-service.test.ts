@@ -22,6 +22,7 @@ function evaluation(overrides: Partial<AutonomyEvaluation> = {}): AutonomyEvalua
       },
     },
     profileMode: 'autopilot',
+    boundaryBehavior: 'request',
     envelope: {
       operations: ['write'],
       intent: 'Update a source file.',

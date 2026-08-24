@@ -56,8 +56,12 @@ Configuration is applied in this order:
 - `agentContextPaths`: optional project instruction files injected into the system prompt. When omitted, Heddle loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`. Only one default file is loaded to preserve context space. If configured, Heddle uses the listed paths exactly, so advanced projects can opt into custom names or multiple files.
 - `permissionMode`: user-facing approval mode for the workspace. `default`
   keeps normal approval behavior, `auto` enables the generated local coding
-  profile, and `custom` uses the hand-authored `autopilot` profile when one
-  exists with `mode: "autopilot"`. Switching modes preserves the `autopilot`
+  profile and asks at boundaries, `unattended` uses the same bounded authority
+  but denies boundary misses instead of ever opening an approval prompt,
+  `unrestricted` skips Heddle approval prompts and checks for calls not blocked
+  by an explicit earlier deny policy, and `custom` uses the hand-authored
+  `autopilot` profile when one exists with
+  `mode: "autopilot"`. Switching modes preserves the `autopilot`
   field so a custom profile is not deleted when the user temporarily returns to
   Default or Auto. An `autopilot` block with `mode: "interactive"` documents
   normal approval behavior and does not make Custom selectable.
@@ -71,6 +75,18 @@ Configuration is applied in this order:
   envelope and the runtime-computed facts match the configured roots,
   capabilities, and environments. Hard-deny rules still block destructive
   actions before remembered approvals.
+
+`unattended` is prompt-free, not unrestricted. Network operations, production
+environments, unconfigured/manual-only roots, missing capabilities, and unclear
+policy envelopes are denied and traced. Shell commands still run with the host
+user's authority when allowed, so use OS isolation for untrusted workloads.
+
+`unrestricted` is also prompt-free, but it auto-approves tool calls that reach
+the permission fallback, including network, remote-service, and outside-root
+requests. Explicit deny policies placed before that fallback still win, and
+tool-owned schema, path-containment, and catastrophic shell-command guards still
+run during execution. This mode is not a sandbox: use it only in a disposable
+container or VM with least-privilege credentials and constrained network access.
 
 `autopilot.roots[].path` should be a project/workspace boundary, usually a git
 repository root or a folder with config such as `package.json`,
@@ -107,6 +123,8 @@ active workspace root, so a sibling notes repo can be stored as
 - you want unattended local/dev coding work inside specific project roots while
   keeping dangerous roots, production-like environments, and broad destructive
   actions approval-gated or denied
+- you want a fully prompt-free agent inside an isolated environment and accept
+  the host-level authority granted by `unrestricted`
 
 ## See Also
 

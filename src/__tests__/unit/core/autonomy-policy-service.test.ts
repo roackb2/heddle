@@ -93,6 +93,26 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('denies instead of requesting when unattended mode reaches a policy boundary', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-unattended',
+          tool: 'run_shell_mutate',
+          input: { command: 'gh run view 123 --log-failed' },
+        },
+      }),
+      profile,
+      boundaryBehavior: 'deny',
+    });
+
+    expect(evaluation.boundaryBehavior).toBe('deny');
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'deny',
+      reason: 'unattended permission boundary denied: tool call needs a declared policy envelope',
+    }));
+  });
+
   it('requests approval for no-envelope reads outside configured Auto roots', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({

@@ -22,9 +22,10 @@ export class ConversationEngineHostNormalizer {
         }
       },
       approveToolCall: requestToolApproval
-        ? ((call, tool, autonomyEvaluation) => requestToolApproval({
+        ? ((call, tool, autonomyEvaluation, reason) => requestToolApproval({
           call,
           tool,
+          ...(reason ? { reason } : {}),
           ...(autonomyEvaluation ? { autonomyEvaluation } : {}),
         }))
         : undefined,

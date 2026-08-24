@@ -9,7 +9,12 @@ import {
   WorkspacePathPolicy,
 } from '@/core/tools/toolkits/coding-files/workspace-path-policy.js';
 import type { ToolApprovalPolicy, ToolApprovalPolicyContext, ToolApprovalSurface } from './types.js';
-import { AutonomyPolicyService, type AutopilotProfile } from './autonomy/index.js';
+import {
+  AutonomyPolicyService,
+  type AutonomyBoundaryBehavior,
+  type AutonomyPermissionGrant,
+  type AutopilotProfile,
+} from './autonomy/index.js';
 
 /**
  * Owns reusable approval policy constructors and the default policy chain.
@@ -92,7 +97,40 @@ export class ToolApprovalPolicies {
     };
   }
 
-  static autopilot(args: { profile: AutopilotProfile }): ToolApprovalPolicy {
+  static unrestricted(): ToolApprovalPolicy {
+    return () => ({
+      type: 'allow',
+      reason: 'Allowed by unrestricted permission mode',
+    });
+  }
+
+  /** Composes bounded gates before host policies and Unrestricted after them. */
+  static forPermissionGrant(
+    grant: AutonomyPermissionGrant | undefined,
+    policies: ToolApprovalPolicy[] = [],
+  ): ToolApprovalPolicy[] {
+    if (!grant) {
+      return policies;
+    }
+
+    if (grant.mode === 'unrestricted') {
+      return [...policies, ToolApprovalPolicies.unrestricted()];
+    }
+
+    if (grant.authority.kind !== 'autopilot') {
+      return policies;
+    }
+
+    return [ToolApprovalPolicies.autopilot({
+      profile: grant.authority.profile,
+      boundaryBehavior: grant.boundaryBehavior,
+    }), ...policies];
+  }
+
+  static autopilot(args: {
+    profile: AutopilotProfile;
+    boundaryBehavior?: AutonomyBoundaryBehavior;
+  }): ToolApprovalPolicy {
     return async (context) => {
       let canonicalTargetPaths: string[] | undefined;
       try {
@@ -112,6 +150,7 @@ export class ToolApprovalPolicies {
         AutonomyPolicyService.evaluate({
           context: canonicalTargetPaths ? { ...context, canonicalTargetPaths } : context,
           profile: args.profile,
+          boundaryBehavior: args.boundaryBehavior,
         }),
       );
     };

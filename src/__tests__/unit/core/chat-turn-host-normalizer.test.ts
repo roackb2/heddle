@@ -21,11 +21,15 @@ describe('conversation engine host normalizer', () => {
       },
     };
 
-    await expect(host?.approveToolCall?.(call, tool)).resolves.toEqual({
+    await expect(host?.approveToolCall?.(call, tool, undefined, 'edit_file requires approval')).resolves.toEqual({
       approved: true,
       reason: 'approved by host',
     });
-    expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
+    expect(requestToolApproval).toHaveBeenCalledWith({
+      call,
+      tool,
+      reason: 'edit_file requires approval',
+    });
   });
 
   it('fans out compaction status by phase through the normalized turn host', () => {
