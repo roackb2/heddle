@@ -6,6 +6,16 @@ import type {
 import { z } from 'zod';
 import { ExecutionHostStreamEventSchema } from '../contracts/index.js';
 import { ExecutionHostInvocationCancelledError } from '../http-sse/index.js';
+import {
+  NodeHttpPathSchema,
+  NodeHttpRequestError,
+  errorType,
+  readJsonBody,
+  readPathname,
+  takeAuthorization,
+  writeJson,
+  writeJsonError,
+} from './http-utils.js';
 import type {
   NodeExecutionAdopterFailure,
   NodeExecutionAdopterHttpHandler,
@@ -20,12 +30,6 @@ export const DEFAULT_ADOPTER_CONVERSATION_TURNS_PATH =
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1_024;
 const DEFAULT_MAX_PROMPT_CHARACTERS = 20_000;
-const REDACTED_HEADER_VALUE = '[REDACTED]';
-const MAX_AUTHORIZATION_CHARACTERS = 8_192;
-const PathSchema = z.string().min(1).max(256).regex(
-  /^\/(?:[^?#\s]*)$/,
-  'must be an absolute path without query, fragment, or whitespace',
-);
 const PublicErrorSchema = z.object({
   statusCode: z.number().int().min(400).max(599),
   message: z.string().min(1).max(1_600),
@@ -37,12 +41,6 @@ type ActiveConversation = {
   response: ServerResponse;
   pending: Promise<void>;
 };
-
-class AdopterHttpRequestError extends Error {
-  constructor(readonly statusCode: 400 | 413 | 415) {
-    super('Invalid adopter HTTP request.');
-  }
-}
 
 /**
  * Standard Node HTTP edge for adopter-side JWKS and hosted conversations.
@@ -212,7 +210,7 @@ implements NodeExecutionAdopterHttpHandler {
       request.resume();
       writeJsonError(
         response,
-        error instanceof AdopterHttpRequestError ? error.statusCode : 400,
+        error instanceof NodeHttpRequestError ? error.statusCode : 400,
         'Invalid conversation request.',
       );
       return;
@@ -250,7 +248,7 @@ implements NodeExecutionAdopterHttpHandler {
         prompt: z.string().trim().min(1).max(this.#maxPromptCharacters),
       }).strict().parse(body).prompt;
     } catch (error) {
-      const statusCode = error instanceof AdopterHttpRequestError
+      const statusCode = error instanceof NodeHttpRequestError
         ? error.statusCode
         : 400;
       writeJsonError(response, statusCode, 'Invalid conversation request.');
@@ -330,8 +328,8 @@ function parsePaths(
   paths: Partial<NodeExecutionAdopterHttpPaths> | undefined,
 ): Readonly<NodeExecutionAdopterHttpPaths> {
   const parsed = {
-    jwks: PathSchema.parse(paths?.jwks ?? DEFAULT_ADOPTER_JWKS_PATH),
-    conversationTurns: PathSchema.parse(
+    jwks: NodeHttpPathSchema.parse(paths?.jwks ?? DEFAULT_ADOPTER_JWKS_PATH),
+    conversationTurns: NodeHttpPathSchema.parse(
       paths?.conversationTurns ?? DEFAULT_ADOPTER_CONVERSATION_TURNS_PATH,
     ),
   };
@@ -339,88 +337,6 @@ function parsePaths(
     throw new Error('Adopter HTTP paths must be distinct.');
   }
   return Object.freeze(parsed);
-}
-
-function readPathname(rawUrl: string | undefined): string | undefined {
-  try {
-    return new URL(rawUrl ?? '/', 'http://localhost').pathname;
-  } catch {
-    return undefined;
-  }
-}
-
-function takeAuthorization(request: IncomingMessage): string | undefined {
-  const occurrences = request.rawHeaders.reduce(
-    (count, headerName, index) => count
-      + (index % 2 === 0 && headerName.toLowerCase() === 'authorization' ? 1 : 0),
-    0,
-  );
-  const raw = request.headers.authorization;
-  request.headers.authorization = raw === undefined
-    ? undefined
-    : REDACTED_HEADER_VALUE;
-  for (let index = 0; index < request.rawHeaders.length; index += 2) {
-    if (request.rawHeaders[index]?.toLowerCase() === 'authorization') {
-      request.rawHeaders[index + 1] = REDACTED_HEADER_VALUE;
-    }
-  }
-  if (occurrences > 1 || Array.isArray(raw)) {
-    throw new AdopterHttpRequestError(400);
-  }
-  if (raw && raw.length > MAX_AUTHORIZATION_CHARACTERS) {
-    throw new AdopterHttpRequestError(400);
-  }
-  return raw;
-}
-
-async function readJsonBody(
-  request: IncomingMessage,
-  maxBodyBytes: number,
-  signal: AbortSignal,
-): Promise<unknown> {
-  const contentType = request.headers['content-type']
-    ?.split(';', 1)[0]
-    ?.trim()
-    .toLowerCase();
-  if (contentType !== 'application/json') {
-    request.resume();
-    throw new AdopterHttpRequestError(415);
-  }
-  const contentLength = request.headers['content-length'];
-  if (contentLength !== undefined) {
-    const declaredLength = Number(contentLength);
-    if (!Number.isSafeInteger(declaredLength) || declaredLength < 0) {
-      request.resume();
-      throw new AdopterHttpRequestError(400);
-    }
-    if (declaredLength > maxBodyBytes) {
-      request.resume();
-      throw new AdopterHttpRequestError(413);
-    }
-  }
-
-  const chunks: Buffer[] = [];
-  let receivedBytes = 0;
-  for await (const chunk of request) {
-    signal.throwIfAborted();
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    receivedBytes += buffer.byteLength;
-    if (receivedBytes > maxBodyBytes) {
-      request.resume();
-      throw new AdopterHttpRequestError(413);
-    }
-    chunks.push(buffer);
-  }
-  if (!request.complete || receivedBytes === 0) {
-    throw new AdopterHttpRequestError(400);
-  }
-  try {
-    return JSON.parse(
-      Buffer.concat(chunks, receivedBytes).toString('utf8'),
-    ) as unknown;
-  } catch {
-    throw new AdopterHttpRequestError(400);
-  }
 }
 
 function writeEventStreamHeaders(response: ServerResponse): void {
@@ -448,40 +364,4 @@ async function writeSseEvent(
   if (!response.write(frame)) {
     await once(response, 'drain', { signal });
   }
-}
-
-function writeJsonError(
-  response: ServerResponse,
-  statusCode: number,
-  message: string,
-  headers: Record<string, string> = {},
-): void {
-  writeJson(response, statusCode, { error: { message } }, {
-    'Cache-Control': 'no-store',
-    ...headers,
-  });
-}
-
-function writeJson(
-  response: ServerResponse,
-  statusCode: number,
-  value: unknown,
-  headers: Record<string, string> = {},
-): void {
-  if (response.headersSent || response.destroyed) {
-    return;
-  }
-  const body = JSON.stringify(value);
-  response.writeHead(statusCode, {
-    'Cache-Control': 'no-store',
-    'Content-Length': Buffer.byteLength(body),
-    'Content-Type': 'application/json; charset=utf-8',
-    'X-Content-Type-Options': 'nosniff',
-    ...headers,
-  });
-  response.end(body);
-}
-
-function errorType(error: unknown): string {
-  return error instanceof Error ? error.name : 'unknown';
 }

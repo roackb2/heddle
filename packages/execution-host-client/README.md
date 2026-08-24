@@ -5,7 +5,7 @@ products that invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** stable version `6.2.0`. The former
+> **Current availability:** stable version `6.3.0`. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
@@ -31,6 +31,8 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 | `@heddleagent/execution-host-client/authority` | ES256 execution assertion and optional MCP capability issuance plus public JWKS projection |
 | `@heddleagent/execution-host-client/conversation` | Turn orchestration across authority, model credentials, optional MCP policy, an `ExecutionHost`, and an optional adopter-implemented durable lifecycle store |
 | `@heddleagent/execution-host-client/heartbeat` | Remote heartbeat orchestration that keeps durable task authority in a coordinator while a compatible Execution Host runs the agent cycle |
+| `@heddleagent/execution-host-client/coordinator` | Authenticated task publication, pause-first desired-state reconciliation, product delegation, and delegated heartbeat execution |
+| `@heddleagent/execution-host-client/coordinator/node` | Standard authenticated Node HTTP edge for product-owned heartbeat authorization |
 | `@heddleagent/execution-host-client/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@heddleagent/execution-host-client/http-sse` | Transport-neutral conversation and heartbeat ports plus the strict direct-development HTTP/SSE client |
@@ -279,30 +281,81 @@ The client refuses redirects, bounds parser and error bodies, validates ordered
 SSE identity, streams accepted/activity events incrementally, and withholds the
 terminal event until clean EOF. It never retries an ambiguous invocation.
 
-## Delegate heartbeat agent cycles
+## Connect a product to the heartbeat coordinator
+
+The product publishes only its desired task state and authorizes individual
+runs. Heddle owns the coordinator protocol, safe reconciliation order, Runtime
+session derivation, short-lived authority bundle, and execution composition.
+
+```ts
+import {
+  HostedHeartbeatCoordinatorClient,
+  HostedHeartbeatDelegationService,
+  HostedHeartbeatTaskReconciler,
+} from '@heddleagent/execution-host-client/coordinator'
+import {
+  NodeHostedHeartbeatDelegationHttpService,
+} from '@heddleagent/execution-host-client/coordinator/node'
+
+const coordinator = new HostedHeartbeatCoordinatorClient({
+  baseUrl: coordinatorUrl,
+  apiToken: coordinatorApiToken,
+})
+await new HostedHeartbeatTaskReconciler({ coordinator }).reconcile({
+  desiredTasks: await projectDesiredHeartbeatTasks(),
+  resume: backgroundChecksEnabled,
+})
+
+const delegations = new HostedHeartbeatDelegationService({
+  authority,
+  runtimeSessionNamespace: 'example-product',
+  maxExecutionMs: 300_000,
+  authorizer: {
+    authorize: ({ taskId, signal }) =>
+      authorizeProductHeartbeat({ taskId, signal }),
+  },
+})
+const delegationHttp = new NodeHostedHeartbeatDelegationHttpService({
+  delegations,
+  apiToken: coordinatorDelegationToken,
+})
+```
+
+`projectDesiredHeartbeatTasks` remains product-owned because it translates
+product records into desired Heddle tasks. `authorizeProductHeartbeat` remains
+product-owned because it decides whether the task may run and returns only the
+authorized tenant/subject/product-session scope and exact MCP tool set. Product
+code does not construct coordinator requests, Runtime-session IDs, deadlines,
+JWTs, or delegation response objects.
+
+The Node handler can be mounted before an existing router through
+`delegationHttp.handle(request, response)`. See the
+[coordinator boundary](src/coordinator/README.md) for the corresponding
+coordinator-side client and execution transport.
+
+## Compose the coordinator execution transport
 
 For autonomous work, keep the durable task store and scheduler in one
 long-running coordinator. Inject the hosted transport only at the point where
-the scheduler would otherwise run the local heartbeat agent:
+the scheduler would otherwise run the local heartbeat agent. The coordinator
+uses the product delegation endpoint rather than receiving product signing
+keys or reimplementing its authority shape:
 
 ```ts
 import { HeartbeatSchedulerService } from '@heddleagent/runtime/advanced'
 import {
-  HostedHeartbeatAgentExecutionTransport,
-  HostedHeartbeatTaskService,
-} from '@heddleagent/execution-host-client/heartbeat'
+  HostedHeartbeatDelegatedExecutionTransport,
+  HostedHeartbeatDelegationClient,
+} from '@heddleagent/execution-host-client/coordinator'
 
-const hostedHeartbeat = new HostedHeartbeatTaskService({
-  authority,
+const delegations = new HostedHeartbeatDelegationClient({
+  baseUrl: productBackendUrl,
+  apiToken: productDelegationToken,
+})
+const agentExecutionTransport = new HostedHeartbeatDelegatedExecutionTransport({
+  delegations,
   executionHost: agentCoreExecutionHost,
   modelCredentials,
-  mcp: { allowedTools: ['read_workspace_snapshot'] },
-})
-const agentExecutionTransport = new HostedHeartbeatAgentExecutionTransport({
-  runner: hostedHeartbeat,
-  resolveInvocationContext: ({ taskId, executionId, signal }) => (
-    resolveAuthorizedHeartbeatInvocation({ taskId, executionId, signal })
-  ),
 })
 
 const scheduler = HeartbeatSchedulerService.start({
@@ -311,11 +364,13 @@ const scheduler = HeartbeatSchedulerService.start({
 })
 ```
 
-The coordinator still owns task lookup, claims, checkpoint loading, cancellation,
-claim-fenced settlement, history, and recovery. The Runtime receives a bounded
-task/checkpoint request plus invocation-scoped authority and model credentials;
-it receives no Heddle database credential. Omitting `agentExecutionTransport`
-preserves the existing in-process runner.
+The coordinator still owns task lookup, claims, checkpoint loading,
+cancellation, claim-fenced settlement, history, and recovery. The Runtime
+receives a bounded task/checkpoint request plus invocation-scoped authority and
+model credentials; it receives no Heddle database credential. Omitting
+`agentExecutionTransport` preserves the existing in-process runner. The lower
+level `/heartbeat` composition remains available for deployments whose
+coordinator and product authority live in the same process.
 
 ## Verify an adopter integration locally
 

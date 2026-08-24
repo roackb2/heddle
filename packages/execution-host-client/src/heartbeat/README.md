@@ -27,11 +27,15 @@ task authority while an isolated Runtime performs only the agent cycle.
 
 The coordinator supplies `HostedHeartbeatAgentExecutionTransport` to
 `HeartbeatSchedulerService`. The scheduler's existing local runner remains the
-default when no transport is configured. The transport's
-`resolveInvocationContext` callback is deliberately small: it selects only the
-already-authorized product scope, Runtime session, and deadline for the claimed
-task. `HostedHeartbeatTaskService` owns the reusable authority, credential,
-MCP, transport, and stream behavior after that selection.
+default when no transport is configured. This low-level transport is suitable
+when product authority and the coordinator live in the same process.
+
+For a separately deployed product backend, use the higher-level
+[`coordinator`](../coordinator/README.md) surface. It owns the authenticated
+task/delegation clients, desired-state reconciliation, Runtime-session and
+authority construction, and delegated execution composition. Product code then
+returns only its authorized scope and allowed tools rather than implementing
+`resolveInvocationContext` or the delegation wire shape.
 
 The returned value crosses an untrusted network boundary. The runtime scheduler
 validates it as an `AgentHeartbeatResult` before any checkpoint or successful
