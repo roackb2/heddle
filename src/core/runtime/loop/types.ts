@@ -82,6 +82,11 @@ export type AgentLoopEvent =
     };
 
 export type RunAgentLoopOptions = {
+  /**
+   * Optional host-preallocated identity for this run. Omit it to preserve the
+   * runtime's generated-ID behavior.
+   */
+  runId?: string;
   goal: string;
   model?: string;
   reasoningEffort?: ReasoningEffort;

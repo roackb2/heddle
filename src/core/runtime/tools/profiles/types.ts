@@ -1,4 +1,5 @@
 export type ToolCapability =
+  | 'agent.delegate'
   | 'workspace.read'
   | 'workspace.write'
   | 'shell.inspect'

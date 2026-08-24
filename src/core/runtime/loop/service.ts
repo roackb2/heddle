@@ -23,7 +23,7 @@ import type { AgentLoopResult, RunAgentLoopOptions } from './types.js';
  */
 export class AgentLoopRuntimeService {
   static async run(options: RunAgentLoopOptions): Promise<AgentLoopResult> {
-    const runId = AgentLoopCheckpointService.generateRunId();
+    const runId = AgentLoopCheckpointService.resolveRunId(options.runId);
     const model = options.model ?? options.llm?.info?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
     const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
     const credentialStorePath = this.resolveCredentialStorePath({ workspaceRoot, stateDir: options.stateDir });

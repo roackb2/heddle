@@ -117,6 +117,56 @@ describe('AgentLoopRuntimeService.run', () => {
     });
   });
 
+  it('uses a validated host-preallocated run id in state and every runtime event', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done with the supplied identity.' };
+      },
+    };
+
+    const result = await AgentLoopRuntimeService.run({
+      runId: 'run_preallocated-test:1',
+      goal: 'Use the supplied run id.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(result.state.runId).toBe('run_preallocated-test:1');
+    expect(events).not.toHaveLength(0);
+    expect(events.every((event) => event.runId === 'run_preallocated-test:1')).toBe(true);
+  });
+
+  it('rejects invalid host-preallocated run ids before execution starts', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        return { content: 'This should not run.' };
+      },
+    };
+
+    await expect(AgentLoopRuntimeService.run({
+      runId: ' invalid/run ',
+      goal: 'Reject the invalid run id.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      logger: silentLogger,
+    })).rejects.toThrow('runId must start with an alphanumeric character');
+  });
+
   it('propagates safe model failures through loop state and terminal activity', async () => {
     const events: AgentLoopEvent[] = [];
     const fakeLlm: LlmAdapter = {

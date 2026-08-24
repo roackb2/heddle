@@ -6,6 +6,8 @@ import type { AgentLoopCheckpoint, AgentLoopState } from './types.js';
  * Owns agent-loop state snapshots and checkpoint conversion.
  */
 export class AgentLoopCheckpointService {
+  static readonly MAX_RUN_ID_LENGTH = 128;
+
   static createFinishedState(args: {
     runId: string;
     goal: string;
@@ -50,6 +52,25 @@ export class AgentLoopCheckpointService {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 6);
     return `run_${timestamp}_${random}`;
+  }
+
+  static resolveRunId(runId: string | undefined): string {
+    if (runId === undefined) {
+      return this.generateRunId();
+    }
+
+    if (
+      !runId.trim()
+      || runId !== runId.trim()
+      || runId.length > this.MAX_RUN_ID_LENGTH
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(runId)
+    ) {
+      throw new Error(
+        `runId must start with an alphanumeric character, contain only letters, numbers, ., _, :, or -, and be at most ${this.MAX_RUN_ID_LENGTH} characters`,
+      );
+    }
+
+    return runId;
   }
 
   static historyFromState(state: AgentLoopState): ChatMessage[] {
