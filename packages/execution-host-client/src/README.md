@@ -11,6 +11,13 @@ independent so an adopter can use only the machinery it needs:
   capability issuance plus public JWKS projection;
 - `conversation`: provider-neutral authority, credential, tool-policy, and
   Execution Host turn orchestration;
+- `heartbeat`: one remotely executed heartbeat cycle behind Heddle's existing
+  scheduler transport;
+- `coordinator`: authenticated task publication, desired-state reconciliation,
+  product delegation, and delegated heartbeat execution shared by products and
+  the Heddle coordinator;
+- `coordinator/node`: the standard authenticated Node HTTP edge for a
+  product-owned heartbeat authorization decision;
 - `mcp`: independent product-edge capability verification against a fixed
   deployment and supported-tool set;
 - `mcp/node`: optional official-SDK Streamable HTTP lifecycle around an
@@ -22,11 +29,12 @@ independent so an adopter can use only the machinery it needs:
 - `node`: optional Node HTTP edge and safe local signing-key conveniences. It
   owns generic mechanics, never product identity or tool policy.
 
-The package must never import the Heddle runtime, Execution Host internals, AWS
-SDK, a database adapter, or product domain code. The explicit `mcp/node`
-surface may import the official MCP SDK, but owns no model-visible tools. New reusable
-machinery belongs here only when it is required by more than one adopter and
-can preserve that dependency boundary.
+The package must never import the Heddle runtime, Execution Host internals, a
+database adapter, or product domain code. The explicit `agentcore` surface may
+import the modular AWS SDK, and `mcp/node` may import the official MCP SDK, but
+neither owns product deployment or model-visible tools. New reusable machinery
+belongs here only when it is required by more than one adopter and can preserve
+that dependency boundary.
 
 The repository includes one clean-room Python consumer to prove the versioned
 contract is implementable outside TypeScript. It is a bounded conformance

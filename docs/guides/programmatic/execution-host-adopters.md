@@ -10,7 +10,7 @@ The package is currently an experimental public contract and local proving
 surface. Heddle does not distribute the compatible Execution Host or offer a
 hosted service today.
 
-The stable coordinate is `@heddleagent/execution-host-client@6.2.0`. The
+The stable coordinate is `@heddleagent/execution-host-client@6.3.0`. The
 former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers. It does not include the durable
 lifecycle described below.
@@ -78,6 +78,11 @@ Its subpaths separate responsibility:
 - `/heartbeat` connects Heddle's provider-neutral heartbeat scheduler to one
   remotely executed agent cycle while keeping durable task authority in the
   coordinator;
+- `/coordinator` owns the authenticated task client, pause-first desired-state
+  reconciliation, product delegation contract, Runtime-session derivation,
+  and delegated heartbeat execution;
+- `/coordinator/node` exposes the standard authenticated Node HTTP edge for a
+  product's task authorization decision;
 - `/mcp` independently verifies product-MCP capabilities against a fixed
   deployment and supported-tool set;
 - `/mcp/node` owns a stateless official-SDK Streamable HTTP lifecycle around
@@ -169,11 +174,17 @@ Runtime deployment.
 The `heartbeat-task` workflow is intentionally narrower than a general control
 plane. One long-running coordinator owns the heartbeat PostgreSQL store,
 scheduler, claims, fencing, checkpoints, settlement, recovery, and shutdown.
-It supplies `HostedHeartbeatAgentExecutionTransport` to the runtime scheduler.
-The transport resolves an already-authorized product scope, Runtime session,
-and deadline, then `HostedHeartbeatTaskService` owns assertion issuance, model
-credentials, optional product MCP, AgentCore/direct invocation, ordered
-activity, cancellation, and terminal classification.
+The product uses `HostedHeartbeatCoordinatorClient` and
+`HostedHeartbeatTaskReconciler` to publish its desired task catalog. It exposes
+`HostedHeartbeatDelegationService` through the optional Node HTTP service; its
+callback returns only the authorized product scope and exact MCP tool set.
+
+The coordinator uses `HostedHeartbeatDelegationClient` and
+`HostedHeartbeatDelegatedExecutionTransport` to obtain that one-run authority
+and execute the claimed task. Heddle owns request validation, Runtime-session
+derivation, deadline and authority construction, scope/tool binding, model
+credentials, AgentCore/direct invocation, ordered activity, cancellation, and
+terminal classification. Neither side recreates the shared wire shape.
 
 Only the nested agent cycle runs in the Execution Host. The Runtime receives
 neither the Heddle database credential nor product database access. Omitting

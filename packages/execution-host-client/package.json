@@ -46,6 +46,14 @@
       "types": "./dist/heartbeat/index.d.ts",
       "import": "./dist/heartbeat/index.js"
     },
+    "./coordinator": {
+      "types": "./dist/coordinator/index.d.ts",
+      "import": "./dist/coordinator/index.js"
+    },
+    "./coordinator/node": {
+      "types": "./dist/coordinator/node/index.d.ts",
+      "import": "./dist/coordinator/node/index.js"
+    },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js"
