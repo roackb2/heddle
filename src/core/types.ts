@@ -36,6 +36,12 @@ export type ToolDefinition = {
   requiresApproval?: boolean;
   capabilities?: string[];
   /**
+   * Host-only wrapper timeout. Omit for the tools-domain 30-second default,
+   * provide a positive duration to override it, or use null when the tool owns
+   * a cancellable long-running lifecycle that must not race the generic timer.
+   */
+  timeoutMs?: number | null;
+  /**
    * Defaults to `serial`. `parallel-safe` is an explicit guarantee from the
    * tool owner that separate calls may overlap without conflicting effects or
    * shared mutable state.

@@ -118,7 +118,10 @@ export class DelegationPolicyService {
     if (!parsed.ok) {
       return parsed;
     }
-    if (!input.policy.allowedAgentProfileIds.includes(parsed.input.agentProfileId ?? 'builtin:ask')) {
+    if (
+      parsed.input.agentProfileId
+      && !input.policy.allowedAgentProfileIds.includes(parsed.input.agentProfileId)
+    ) {
       return { ok: false, code: 'agent_not_allowed' };
     }
     if (input.reservedChildren >= input.policy.maxChildren) {

@@ -59,6 +59,7 @@ describe('delegation policy and scope', () => {
       name: 'delegate_task',
       capabilities: ['agent.delegate'],
       concurrency: 'parallel-safe',
+      timeoutMs: null,
       parameters: {
         type: 'object',
         additionalProperties: false,
@@ -122,6 +123,26 @@ describe('delegation policy and scope', () => {
     expect(output(disallowedAgent).error?.code).toBe('agent_not_allowed');
     expect(output(depthTwo).error?.code).toBe('depth_limit');
     expect(scope.records()).toEqual([]);
+  });
+
+  it('defaults an omitted profile to the host-allowed review worker when ask is unavailable', async () => {
+    const { scope } = activeScope({
+      policy: { allowedAgentProfileIds: ['builtin:review'] },
+    });
+
+    const result = await scope.delegateTask({ task: 'Review safely.' });
+    const tool = scope.createTool();
+
+    expect(result.ok).toBe(true);
+    expect(tool.description).toContain('omitted to use builtin:review');
+    expect(tool.parameters).toMatchObject({
+      properties: {
+        agentProfileId: {
+          description: 'Read-only child profile. Omit to use builtin:review.',
+        },
+      },
+    });
+    expect(scope.records()[0]?.agentSnapshot.agentProfileId).toBe('builtin:review');
   });
 
   it('consumes the total slot after success, provider failure, and cancellation', async () => {
@@ -209,22 +230,36 @@ describe('delegation policy and scope', () => {
     });
   });
 
-  it('intersects snapshot tools with the mandatory envelope and passes a separate read-only approval policy', async () => {
+  it('intersects snapshot tools with the exact delegated read-only allowlist', async () => {
     const workspaceRoot = workspace();
     const snapshot = askSnapshot({
       toolProfile: {
         preset: 'inspect',
-        includeTools: ['read_file', 'edit_file', 'delegate_task'],
+        includeTools: [
+          'read_file',
+          'edit_file',
+          'run_shell_inspect',
+          'read_agent_skill',
+          'delegate_task',
+        ],
         memoryMode: 'none',
       },
     });
-    const mutationTool: ToolDefinition = {
-      name: 'forged_mutation',
-      description: 'A forged mutation used to test defense in depth.',
-      capabilities: ['workspace.write'],
+    const unsafeTools: ToolDefinition[] = ([
+      ['forged_mutation', 'workspace.write'],
+      ['forged_shell', 'shell.inspect'],
+      ['forged_external_read', 'external.read'],
+      ['forged_memory_read', 'memory.read'],
+      ['forged_artifact_read', 'artifact.read'],
+      ['read_agent_skill', 'workspace.read'],
+      ['forged_future_read', 'workspace.read'],
+    ] as const).map(([name, capability]) => ({
+      name,
+      description: `A forged ${capability} tool used to test defense in depth.`,
+      capabilities: [capability],
       parameters: {},
       execute: async () => ({ ok: true }),
-    };
+    }));
     let captured: RunAgentLoopOptions | undefined;
     vi.spyOn(AgentLoopRuntimeService, 'run').mockImplementation(async (options) => {
       captured = options;
@@ -239,7 +274,7 @@ describe('delegation policy and scope', () => {
         model: 'gpt-test',
         baseSystemContext: 'BASE_PROJECT_CONTEXT',
         logger: silentLogger,
-        extraTools: [mutationTool],
+        extraTools: unsafeTools,
         llm: finalAdapter(async () => ({ content: 'Unsafe shared adapter.' })),
       } as unknown as DelegationChildRuntimeOptions,
       agentSnapshotResolver: {
@@ -249,30 +284,53 @@ describe('delegation policy and scope', () => {
 
     const result = await scope.delegateTask({ task: 'Inspect safely.' });
     const tools = captured?.tools ?? [];
-    const approval = await new ToolApprovalService().evaluate({
-      policies: captured?.approvalPolicies ?? [],
-      context: {
-        call: { id: 'forged-call', tool: mutationTool.name, input: {} },
-        tool: mutationTool,
-        workspaceRoot,
-      },
-    });
+    const approvalService = new ToolApprovalService();
+    const approvals = await Promise.all(unsafeTools.map(async (tool) => (
+      await approvalService.evaluate({
+        policies: captured?.approvalPolicies ?? [],
+        context: {
+          call: { id: `call-${tool.name}`, tool: tool.name, input: {} },
+          tool,
+          workspaceRoot,
+        },
+      })
+    )));
+    const readFileTool = tools.find((tool) => tool.name === 'read_file');
+    const safeApproval = readFileTool
+      ? await approvalService.evaluate({
+        policies: captured?.approvalPolicies ?? [],
+        context: {
+          call: { id: 'call-read-file', tool: readFileTool.name, input: {} },
+          tool: readFileTool,
+          workspaceRoot,
+        },
+      })
+      : undefined;
 
     expect(result.ok).toBe(true);
-    expect(tools.map((tool) => tool.name)).toContain('read_file');
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'list_files',
+      'project_dashboard',
+      'read_file',
+      'search_files',
+    ]);
     expect(tools.map((tool) => tool.name)).not.toEqual(expect.arrayContaining([
       'edit_file',
       'delegate_task',
+      'run_shell_inspect',
       'run_shell_mutate',
+      'read_artifact',
+      'read_agent_skill',
       'mcp_call_tool',
     ]));
     expect(tools.every((tool) => RuntimeToolProfileService.capabilitiesFor(tool).every(
-      (capability) => ['workspace.read', 'shell.inspect', 'artifact.read'].includes(capability),
+      (capability) => capability === 'workspace.read',
     ))).toBe(true);
-    expect(approval).toEqual({
+    expect(approvals).toEqual(unsafeTools.map((tool) => ({
       type: 'deny',
-      reason: 'forged_mutation is not available to read-only agents',
-    });
+      reason: `${tool.name} is outside the delegated read-only tool allowlist`,
+    })));
+    expect(safeApproval).toBeUndefined();
     expect(captured).toMatchObject({
       runId: expect.stringMatching(/^run_/),
       goal: 'Inspect safely.',

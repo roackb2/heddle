@@ -70,6 +70,11 @@ omitting `runId` preserves generated run IDs. Calling `scope.cancel()` aborts
 active and queued children. A root runtime's abort signal also reaches every
 delegate tool call through the existing tool execution context.
 
+`delegate_task` disables the tools domain's generic 30-second wrapper timeout
+because one call owns a complete child loop. Root cancellation and child step
+limits remain active. Until delegation owns a validated wall-time policy, hosts
+that need a wall-clock bound should provide an abort signal for the root run.
+
 ## V1 Safety Invariants
 
 - Depth is exactly one; child registries never contain `delegate_task`.
@@ -79,7 +84,17 @@ delegate tool call through the existing tool execution context.
 - Child step budgets default to 24 and cannot exceed 32.
 - Only built-in ask/review snapshots are eligible.
 - Snapshot tool selection is intersected with a mandatory capability envelope.
-- A separate read-only approval policy remains active as defense in depth.
+- Children receive only `project_dashboard`, `list_files`, `read_file`, and
+  `search_files`. Shell execution is not available because model-authored shell
+  syntax cannot guarantee read-only host effects, and artifact tools stay out
+  of the first-slice repository-inspection catalog to keep tool selection
+  predictable.
+- Agent-skill activation is unavailable to children so the inherited base
+  context plus immutable child-profile appendix remain the complete child
+  system context.
+- A delegation-owned approval policy independently enforces the same exact
+  tool-name and `workspace.read` capability allowlist, in addition to snapshot
+  approval policy.
 - Children share the normalized workspace but receive no root history or root
   profile appendix.
 - Raw child transcripts and traces never enter model-facing tool output.

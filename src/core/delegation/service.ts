@@ -70,6 +70,7 @@ export class DelegationRootScope {
   private readonly childRecords: DelegatedRunRecord[] = [];
   private readonly childControllers = new Map<string, AbortController>();
   private readonly childRuntime: DelegationChildRuntimeService;
+  private readonly defaultAgentProfileId: DelegationAgentProfileId;
   private readonly semaphore: Semaphore;
   private readonly scopeController = new AbortController();
 
@@ -81,6 +82,9 @@ export class DelegationRootScope {
     this.rootRunId = AgentLoopCheckpointService.resolveRunId(options.rootRunId);
     this.workspaceRoot = resolve(options.workspaceRoot);
     this.semaphore = new Semaphore(this.policy.maxConcurrentChildren);
+    this.defaultAgentProfileId = this.policy.allowedAgentProfileIds.includes('builtin:ask')
+      ? 'builtin:ask'
+      : this.policy.allowedAgentProfileIds[0]!;
     this.childRuntime = new DelegationChildRuntimeService({
       rootRunId: this.rootRunId,
       workspaceRoot: this.workspaceRoot,
@@ -108,10 +112,11 @@ export class DelegationRootScope {
         'Run one bounded, read-only child agent on an independent inspection task.',
         'The child receives the same workspace but no parent transcript and cannot delegate or mutate state.',
         `task is required and limited to ${MAX_DELEGATED_TASK_LENGTH} characters.`,
-        'agentProfileId may be builtin:ask (default) or builtin:review when allowed by the host.',
+        `agentProfileId may be omitted to use ${this.defaultAgentProfileId}.`,
       ].join(' '),
       capabilities: ['agent.delegate'],
       concurrency: 'parallel-safe',
+      timeoutMs: null,
       parameters: {
         type: 'object',
         additionalProperties: false,
@@ -125,7 +130,7 @@ export class DelegationRootScope {
           agentProfileId: {
             type: 'string',
             enum: [...this.policy.allowedAgentProfileIds],
-            description: 'Read-only child profile. Omit to use builtin:ask.',
+            description: `Read-only child profile. Omit to use ${this.defaultAgentProfileId}.`,
           },
         },
         required: ['task'],
@@ -156,7 +161,7 @@ export class DelegationRootScope {
       return this.rejection(request.code);
     }
 
-    const agentProfileId = request.input.agentProfileId ?? 'builtin:ask';
+    const agentProfileId = request.input.agentProfileId ?? this.defaultAgentProfileId;
     const snapshot = this.agentSnapshots.get(agentProfileId);
     if (!snapshot) {
       return this.rejection('agent_not_allowed');

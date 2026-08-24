@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AgentLoopRuntimeService,
   DelegationService,
@@ -57,8 +57,10 @@ describe('headless read-only delegation', () => {
     })).toBe(true);
     expect(fixture.childTools.every((tools) => (
       !tools.some((tool) => tool.name === 'delegate_task')
+      && !tools.some((tool) => tool.name === 'run_shell_inspect')
+      && !tools.some((tool) => tool.name === 'read_agent_skill')
       && tools.every((tool) => RuntimeToolProfileService.capabilitiesFor(tool).every(
-        (capability) => ['workspace.read', 'shell.inspect', 'artifact.read'].includes(capability),
+        (capability) => capability === 'workspace.read',
       ))
     ))).toBe(true);
   });
@@ -76,6 +78,93 @@ describe('headless read-only delegation', () => {
       'Inspect the module boundary.',
       'Review the test coverage.',
     ]);
+  });
+
+  it('lets a delegated child exceed the generic 30-second tool timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-long-delegation-integration-'));
+      let markChildStarted!: () => void;
+      const childStarted = new Promise<void>((resolveStarted) => {
+        markChildStarted = resolveStarted;
+      });
+      const scope = new DelegationService({
+        policy: {
+          enabled: true,
+          maxChildren: 1,
+          maxConcurrentChildren: 1,
+          maxStepsPerChild: 2,
+          allowedAgentProfileIds: ['builtin:ask'],
+        },
+      }).createRootScope({
+        rootRunId: 'run_long-child-fixture',
+        workspaceRoot,
+        runtime: {
+          model: 'gpt-test',
+          logger: silentLogger,
+          createChildLlm: () => childAdapter({
+            task: 'Inspect slow-child',
+            onStart: markChildStarted,
+            onFinish: () => undefined,
+            onRequest: () => undefined,
+            delayMs: 30_001,
+          }),
+        },
+      });
+      let rootRequest = 0;
+      const rootAdapter: LlmAdapter = {
+        info: {
+          provider: 'openai',
+          model: 'gpt-test',
+          capabilities: {
+            toolCalls: true,
+            systemMessages: true,
+            reasoningSummaries: false,
+            parallelToolCalls: false,
+          },
+        },
+        async chat(): Promise<LlmResponse> {
+          rootRequest += 1;
+          return rootRequest === 1
+            ? {
+              toolCalls: [{
+                id: 'delegate-slow-child',
+                tool: 'delegate_task',
+                input: { task: 'Inspect slow-child', agentProfileId: 'builtin:ask' },
+              }],
+            }
+            : { content: 'Synthesized slow child result.' };
+        },
+      };
+
+      const running = AgentLoopRuntimeService.run({
+        runId: scope.rootRunId,
+        goal: 'Delegate one deliberately slow inspection.',
+        model: 'gpt-test',
+        llm: rootAdapter,
+        tools: [scope.createTool()],
+        includeDefaultTools: false,
+        maxSteps: 3,
+        workspaceRoot,
+        logger: silentLogger,
+      });
+
+      await childStarted;
+      await vi.advanceTimersByTimeAsync(30_001);
+      const result = await running;
+
+      expect(result).toMatchObject({
+        outcome: 'done',
+        summary: 'Synthesized slow child result.',
+      });
+      expect(scope.records()).toMatchObject([{
+        status: 'finished',
+        outcome: 'done',
+        summary: 'Module inspection found the runtime boundary.',
+      }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -222,6 +311,7 @@ function childAdapter(input: {
   onStart: () => void;
   onFinish: () => void;
   onRequest: (messages: ChatMessage[], tools: ToolDefinition[]) => void;
+  delayMs?: number;
 }): LlmAdapter {
   return {
     info: {
@@ -238,7 +328,7 @@ function childAdapter(input: {
       input.onRequest(messages, tools);
       input.onStart();
       try {
-        await delay(input.task.startsWith('Inspect') ? 20 : 5);
+        await delay(input.delayMs ?? (input.task.startsWith('Inspect') ? 20 : 5));
         return {
           content: input.task.startsWith('Inspect')
             ? 'Module inspection found the runtime boundary.'

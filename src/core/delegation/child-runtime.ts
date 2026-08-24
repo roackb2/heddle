@@ -30,13 +30,15 @@ import type {
 
 const MANDATORY_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
   preset: 'custom',
-  allowedCapabilities: ['workspace.read', 'shell.inspect', 'artifact.read'],
+  allowedCapabilities: ['workspace.read'],
   deniedCapabilities: [
     'agent.delegate',
     'workspace.write',
+    'shell.inspect',
     'shell.mutate',
     'memory.read',
     'memory.write',
+    'artifact.read',
     'artifact.write',
     'external.read',
     'browser.read',
@@ -49,8 +51,13 @@ const MANDATORY_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
 
 const SAFE_CHILD_CAPABILITIES = new Set<ToolCapability>([
   'workspace.read',
-  'shell.inspect',
-  'artifact.read',
+]);
+
+const SAFE_CHILD_TOOL_NAMES = new Set([
+  'project_dashboard',
+  'list_files',
+  'read_file',
+  'search_files',
 ]);
 
 const CHILD_RUNTIME_OPTION_KEYS = [
@@ -188,14 +195,10 @@ export class DelegationChildRuntimeService {
     const tools = RuntimeToolProfileService.apply({
       tools: snapshotTools,
       profile: MANDATORY_CHILD_TOOL_PROFILE,
-    });
+    }).filter((tool) => SAFE_CHILD_TOOL_NAMES.has(tool.name));
 
     tools.forEach((tool) => {
-      const capabilities = RuntimeToolProfileService.capabilitiesFor(tool);
-      const isSafe = tool.name !== 'delegate_task'
-        && capabilities.length > 0
-        && capabilities.every((capability) => SAFE_CHILD_CAPABILITIES.has(capability));
-      if (!isSafe) {
+      if (!DelegationChildRuntimeService.isSafeChildTool(tool)) {
         throw new Error(
           `${DelegationPolicyService.message('agent_not_read_only')} Tool: ${tool.name}`,
         );
@@ -210,10 +213,28 @@ export class DelegationChildRuntimeService {
     const snapshotPolicies = ToolApprovalProfileService.compile({
       profile: snapshot.approvalProfile,
     });
-    return ToolApprovalProfileService.compile({
-      profile: { preset: 'read_only' },
-      basePolicies: snapshotPolicies,
-    });
+    return [
+      DelegationChildRuntimeService.enforceSafeChildToolAllowlist(),
+      ...snapshotPolicies,
+    ];
+  }
+
+  private static enforceSafeChildToolAllowlist(): ToolApprovalPolicy {
+    return ({ tool }) => {
+      return DelegationChildRuntimeService.isSafeChildTool(tool)
+        ? undefined
+        : {
+          type: 'deny',
+          reason: `${tool.name} is outside the delegated read-only tool allowlist`,
+        };
+    };
+  }
+
+  private static isSafeChildTool(tool: ToolDefinition): boolean {
+    const capabilities = RuntimeToolProfileService.capabilitiesFor(tool);
+    return SAFE_CHILD_TOOL_NAMES.has(tool.name)
+      && capabilities.length > 0
+      && capabilities.every((capability) => SAFE_CHILD_CAPABILITIES.has(capability));
   }
 
   private async createChildLlm(input: {
