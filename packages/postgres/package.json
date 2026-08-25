@@ -1,6 +1,6 @@
 {
   "name": "@heddleagent/postgres",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "description": "Official PostgreSQL adapters for selected Heddle-owned domain persistence ports",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
@@ -30,7 +30,8 @@
     },
     "./heartbeat/schema": {
       "types": "./dist/heartbeat/schema.d.ts",
-      "import": "./dist/heartbeat/schema.js"
+      "import": "./dist/heartbeat/schema.js",
+      "default": "./dist/heartbeat/schema.js"
     },
     "./execution-host/conversations": {
       "types": "./dist/execution-host/conversations/index.d.ts",

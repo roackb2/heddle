@@ -1,7 +1,7 @@
 # `@heddleagent/postgres`
 
 Official PostgreSQL implementations for selected, public Heddle-owned durable
-ports. Version `6.1.0` ships two independent adapter families:
+ports. Version `6.1.1` ships two independent adapter families:
 
 | Entrypoint | Domain contract | Status |
 | --- | --- | --- |
@@ -150,6 +150,29 @@ required because the application—not a library running at startup—owns schem
 review, rollout order, rollback policy, and production database credentials.
 When upgrading `@heddleagent/postgres`, compare the exported ordered list with
 the migrations already adopted and copy only newly published files.
+
+### Generate a Drizzle migration from the heartbeat schema
+
+Drizzle Kit expects a filesystem path rather than a package import. Resolve the
+public schema subpath in `drizzle.config.ts`; do not inspect the package's
+internal `dist/` layout:
+
+```ts
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { defineConfig } from 'drizzle-kit';
+
+const require = createRequire(join(process.cwd(), 'package.json'));
+
+export default defineConfig({
+  dialect: 'postgresql',
+  schema: require.resolve('@heddleagent/postgres/heartbeat/schema'),
+  out: './drizzle',
+});
+```
+
+The package's public export owns the resolved file location. This workflow
+requires `@heddleagent/postgres@6.1.1` or newer.
 
 ## Correctness promise
 
