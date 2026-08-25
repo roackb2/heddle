@@ -5,7 +5,7 @@ invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** `6.5.0` is the latest published version as of
+> **Current availability:** `6.6.0` is the latest published version as of
 > 2026-08-25; repository source may be ahead of that release. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
