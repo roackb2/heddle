@@ -112,9 +112,10 @@ adopter database credential.
 The embedded runtime promise and the separate-host portability promise are
 different. Heddle's maintained embedded runtime is TypeScript/Node. The
 separate-host v1 network and durable-lifecycle profiles are language-neutral.
-The checked-in Python implementation proves that a second language can conform;
-it is version-pinned reference material, not a published or supported Python
-SDK and not a promise to mirror every TypeScript convenience.
+A clean-room Python implementation in the permissioned canonical source proves
+that a second language can conform. It is validation evidence, not a published
+or supported Python SDK and not a promise to mirror every TypeScript
+convenience.
 
 ## Public availability
 
@@ -122,7 +123,7 @@ SDK and not a promise to mirror every TypeScript convenience.
 | --- | --- | --- |
 | `@heddleagent/runtime` and `/runs` | Public | TypeScript/Node SDK and runtime surfaces for adopter-owned processes |
 | `@heddleagent/run-client` | Public | Browser-safe run protocol and optional HTTP/SSE client |
-| `@heddleagent/execution-host-client` | Public | The canonical backend integration kit, including conversation and heartbeat workflows, coordinator integration, durable conversation lifecycle semantics, store conformance, and shared TypeScript/Python fixtures |
+| `@heddleagent/execution-host-client` | Public package; permissioned canonical source | The backend integration kit, including conversation and heartbeat workflows, coordinator integration, durable conversation lifecycle semantics, store conformance, and public language-neutral contract artifacts |
 | `@heddleagent/postgres/execution-host/conversations` | Public | Official PostgreSQL lifecycle adapter over an adopter-managed database and migration process |
 | Compatible Heddle Execution Host | Private research | A proving ground for isolated hosted execution and deployment evidence; it is not distributed or offered as a service |
 | AWS AgentCore deployment | Private research target | One way to test managed session isolation and lifecycle behavior, not a requirement of the public contract |
@@ -141,4 +142,4 @@ not claim that a managed Heddle hosting product is available.
 - Integrate a backend with a separate host:
   [Execution Host adopter backend](execution-host-adopters.md).
 - Implement the network contract outside TypeScript:
-  [v1 language-neutral specification](../../../packages/execution-host-client/spec/v1/README.md).
+  [v1 language-neutral specification](https://unpkg.com/@heddleagent/execution-host-client@6.6.1/spec/v1/README.md).

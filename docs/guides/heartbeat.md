@@ -179,7 +179,7 @@ atomic administration policy; it does not open a connection, run migrations,
 authenticate a namespace, deliver tasks, or start a scheduler. Adopt the
 bundled baseline SQL into exactly one application migration history, and choose
 an execution lease longer than the maximum duration of one bounded attempt.
-See the [`@heddleagent/postgres` boundary](../../packages/postgres/README.md)
+See the [published `@heddleagent/postgres` boundary](https://www.npmjs.com/package/@heddleagent/postgres)
 for the full operational contract.
 
 ### Targeted one-shot workers

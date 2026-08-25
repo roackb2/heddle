@@ -7,10 +7,11 @@ and transport machinery while your product keeps its language stack and domain
 ownership.
 
 The package is currently an experimental public contract and local proving
-surface. Heddle does not distribute the compatible Execution Host or offer a
-hosted service today.
+surface. Its canonical source and the compatible Execution Host are maintained
+in a separate permissioned repository; Heddle does not offer a hosted service
+today.
 
-The stable coordinate is `@heddleagent/execution-host-client@6.4.0`. The
+The stable coordinate is `@heddleagent/execution-host-client@6.6.1`. The
 former `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers. It does not include the durable
 lifecycle described below.
@@ -97,8 +98,8 @@ Its subpaths separate responsibility:
 - `/node` provides an optional standard Node JWKS/conversation HTTP edge and
   owner-only local signing-key file helpers.
 
-See the [package README](../../../packages/execution-host-client/README.md) for
-copyable code.
+See the [published package README](https://www.npmjs.com/package/@heddleagent/execution-host-client)
+for copyable code.
 
 TypeScript products using PostgreSQL can install the official atomic store
 instead of recreating its transition SQL:
@@ -112,18 +113,17 @@ migrations through the product's normal migration system, and inject the
 resulting store into `DurableHostedConversationTurnService`. The product still
 owns its pool, authenticated scope, history queries, retention, and product
 result transaction. Follow the package's
-[migration adoption steps](../../../packages/postgres/README.md#copy-the-migration-into-your-application)
+[published migration adoption steps](https://www.npmjs.com/package/@heddleagent/postgres)
 to locate the installed SQL, copy it into the application's checked-in
 sequence, and apply it before constructing the store.
 
 Backends outside TypeScript can use the versioned
-[OpenAPI, JSON Schema, and golden fixtures](../../../packages/execution-host-client/spec/v1/README.md)
-as the canonical v1 contract. The
-[clean-room Python v1 conformance reference](../../../packages/execution-host-client/conformance/reference-adopters/python-v1/README.md)
-shows the same ES256 authority, independent MCP verification, and strict SSE
-rules. Its lifecycle cases import no Heddle or private host. It is an
-executable conformance proof, not a
-published or supported Python SDK.
+[OpenAPI, JSON Schema, and golden fixtures](https://unpkg.com/@heddleagent/execution-host-client@6.6.1/spec/v1/README.md)
+as the canonical v1 contract. A clean-room Python reference in the permissioned
+canonical source validates the same ES256 authority, independent MCP
+verification, strict SSE rules, and lifecycle cases without importing Heddle
+or a private host. It is internal validation evidence, not a published or
+supported Python SDK.
 
 The package deliberately excludes:
 
@@ -203,7 +203,7 @@ authorized scope and durable invocation identity. It can delegate to
 `HostedConversationTurnService`. The durable wrapper owns the generic
 requested/accepted/terminal state machine and requires only the adopter's
 database adapter. The normative lifecycle profile and shared scenarios live in
-the [v1 durable lifecycle specification](../../../packages/execution-host-client/spec/v1/durable-hosted-conversation-lifecycle.md).
+the [v1 durable lifecycle specification](https://unpkg.com/@heddleagent/execution-host-client@6.6.1/spec/v1/durable-hosted-conversation-lifecycle.md).
 
 Teams with an existing router that exposes Node `IncomingMessage` and
 `ServerResponse`—including raw Node, Express, or a framework's raw adapter—can
@@ -244,9 +244,9 @@ TypeScript is the first reference implementation, not a requirement for
 adopters. Python, Go, Java, or other backends can implement the same compact
 claim, wire, and optional durable-lifecycle semantics without porting Heddle.
 Canonical OpenAPI 3.1.1, JSON Schema Draft 2020-12, golden conversation,
-heartbeat, authority, and lifecycle fixtures, TypeScript conformance, and one
-independent Python
-implementation now form the executable reference.
+heartbeat, authority, and lifecycle fixtures, TypeScript conformance, and a
+clean-room Python proof in the permissioned canonical source form the
+executable reference.
 
 This is also the deliberate stop line. More languages, generated clients,
 framework starters, alternate transports, or an adopter gateway require a real

@@ -90,8 +90,8 @@ jobs:
       - name: Run integration tests
         run: yarn test:integration
 
-  test-postgres-reference:
-    name: test-postgres-reference
+  test-postgres-storage-reference:
+    name: test-postgres-storage-reference
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -110,7 +110,6 @@ jobs:
           --health-retries 20
     env:
       HEDDLE_POSTGRES_DATABASE_URL: postgresql://heddle:heddle@127.0.0.1:5432/heddle_reference
-      HEDDLE_POSTGRES_TEST_URL: postgresql://heddle:heddle@127.0.0.1:5432/heddle_reference
 
     steps:
       - name: Check out repository
@@ -124,67 +123,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-
-      - name: Apply PostgreSQL package migrations
-        run: |
-          psql "$HEDDLE_POSTGRES_TEST_URL" \
-            --set ON_ERROR_STOP=1 \
-            --file packages/postgres/migrations/heartbeat/0000_heartbeat_authority.sql
-          psql "$HEDDLE_POSTGRES_TEST_URL" \
-            --set ON_ERROR_STOP=1 \
-            --file packages/postgres/migrations/execution-host/conversations/0000_turn_lifecycle.sql
-
-      - name: Test PostgreSQL package
-        run: yarn postgres:test
 
       - name: Verify PostgreSQL storage reference
         run: yarn test:postgres-storage
-
-  test-execution-host-client:
-    name: test-execution-host-client
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Test Execution Host client
-        run: yarn execution-host-client:test
-
-  test-python-adopter-conformance:
-    name: test-python-adopter-conformance
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: packages/execution-host-client/conformance/reference-adopters/python-v1/pyproject.toml
-
-      - name: Install Python adopter reference
-        run: python -m pip install -e 'packages/execution-host-client/conformance/reference-adopters/python-v1[test]'
-
-      - name: Check Python adopter reference
-        run: |
-          python -m ruff check packages/execution-host-client/conformance/reference-adopters/python-v1
-          python -m ruff format --check packages/execution-host-client/conformance/reference-adopters/python-v1
-          python -m pytest packages/execution-host-client/conformance/reference-adopters/python-v1
 
   test-browser-integration:
     name: test-browser-integration

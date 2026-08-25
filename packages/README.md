@@ -3,9 +3,10 @@
 Status: **five stable packages**
 
 This directory records the v6 package identities and responsibility boundaries.
-`@heddleagent/execution-host-client@6.2.0` contains its canonical
-implementation as a stable package. `@heddleagent/postgres@6.1.1` ships the
-Execution Host lifecycle and heartbeat adapters. `@heddleagent/run-client@6.0.0`
+It contains the canonical source for the runtime, CLI, and run client. The
+public `@heddleagent/execution-host-client@6.6.1` and
+`@heddleagent/postgres@6.1.2` packages are maintained and released from the
+separate permissioned Execution Host repository. `@heddleagent/run-client@6.0.0`
 ships the existing browser-safe run client under its final coordinate.
 `@heddleagent/runtime@6.3.0` ships the existing embeddable SDK, the bridge
 used by the official CLI, an optional remote heartbeat-execution seam, and the
@@ -22,8 +23,8 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 | `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.3.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and Heddle owns the lifecycle for explicit heartbeat runs |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
-| `@heddleagent/execution-host-client` | Backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.2.0`; explicit conversation and heartbeat workflows with hosted heartbeat composition at `/heartbeat` |
-| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.1.1`; Execution Host conversation lifecycle and heartbeat task authority are explicit subpaths |
+| `@heddleagent/execution-host-client` | Backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.6.1`; canonical source and release lane are in the permissioned Execution Host repository |
+| `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.1.2`; canonical source and release lane are in the permissioned Execution Host repository |
 
 The in-process run service is exposed from
 `@heddleagent/runtime/runs`; it is not a sixth package. Its conventional Node

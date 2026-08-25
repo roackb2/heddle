@@ -1,9 +1,0 @@
-id: 0
-event: accepted
-data: {"schemaVersion":1,"invocationId":"invocation-001","runId":"run-001","sequence":0,"timestamp":"2026-08-10T04:00:00.000Z","kind":"accepted"}
-
-id: 1
-event: cancelled
-data: {"schemaVersion":1,"invocationId":"invocation-001","runId":"run-001","sequence":1,"timestamp":"2026-08-10T04:00:00.000Z","kind":"cancelled","reason":"product_cancelled"}
-
-: fixture-clean-eof

@@ -37,7 +37,7 @@ Start here:
 | Heddle coding agent | Use the CLI and browser control plane built on the same runtime | `@heddleagent/cli` (`heddle` command) |
 
 The stable separate-host package is
-`@heddleagent/execution-host-client@6.2.0`. The former
+`@heddleagent/execution-host-client@6.6.1`. The former
 `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers.
 
@@ -57,8 +57,9 @@ requested/accepted/terminal ordering, interruption, safe projection, expiry,
 and store conformance. Your product still owns the authenticated IDs, database
 adapter/schema/migrations, history query, retention, and UI. The maintained
 embedded runtime is TypeScript/Node; the separate-host wire and lifecycle
-profiles are language-neutral. The Python implementation is clean-room
-conformance proof, not a published or supported Python SDK.
+profiles are language-neutral. The public package includes the canonical wire
+artifacts; a clean-room Python implementation in the permissioned canonical
+source provides conformance proof, not a published or supported Python SDK.
 
 See the [component and deployment model](docs/guides/programmatic/component-model.md)
 for the boundaries, availability, and decision path.
@@ -224,7 +225,7 @@ that already owns the mechanics your host needs:
 | Conventional Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
 | A remote browser or client | `@heddleagent/run-client` | Browser-safe protocol validation and transport-neutral run consumption |
 | Conventional browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch, incremental SSE parsing, and transport validation |
-| A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, conversation and heartbeat orchestration, durable conversation persistence semantics, product-MCP verification, direct and AgentCore clients, Node conveniences, store conformance, and shared TypeScript/Python fixtures |
+| A backend invoking a separate Execution Host | `@heddleagent/execution-host-client` | Contracts, authority/JWKS, conversation and heartbeat orchestration, durable conversation persistence semantics, product-MCP verification, direct and AgentCore clients, Node conveniences, store conformance, and public language-neutral fixtures |
 | Durable Execution Host lifecycle in PostgreSQL | `@heddleagent/postgres/execution-host/conversations` | Atomic scope-fenced lifecycle store, ordered adopter-run migrations, SQL constraints, expiry, and real-PostgreSQL conformance |
 | Durable PostgreSQL heartbeat workers | `@heddleagent/postgres/heartbeat` | Claim-fenced task execution, lease recovery, checkpoints, history, and atomic operator controls over an injected Drizzle database |
 | Lower-level runtime assembly | `@heddleagent/runtime/advanced` | Model adapters, individual tools, trace, memory, heartbeat, and core runtime services |
@@ -393,7 +394,8 @@ Heddle is designed to make assumptions and limitations visible:
   protocol mechanics itself; optional Node helpers own generic HTTP/key mechanics, while the
   adopter still owns identity, policy, production key operations, tools, and
   results; canonical OpenAPI/JSON Schema/golden fixtures and a clean-room
-  Python proof keep this boundary language-neutral;
+  Python proof in the permissioned canonical source keep this boundary
+  language-neutral;
 - the deprecated `@roackb2/heddle-adopter@5.13.0` package remains installable
   only so existing consumers keep running;
 - the deprecated `@roackb2/heddle@5.13.0` package remains installable only so
