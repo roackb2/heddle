@@ -2,6 +2,7 @@ import type {
   InvokeAgentRuntimeCommand,
   InvokeAgentRuntimeCommandOutput,
 } from '@aws-sdk/client-bedrock-agentcore';
+import type { AgentCoreExecutionTarget } from './schemas.js';
 
 export interface AgentCoreRuntimeClient {
   send(
@@ -11,9 +12,6 @@ export interface AgentCoreRuntimeClient {
   destroy?(): void;
 }
 
-export type AgentCoreExecutionHostConfig = {
-  region: string;
-  runtimeArn: string;
-  qualifier?: string;
+export type AgentCoreExecutionHostConfig = AgentCoreExecutionTarget & {
   client?: AgentCoreRuntimeClient;
 };

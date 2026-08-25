@@ -13,3 +13,9 @@ authorization, and capability issuance.
 The product MCP edge uses `../mcp` instead. Its verifier derives scope from a
 capability for product data access; this module independently cross-checks that
 same capability against the host's verified execution identity.
+
+The provider-neutral Runtime session service under `runtime-session/` owns
+immutable scope binding, one-active-invocation admission, workflow dispatch,
+deadlines, cancellation, bounded duplicate suppression, status, and shutdown.
+Provider ingress, process isolation, health projection, engine composition, and
+deployment bootstrap remain responsibilities of the deployable host.

@@ -1,4 +1,3 @@
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { z } from 'zod';
 import {
   AGENTCORE_RUNTIME_SESSION_HEADER,
@@ -24,9 +23,7 @@ import {
 } from '../contracts/index.js';
 import {
   ExecutionHostInvocationCancelledError,
-  ExecutionHostProtocolError,
   ExecutionHostRejectedError,
-  ExecutionHostStreamInterruptedError,
 } from './errors.js';
 import type {
   DirectHttpExecutionHostConfig,
@@ -35,9 +32,12 @@ import type {
   ExecutionHostHeartbeatTask,
   HeartbeatExecutionHost,
 } from './types.js';
+import {
+  readExecutionHostEventStream,
+  toExecutionHostTransportError,
+} from '../internal/execution-host-event-stream.js';
+import { readBoundedJsonResponse } from '../internal/http-response.js';
 
-const MAX_SSE_BUFFER_CHARACTERS = 1_048_576;
-const MAX_PENDING_SSE_FRAMES = 1_024;
 const MAX_ERROR_BODY_BYTES = 16_384;
 const SecretSchema = z.string().min(8).max(4_096);
 const InvocationAuthoritySchema = z.object({
@@ -154,98 +154,13 @@ implements ExecutionHost, HeartbeatExecutionHost {
         await readSafeErrorCode(response),
       );
     }
-    if (!isEventStream(response.headers.get('content-type'))) {
-      await cancelBody(response);
-      throw new ExecutionHostProtocolError(
-        'Execution Host did not return an SSE stream.',
-      );
-    }
-    if (!response.body) {
-      throw new ExecutionHostProtocolError(
-        'Execution Host returned an empty SSE response body.',
-      );
-    }
-
-    const state: StreamValidationState = {
+    yield* readExecutionHostEventStream({
+      response,
+      schema,
+      isTerminal,
       invocationId: input.invocationId,
-      nextSequence: 0,
-      terminal: false,
-    };
-    const decoder = new TextDecoder();
-    const pending: EventSourceMessage[] = [];
-    let terminalEvent: TEvent | undefined;
-    let parserError = false;
-    const parser = createParser({
-      maxBufferSize: MAX_SSE_BUFFER_CHARACTERS,
-      onEvent: (event) => {
-        if (pending.length >= MAX_PENDING_SSE_FRAMES) {
-          parserError = true;
-          return;
-        }
-        pending.push(event);
-      },
-      onError: () => {
-        parserError = true;
-      },
+      signal: input.signal,
     });
-
-    try {
-      for await (const chunk of response.body) {
-        input.signal?.throwIfAborted();
-        parser.feed(decoder.decode(chunk, { stream: true }));
-        if (parserError) {
-          throw new ExecutionHostProtocolError();
-        }
-        while (pending.length > 0) {
-          const event = validateEvent(
-            pending.shift()!,
-            state,
-            schema,
-            isTerminal,
-          );
-          if (isTerminal(event)) {
-            terminalEvent = event;
-          } else {
-            yield event;
-          }
-        }
-      }
-      parser.feed(decoder.decode());
-      parser.reset({ consume: true });
-      if (parserError) {
-        throw new ExecutionHostProtocolError();
-      }
-      while (pending.length > 0) {
-        const event = validateEvent(
-          pending.shift()!,
-          state,
-          schema,
-          isTerminal,
-        );
-        if (isTerminal(event)) {
-          terminalEvent = event;
-        } else {
-          yield event;
-        }
-      }
-    } catch (error) {
-      if (error instanceof ExecutionHostProtocolError) {
-        throw error;
-      }
-      throw toTransportError(error, input.signal);
-    }
-
-    if (!state.accepted) {
-      throw new ExecutionHostProtocolError(
-        'Execution Host stream omitted the accepted event.',
-      );
-    }
-    if (!state.terminal || !terminalEvent) {
-      throw new ExecutionHostStreamInterruptedError();
-    }
-    // Terminal is released only after clean EOF, so a trailing malformed or
-    // post-terminal frame cannot be projected as success.
-    yield terminalEvent;
   }
 
   async #invoke(input: InvocationInput, body: unknown): Promise<Response> {
@@ -258,18 +173,10 @@ implements ExecutionHost, HeartbeatExecutionHost {
         body: JSON.stringify(body),
       });
     } catch (error) {
-      throw toTransportError(error, input.signal);
+      throw toExecutionHostTransportError(error, input.signal);
     }
   }
 }
-
-type StreamValidationState = {
-  invocationId: string;
-  runId?: string;
-  nextSequence: number;
-  accepted?: true;
-  terminal: boolean;
-};
 
 type InvocationInput = {
   invocationId: string;
@@ -287,46 +194,6 @@ type ValidatedStreamEvent = {
   sequence: number;
   timestamp: string;
 };
-
-function validateEvent<TEvent extends ValidatedStreamEvent>(
-  frame: EventSourceMessage,
-  state: StreamValidationState,
-  schema: z.ZodType<TEvent>,
-  isTerminal: (event: TEvent) => boolean,
-): TEvent {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(frame.data);
-  } catch {
-    throw new ExecutionHostProtocolError();
-  }
-  const parsed = schema.safeParse(decoded);
-  if (!parsed.success) {
-    throw new ExecutionHostProtocolError();
-  }
-  const event = parsed.data;
-  const correctFrameMetadata = frame.event === event.kind
-    && frame.id === String(event.sequence);
-  const correctEnvelope = event.invocationId === state.invocationId
-    && event.sequence === state.nextSequence;
-  if (!correctFrameMetadata || !correctEnvelope || state.terminal) {
-    throw new ExecutionHostProtocolError();
-  }
-
-  if (!state.accepted) {
-    if (event.kind !== 'accepted') {
-      throw new ExecutionHostProtocolError();
-    }
-    state.accepted = true;
-    state.runId = event.runId;
-  } else if (event.kind === 'accepted' || event.runId !== state.runId) {
-    throw new ExecutionHostProtocolError();
-  }
-
-  state.nextSequence += 1;
-  state.terminal = isTerminal(event);
-  return event;
-}
 
 function createSensitiveHeaders(
   input: InvocationInput,
@@ -346,86 +213,16 @@ function createSensitiveHeaders(
   return headers;
 }
 
-function isEventStream(contentType: string | null): boolean {
-  return contentType?.split(';', 1)[0]?.trim().toLowerCase()
-    === 'text/event-stream';
-}
-
 async function readSafeErrorCode(response: Response): Promise<string> {
   try {
-    const declaredLength = Number(response.headers.get('content-length'));
-    if (
-      Number.isFinite(declaredLength)
-      && declaredLength > MAX_ERROR_BODY_BYTES
-    ) {
-      await cancelBody(response);
-      return 'unknown';
-    }
-    const bytes = await readBoundedBody(response, MAX_ERROR_BODY_BYTES);
-    if (!bytes) {
-      return 'unknown';
-    }
-    const parsed = ApiErrorSchema.safeParse(
-      JSON.parse(new TextDecoder().decode(bytes)),
-    );
+    const parsed = ApiErrorSchema.safeParse(await readBoundedJsonResponse(
+      response,
+      MAX_ERROR_BODY_BYTES,
+    ));
     return parsed.success ? parsed.data.error.code : 'unknown';
   } catch {
     return 'unknown';
   }
-}
-
-async function readBoundedBody(
-  response: Response,
-  maxBytes: number,
-): Promise<Uint8Array | undefined> {
-  if (!response.body) {
-    return new Uint8Array();
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      totalBytes += value.byteLength;
-      if (totalBytes > maxBytes) {
-        await reader.cancel();
-        return undefined;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
-}
-
-async function cancelBody(response: Response): Promise<void> {
-  try {
-    await response.body?.cancel();
-  } catch {
-    // Response cleanup is best effort and must not replace the protocol error.
-  }
-}
-
-function toTransportError(error: unknown, signal?: AbortSignal): Error {
-  if (signal?.aborted || isAbortError(error)) {
-    return new ExecutionHostInvocationCancelledError();
-  }
-  return new ExecutionHostStreamInterruptedError();
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }
 
 function assertSafeBaseUrl(url: URL): void {

@@ -1,12 +1,12 @@
 # `@heddleagent/execution-host-client`
 
-`@heddleagent/execution-host-client` is the backend-side SDK for
-products that invoke a separately deployed Heddle Execution Host. It lets an
+`@heddleagent/execution-host-client` is the integration SDK for products that
+invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** `6.5.0` is the next manual release from this
-> repository; `6.4.0` remains the latest published version until then. The former
+> **Current availability:** `6.5.0` is the latest published version as of
+> 2026-08-25; repository source may be ahead of that release. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
@@ -28,6 +28,7 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 
 | Import | Reusable responsibility |
 | --- | --- |
+| `@heddleagent/execution-host-client/adopter` | Browser-safe authenticated hosted-conversation client, canonical adopter paths, bounded public errors, and strict ordered SSE settlement |
 | `@heddleagent/execution-host-client/contracts` | Runtime-validated v1 request, stream, identity, capability, and header contracts |
 | `@heddleagent/execution-host-client/authority` | ES256 execution assertion and optional MCP capability issuance plus public JWKS projection |
 | `@heddleagent/execution-host-client/conversation` | Turn orchestration across authority, model credentials, optional MCP policy, an `ExecutionHost`, and an optional adopter-implemented durable lifecycle store |
@@ -37,8 +38,8 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 | `@heddleagent/execution-host-client/mcp` | Independent capability verification at the adopter's MCP edge |
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@heddleagent/execution-host-client/http-sse` | Transport-neutral conversation and heartbeat ports plus the strict direct-development HTTP/SSE client |
-| `@heddleagent/execution-host-client/agentcore` | Official AWS AgentCore/SigV4 implementation of the same conversation and heartbeat ports |
-| `@heddleagent/execution-host-client/host` | Invocation-bound execution-identity and MCP-capability verification shared by compatible Execution Host implementations |
+| `@heddleagent/execution-host-client/agentcore` | Canonical AgentCore deployment-target validation plus the official AWS AgentCore/SigV4 implementation of the conversation and heartbeat ports |
+| `@heddleagent/execution-host-client/host` | Invocation-bound authority verification plus provider-neutral Runtime-session scope binding, admission, deadlines, cancellation, status, and workflow dispatch shared by compatible Execution Host implementations |
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 

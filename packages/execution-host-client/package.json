@@ -1,7 +1,7 @@
 {
   "name": "@heddleagent/execution-host-client",
   "version": "6.5.0",
-  "description": "Backend contracts, execution authority, lifecycle services, and clients for compatible Heddle Execution Hosts",
+  "description": "Contracts, execution authority, lifecycle services, and adopter clients for compatible Heddle Execution Hosts",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
   "type": "module",
@@ -37,6 +37,10 @@
     "./authority": {
       "types": "./dist/authority/index.d.ts",
       "import": "./dist/authority/index.js"
+    },
+    "./adopter": {
+      "types": "./dist/adopter/index.d.ts",
+      "import": "./dist/adopter/index.js"
     },
     "./conversation": {
       "types": "./dist/conversation/index.d.ts",

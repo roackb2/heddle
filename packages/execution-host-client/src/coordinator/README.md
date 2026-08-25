@@ -6,7 +6,8 @@ delegated authority, and remote-execution composition out of every adopter.
 
 ## Owns
 
-- the authenticated coordinator task API client;
+- the authenticated coordinator state, task inspection, mutation, trigger,
+  pause, resume, and drain client;
 - pause-first desired-task reconciliation;
 - the coordinator-to-product delegation request and response contracts;
 - stable Runtime-session derivation from authorized product scope;
@@ -64,6 +65,20 @@ await new HostedHeartbeatTaskReconciler({ coordinator }).reconcile({
 
 If reconciliation fails after pausing, the coordinator remains paused. This is
 intentional: partial desired state must not start new runs.
+
+The same client is the canonical product/operator API for current status and
+explicit control. It validates Heddle's task-view vocabulary rather than
+requiring each product to redefine the response or construct HTTP requests.
+
+```ts
+const tasks = await coordinator.listTasks()
+const detail = await coordinator.readTask(tasks[0].taskId)
+await coordinator.triggerTask(detail.task.taskId)
+```
+
+`readState()`, `pause()`, `resume()`, and `drain()` expose the coordinator
+lifecycle directly. Product code still decides who may perform those actions
+and how a task view appears in its UI.
 
 ## Authorize one coordinator run
 

@@ -10,7 +10,9 @@ import type {
 import type { HeartbeatExecutionHost } from '../http-sse/index.js';
 import type {
   HostedHeartbeatCoordinatorTaskInput,
-  HostedHeartbeatCoordinatorTaskSummary,
+  HostedHeartbeatCoordinatorState,
+  HostedHeartbeatCoordinatorTaskDetail,
+  HostedHeartbeatCoordinatorTaskView,
   HostedHeartbeatDelegation,
   HostedHeartbeatDelegationAuthorization,
   HostedHeartbeatDelegationRequest,
@@ -24,17 +26,27 @@ export type HostedHeartbeatCoordinatorClientConfig = {
 };
 
 export interface HostedHeartbeatCoordinatorTaskApi {
-  listTasks(signal?: AbortSignal): Promise<
-    HostedHeartbeatCoordinatorTaskSummary[]
-  >;
+  readState(signal?: AbortSignal): Promise<HostedHeartbeatCoordinatorState>;
+  listTasks(
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorTaskView[]>;
+  readTask(
+    taskId: string,
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorTaskDetail>;
   upsertTask(
     taskId: string,
     task: HostedHeartbeatCoordinatorTaskInput,
     signal?: AbortSignal,
   ): Promise<void>;
+  triggerTask(
+    taskId: string,
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorTaskView>;
   deleteTask(taskId: string, signal?: AbortSignal): Promise<void>;
   pause(signal?: AbortSignal): Promise<void>;
   resume(signal?: AbortSignal): Promise<void>;
+  drain(signal?: AbortSignal): Promise<void>;
 }
 
 export type HostedHeartbeatTaskReconciliationInput = {
@@ -50,7 +62,10 @@ export type HostedHeartbeatTaskReconciliation = {
 };
 
 export type HostedHeartbeatTaskReconcilerConfig = {
-  coordinator: HostedHeartbeatCoordinatorTaskApi;
+  coordinator: Pick<
+    HostedHeartbeatCoordinatorTaskApi,
+    'listTasks' | 'upsertTask' | 'deleteTask' | 'pause' | 'resume'
+  >;
 };
 
 export type HostedHeartbeatDelegationAuthorizationInput = {

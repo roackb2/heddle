@@ -4,6 +4,10 @@ import type {
   ServerResponse,
 } from 'node:http';
 import { z } from 'zod';
+import {
+  DEFAULT_ADOPTER_CONVERSATION_TURNS_PATH,
+  DEFAULT_ADOPTER_JWKS_PATH,
+} from '../adopter/index.js';
 import { ExecutionHostStreamEventSchema } from '../contracts/index.js';
 import { ExecutionHostInvocationCancelledError } from '../http-sse/index.js';
 import {
@@ -23,10 +27,6 @@ import type {
   NodeExecutionAdopterHttpServiceConfig,
   NodeExecutionAdopterPublicError,
 } from './types.js';
-
-export const DEFAULT_ADOPTER_JWKS_PATH = '/.well-known/jwks.json';
-export const DEFAULT_ADOPTER_CONVERSATION_TURNS_PATH =
-  '/hosted-execution/conversation-turns';
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1_024;
 const DEFAULT_MAX_PROMPT_CHARACTERS = 20_000;

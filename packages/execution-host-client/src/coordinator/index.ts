@@ -1,9 +1,15 @@
 export {
   HOSTED_HEARTBEAT_COORDINATOR_PATHS,
   HOSTED_HEARTBEAT_DELEGATIONS_PATH,
+  HostedHeartbeatCoordinatorRunViewSchema,
+  HostedHeartbeatCoordinatorStateResponseSchema,
+  HostedHeartbeatCoordinatorStateSchema,
+  HostedHeartbeatCoordinatorTaskDetailSchema,
   HostedHeartbeatCoordinatorTaskInputSchema,
   HostedHeartbeatCoordinatorTaskListSchema,
-  HostedHeartbeatCoordinatorTaskSummarySchema,
+  HostedHeartbeatCoordinatorTaskResultSchema,
+  HostedHeartbeatCoordinatorTaskStatusSchema,
+  HostedHeartbeatCoordinatorTaskViewSchema,
   HostedHeartbeatDelegationAuthorizationSchema,
   HostedHeartbeatDelegationRequestSchema,
   HostedHeartbeatDelegationSchema,
@@ -12,7 +18,10 @@ export {
 } from './contracts.js';
 export type {
   HostedHeartbeatCoordinatorTaskInput,
-  HostedHeartbeatCoordinatorTaskSummary,
+  HostedHeartbeatCoordinatorRunView,
+  HostedHeartbeatCoordinatorState,
+  HostedHeartbeatCoordinatorTaskDetail,
+  HostedHeartbeatCoordinatorTaskView,
   HostedHeartbeatDelegation,
   HostedHeartbeatDelegationAuthorization,
   HostedHeartbeatDelegationRequest,
