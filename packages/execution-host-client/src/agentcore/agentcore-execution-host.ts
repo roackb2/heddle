@@ -24,6 +24,7 @@ import type {
   AgentCoreExecutionHostConfig,
   AgentCoreRuntimeClient,
 } from './types.js';
+import { AgentCoreExecutionTargetSchema } from './schemas.js';
 
 const CONTENT_TYPE = 'application/json';
 const ACCEPT = 'text/event-stream';
@@ -55,10 +56,12 @@ implements ExecutionHost, HeartbeatExecutionHost {
   readonly #wire: DirectHttpExecutionHost;
 
   constructor(config: AgentCoreExecutionHostConfig) {
-    this.#runtimeArn = config.runtimeArn;
-    this.#qualifier = config.qualifier;
-    this.#client = config.client ?? new BedrockAgentCoreClient({
-      region: config.region,
+    const { client, ...rawTarget } = config;
+    const target = AgentCoreExecutionTargetSchema.parse(rawTarget);
+    this.#runtimeArn = target.runtimeArn;
+    this.#qualifier = target.qualifier;
+    this.#client = client ?? new BedrockAgentCoreClient({
+      region: target.region,
       // Invocation settlement is ambiguous after a transport interruption.
       // Product policy, not the AWS client, decides whether a turn may retry.
       maxAttempts: 1,

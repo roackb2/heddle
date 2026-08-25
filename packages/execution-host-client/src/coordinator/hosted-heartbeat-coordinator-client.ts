@@ -5,10 +5,15 @@ import {
 } from '../contracts/index.js';
 import {
   HOSTED_HEARTBEAT_COORDINATOR_PATHS,
+  HostedHeartbeatCoordinatorStateResponseSchema,
+  HostedHeartbeatCoordinatorTaskDetailSchema,
   HostedHeartbeatCoordinatorTaskInputSchema,
   HostedHeartbeatCoordinatorTaskListSchema,
+  HostedHeartbeatCoordinatorTaskViewSchema,
   type HostedHeartbeatCoordinatorTaskInput,
-  type HostedHeartbeatCoordinatorTaskSummary,
+  type HostedHeartbeatCoordinatorState,
+  type HostedHeartbeatCoordinatorTaskDetail,
+  type HostedHeartbeatCoordinatorTaskView,
 } from './contracts.js';
 import { HostedHeartbeatServiceTokenSchema } from './service-token.js';
 import type {
@@ -48,9 +53,21 @@ implements HostedHeartbeatCoordinatorTaskApi {
     this.#fetch = config.fetch ?? globalThis.fetch;
   }
 
+  async readState(
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorState> {
+    const response = await this.#request(
+      HOSTED_HEARTBEAT_COORDINATOR_PATHS.state,
+      { method: 'GET', signal },
+    );
+    return HostedHeartbeatCoordinatorStateResponseSchema.parse(
+      await response.json(),
+    ).state;
+  }
+
   async listTasks(
     signal?: AbortSignal,
-  ): Promise<HostedHeartbeatCoordinatorTaskSummary[]> {
+  ): Promise<HostedHeartbeatCoordinatorTaskView[]> {
     const response = await this.#request(
       HOSTED_HEARTBEAT_COORDINATOR_PATHS.tasks,
       { method: 'GET', signal },
@@ -58,6 +75,19 @@ implements HostedHeartbeatCoordinatorTaskApi {
     return HostedHeartbeatCoordinatorTaskListSchema.parse(
       await response.json(),
     ).tasks;
+  }
+
+  async readTask(
+    rawTaskId: string,
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorTaskDetail> {
+    const response = await this.#request(
+      this.#taskPath(OpaqueIdSchema.parse(rawTaskId)),
+      { method: 'GET', signal },
+    );
+    return HostedHeartbeatCoordinatorTaskDetailSchema.parse(
+      await response.json(),
+    );
   }
 
   async upsertTask(
@@ -82,6 +112,18 @@ implements HostedHeartbeatCoordinatorTaskApi {
     });
   }
 
+  async triggerTask(
+    rawTaskId: string,
+    signal?: AbortSignal,
+  ): Promise<HostedHeartbeatCoordinatorTaskView> {
+    const taskId = OpaqueIdSchema.parse(rawTaskId);
+    const path = `${this.#taskPath(taskId)}/trigger`;
+    const response = await this.#request(path, { method: 'POST', signal });
+    return HostedHeartbeatCoordinatorTaskViewSchema.parse(
+      await response.json(),
+    );
+  }
+
   async pause(signal?: AbortSignal): Promise<void> {
     await this.#request(HOSTED_HEARTBEAT_COORDINATOR_PATHS.pause, {
       method: 'POST',
@@ -91,6 +133,13 @@ implements HostedHeartbeatCoordinatorTaskApi {
 
   async resume(signal?: AbortSignal): Promise<void> {
     await this.#request(HOSTED_HEARTBEAT_COORDINATOR_PATHS.resume, {
+      method: 'POST',
+      signal,
+    });
+  }
+
+  async drain(signal?: AbortSignal): Promise<void> {
+    await this.#request(HOSTED_HEARTBEAT_COORDINATOR_PATHS.drain, {
       method: 'POST',
       signal,
     });

@@ -8,6 +8,7 @@ import {
   HostedHeartbeatCoordinatorRequestError,
   HostedHeartbeatDelegationService,
   HostedHeartbeatTaskReconciler,
+  type HostedHeartbeatCoordinatorTaskView,
 } from '../coordinator/index.js';
 
 const API_TOKEN = 'coordinator-api-token-at-least-32-characters';
@@ -20,7 +21,7 @@ describe('HostedHeartbeatCoordinatorClient', () => {
         `Bearer ${API_TOKEN}`,
       );
       return new Response(JSON.stringify({
-        tasks: [{ id: 'task-1', workspaceId: 'workspace-1', state: {} }],
+        tasks: [coordinatorTask()],
       }), { status: 200 });
     });
     const client = new HostedHeartbeatCoordinatorClient({
@@ -30,9 +31,48 @@ describe('HostedHeartbeatCoordinatorClient', () => {
     });
 
     await expect(client.listTasks()).resolves.toEqual([
-      { id: 'task-1', workspaceId: 'workspace-1', state: {} },
+      coordinatorTask(),
     ]);
     expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('owns task inspection, triggering, and coordinator admission requests', async () => {
+    const requests: string[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (request, init) => {
+      const path = new URL(String(request)).pathname;
+      requests.push(`${init?.method ?? 'GET'} ${path}`);
+      if (path === '/v1/coordinator') {
+        return Response.json({ state: 'running' });
+      }
+      if (path.endsWith('/trigger')) {
+        return Response.json(coordinatorTask());
+      }
+      if (path.endsWith('/task-1')) {
+        return Response.json({ task: coordinatorTask(), runs: [] });
+      }
+      return Response.json({ state: 'drained' });
+    });
+    const client = new HostedHeartbeatCoordinatorClient({
+      baseUrl: new URL('http://127.0.0.1:18082'),
+      apiToken: API_TOKEN,
+      fetch,
+    });
+
+    await expect(client.readState()).resolves.toBe('running');
+    await expect(client.readTask('task-1')).resolves.toEqual({
+      task: coordinatorTask(),
+      runs: [],
+    });
+    await expect(client.triggerTask('task-1')).resolves.toEqual(
+      coordinatorTask(),
+    );
+    await expect(client.drain()).resolves.toBeUndefined();
+    expect(requests).toEqual([
+      'GET /v1/coordinator',
+      'GET /v1/heartbeat/tasks/task-1',
+      'POST /v1/heartbeat/tasks/task-1/trigger',
+      'POST /v1/control/drain',
+    ]);
   });
 
   it('reports a safe method, path, and status for rejected requests', async () => {
@@ -61,8 +101,15 @@ describe('HostedHeartbeatTaskReconciler', () => {
         listTasks: async () => {
           events.push('list');
           return [
-            { id: 'retired-task', workspaceId: 'workspace-1' },
-            { id: 'active-task', workspaceId: 'workspace-old' },
+            coordinatorTask({
+              id: 'retired-task',
+              taskId: 'retired-task',
+            }),
+            coordinatorTask({
+              id: 'active-task',
+              taskId: 'active-task',
+              workspaceId: 'workspace-old',
+            }),
           ];
         },
         deleteTask: async (taskId) => { events.push(`delete:${taskId}`); },
@@ -153,6 +200,23 @@ describe('HostedHeartbeatDelegationService', () => {
     }]);
   });
 });
+
+function coordinatorTask(
+  overrides: Partial<HostedHeartbeatCoordinatorTaskView> = {},
+): HostedHeartbeatCoordinatorTaskView {
+  return {
+    id: 'task-1',
+    taskId: 'task-1',
+    workspaceId: 'workspace-1',
+    name: 'Task one',
+    task: 'Check for relevant changes.',
+    enabled: true,
+    continuationMode: 'operator',
+    schedule: { intervalMs: 60_000 },
+    state: { status: 'idle' },
+    ...overrides,
+  };
+}
 
 function issuedAuthority(
   input: ExecutionAuthorityIssueInput,

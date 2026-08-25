@@ -7,6 +7,7 @@ delegates strict request/SSE validation to the shared Execution Host client.
 
 It owns:
 
+- canonical Runtime region, ARN, qualifier, and composed-target validation;
 - AgentCore Runtime session-ID validation;
 - AWS SDK client construction through the default credential chain;
 - one-attempt invocation semantics because a disconnected streaming request
@@ -19,6 +20,11 @@ It does not own AWS account configuration, Runtime provisioning, product
 authentication, authority issuance, model credentials, MCP tools, persistence,
 result application, or UI. Adopters provide their region, Runtime ARN, optional
 qualifier, and normal AWS credential environment at composition.
+
+The same `AgentCoreRegionSchema`, `AgentCoreRuntimeArnSchema`,
+`AgentCoreQualifierSchema`, and `AgentCoreExecutionTargetSchema` are public for
+deployment configuration loaders. Consumers should use these contracts
+directly instead of copying the rules or renaming their inferred types.
 
 Both conversation turns and heartbeat tasks use the same AgentCore client,
 Runtime-session validation, signed custom headers, one-attempt policy, and SSE

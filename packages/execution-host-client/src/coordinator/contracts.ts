@@ -14,9 +14,11 @@ const ProductExecutionScopeSchema = ExecutionScopeSchema.omit({
 });
 
 export const HOSTED_HEARTBEAT_COORDINATOR_PATHS = Object.freeze({
+  state: '/v1/coordinator',
   tasks: '/v1/heartbeat/tasks',
   pause: '/v1/control/pause',
   resume: '/v1/control/resume',
+  drain: '/v1/control/drain',
 });
 
 export const HOSTED_HEARTBEAT_DELEGATIONS_PATH =
@@ -38,13 +40,87 @@ export const HostedHeartbeatCoordinatorTaskInputSchema = z.object({
   systemContext: z.string().max(200_000).optional(),
 }).strict();
 
-export const HostedHeartbeatCoordinatorTaskSummarySchema = z.object({
+export const HostedHeartbeatCoordinatorStateSchema = z.enum([
+  'running',
+  'paused',
+  'drained',
+  'stopped',
+]);
+
+export const HostedHeartbeatCoordinatorStateResponseSchema = z.object({
+  state: HostedHeartbeatCoordinatorStateSchema,
+}).strict();
+
+export const HostedHeartbeatCoordinatorTaskStatusSchema = z.enum([
+  'idle',
+  'running',
+  'waiting',
+  'blocked',
+  'complete',
+  'failed',
+]);
+
+export const HostedHeartbeatCoordinatorTaskResultSchema = z.object({
+  kind: z.enum([
+    'agent',
+    'skipped',
+    'cancelled',
+    'retry',
+    'blocked',
+    'failed',
+  ]),
+  decision: z.enum(['continue', 'pause', 'complete', 'escalate']).optional(),
+  summary: z.string(),
+  outcome: z.string(),
+  agentRunId: OpaqueIdSchema.optional(),
+  usage: z.unknown().optional(),
+}).passthrough();
+
+/** Stable product/operator projection returned by the Coordinator API. */
+export const HostedHeartbeatCoordinatorTaskViewSchema = z.object({
   id: OpaqueIdSchema,
+  taskId: OpaqueIdSchema,
   workspaceId: OpaqueIdSchema.optional(),
+  name: z.string().optional(),
+  task: z.string(),
+  enabled: z.boolean(),
+  continuationMode: z.enum(['operator', 'agent']).optional(),
+  schedule: z.object({
+    intervalMs: z.number().int().positive(),
+    nextRunAt: TimestampSchema.optional(),
+  }).passthrough(),
+  state: z.object({
+    status: HostedHeartbeatCoordinatorTaskStatusSchema,
+    progress: z.string().optional(),
+    runId: OpaqueIdSchema.optional(),
+    runAt: TimestampSchema.optional(),
+    loadedCheckpoint: z.boolean().optional(),
+    resumable: z.boolean().optional(),
+    result: HostedHeartbeatCoordinatorTaskResultSchema.optional(),
+    error: z.string().optional(),
+    updatedAt: TimestampSchema.optional(),
+  }).passthrough(),
 }).passthrough();
 
 export const HostedHeartbeatCoordinatorTaskListSchema = z.object({
-  tasks: z.array(HostedHeartbeatCoordinatorTaskSummarySchema),
+  tasks: z.array(HostedHeartbeatCoordinatorTaskViewSchema),
+}).strict();
+
+export const HostedHeartbeatCoordinatorRunViewSchema = z.object({
+  id: OpaqueIdSchema,
+  taskId: OpaqueIdSchema,
+  workspaceId: OpaqueIdSchema.optional(),
+  executionId: OpaqueIdSchema,
+  runId: OpaqueIdSchema.optional(),
+  createdAt: TimestampSchema,
+  task: HostedHeartbeatCoordinatorTaskViewSchema,
+  result: HostedHeartbeatCoordinatorTaskResultSchema,
+  loadedCheckpoint: z.boolean().optional(),
+}).passthrough();
+
+export const HostedHeartbeatCoordinatorTaskDetailSchema = z.object({
+  task: HostedHeartbeatCoordinatorTaskViewSchema,
+  runs: z.array(HostedHeartbeatCoordinatorRunViewSchema),
 }).strict();
 
 export const HostedHeartbeatDesiredTaskSchema = z.object({
@@ -129,8 +205,17 @@ export const HostedHeartbeatDelegationAuthorizationSchema = z.object({
 export type HostedHeartbeatCoordinatorTaskInput = z.infer<
   typeof HostedHeartbeatCoordinatorTaskInputSchema
 >;
-export type HostedHeartbeatCoordinatorTaskSummary = z.infer<
-  typeof HostedHeartbeatCoordinatorTaskSummarySchema
+export type HostedHeartbeatCoordinatorState = z.infer<
+  typeof HostedHeartbeatCoordinatorStateSchema
+>;
+export type HostedHeartbeatCoordinatorTaskView = z.infer<
+  typeof HostedHeartbeatCoordinatorTaskViewSchema
+>;
+export type HostedHeartbeatCoordinatorRunView = z.infer<
+  typeof HostedHeartbeatCoordinatorRunViewSchema
+>;
+export type HostedHeartbeatCoordinatorTaskDetail = z.infer<
+  typeof HostedHeartbeatCoordinatorTaskDetailSchema
 >;
 export type HostedHeartbeatDesiredTask = z.infer<
   typeof HostedHeartbeatDesiredTaskSchema

@@ -1,4 +1,5 @@
 export * from './contracts/index.js';
+export * from './adopter/index.js';
 export * from './authority/index.js';
 export * from './conversation/index.js';
 export * from './heartbeat/index.js';

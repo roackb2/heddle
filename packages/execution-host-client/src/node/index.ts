@@ -11,6 +11,8 @@ export type {
 export {
   DEFAULT_ADOPTER_CONVERSATION_TURNS_PATH,
   DEFAULT_ADOPTER_JWKS_PATH,
+} from '../adopter/index.js';
+export {
   NodeExecutionAdopterHttpService,
 } from './http-service.js';
 export type {

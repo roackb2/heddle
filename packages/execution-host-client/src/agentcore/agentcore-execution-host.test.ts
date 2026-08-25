@@ -37,6 +37,20 @@ afterEach(async () => {
 });
 
 describe('AgentCoreExecutionHost', () => {
+  it.each([
+    ['region', { region: 'US East 2' }],
+    ['Runtime ARN', { runtimeArn: 'arn:aws:lambda:us-east-2:123:function:x' }],
+    ['qualifier', { qualifier: 'invalid qualifier' }],
+  ])('rejects an invalid %s at composition', (_label, override) => {
+    expect(() => new AgentCoreExecutionHost({
+      region: 'us-east-2',
+      runtimeArn: RUNTIME_ARN,
+      qualifier: 'pilot',
+      client: { send: vi.fn<AgentCoreRuntimeClient['send']>() },
+      ...override,
+    })).toThrow();
+  });
+
   it('signs and streams the portable Execution Host contract through the AWS SDK', async () => {
     const observed = {
       headers: {} as IncomingMessage['headers'],
