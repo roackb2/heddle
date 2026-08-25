@@ -24,17 +24,19 @@ independent so an adopter can use only the machinery it needs:
   adopter-owned product toolset;
 - `http-sse`: a strict direct-development client behind a transport-neutral
   `ExecutionHost` port;
+- `host`: invocation-bound execution-identity and MCP-capability verification
+  shared by compatible Execution Host implementations;
 - `testing`: a Node-only loopback v1 contract fixture for adopter integration
   tests. It is intentionally available only through its explicit subpath.
 - `node`: optional Node HTTP edge and safe local signing-key conveniences. It
   owns generic mechanics, never product identity or tool policy.
 
-The package must never import the Heddle runtime, Execution Host internals, a
-database adapter, or product domain code. The explicit `agentcore` surface may
+The package must never import the Heddle runtime, deployable Execution Host
+internals, a database adapter, or product domain code. The explicit `agentcore` surface may
 import the modular AWS SDK, and `mcp/node` may import the official MCP SDK, but
 neither owns product deployment or model-visible tools. New reusable machinery
-belongs here only when it is required by more than one adopter and can preserve
-that dependency boundary.
+belongs here only when it is required across adopters or compatible host
+implementations and can preserve that dependency boundary.
 
 The repository includes one clean-room Python consumer to prove the versioned
 contract is implementable outside TypeScript. It is a bounded conformance

@@ -5,7 +5,8 @@ products that invoke a separately deployed Heddle Execution Host. It lets an
 adopter keep its own language stack, authentication, database, product policy,
 MCP tools, and UI while reusing the security-sensitive v1 contract machinery.
 
-> **Current availability:** stable version `6.4.0`. The former
+> **Current availability:** `6.5.0` is the next manual release from this
+> repository; `6.4.0` remains the latest published version until then. The former
 > `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 > installable only for existing consumers. Heddle does not currently distribute
 > the compatible Execution Host implementation or offer a hosted service. The
@@ -37,6 +38,7 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@heddleagent/execution-host-client/http-sse` | Transport-neutral conversation and heartbeat ports plus the strict direct-development HTTP/SSE client |
 | `@heddleagent/execution-host-client/agentcore` | Official AWS AgentCore/SigV4 implementation of the same conversation and heartbeat ports |
+| `@heddleagent/execution-host-client/host` | Invocation-bound execution-identity and MCP-capability verification shared by compatible Execution Host implementations |
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
@@ -229,6 +231,50 @@ const productMcp = new NodeStreamableHttpMcpService({
 
 Use the lower-level `NodeMcpToolset` interface only when a tool needs custom MCP
 content or lifecycle semantics.
+
+## Verify authority inside a compatible Execution Host
+
+The host must independently verify the adopter's execution assertion before it
+trusts product scope, then bind any optional MCP capability to that same
+verified invocation. Compatible host implementations can reuse that generic
+security boundary instead of maintaining their own JOSE logic:
+
+```ts
+import {
+  JwtExecutionHostMcpCapabilityVerifier,
+  JwtExecutionIdentityVerifier,
+} from '@heddleagent/execution-host-client/host'
+
+const identity = await new JwtExecutionIdentityVerifier({
+  executionIssuer: 'https://api.example.com',
+  executionAudience: 'heddle-execution-host',
+  executionJwksUrl: new URL('https://api.example.com/.well-known/jwks.json'),
+  executionJwtAlgorithms: ['ES256'],
+  trustedAdopterId: 'example-product',
+  maxAssertionAgeSeconds: 300,
+  assertionClockToleranceSeconds: 5,
+}).verify({
+  assertion: executionAssertion,
+  runtimeSessionId,
+  invocationId,
+  workflow: 'conversation-turn',
+})
+
+const capability = await new JwtExecutionHostMcpCapabilityVerifier({
+  issuer: 'https://api.example.com',
+  audience: 'example-product-mcp',
+  jwksUrl: new URL('https://api.example.com/.well-known/jwks.json'),
+  jwtAlgorithms: ['ES256'],
+  trustedAdopterId: 'example-product',
+  serverId: 'product_capabilities',
+  maxCapabilityAgeSeconds: 900,
+  clockToleranceSeconds: 5,
+}).verify({ assertion: mcpCapability, identity })
+```
+
+This surface owns credential verification and exact scope binding. It does not
+own HTTP ingress, Runtime-session isolation, model credentials, streaming,
+provider bootstrap, or deployment.
 
 ## Invoke an Execution Host
 
