@@ -39,7 +39,7 @@ modular AWS SDK for its AgentCore transport and the official MCP SDK, plus
 | `@heddleagent/execution-host-client/mcp/node` | Stateless official-SDK Streamable HTTP lifecycle around adopter-defined toolsets |
 | `@heddleagent/execution-host-client/http-sse` | Transport-neutral conversation and heartbeat ports plus the strict direct-development HTTP/SSE client |
 | `@heddleagent/execution-host-client/agentcore` | Canonical AgentCore deployment-target validation plus the official AWS AgentCore/SigV4 implementation of the conversation and heartbeat ports |
-| `@heddleagent/execution-host-client/host` | Invocation-bound execution-identity and MCP-capability verification shared by compatible Execution Host implementations |
+| `@heddleagent/execution-host-client/host` | Invocation-bound authority verification plus provider-neutral Runtime-session scope binding, admission, deadlines, cancellation, status, and workflow dispatch shared by compatible Execution Host implementations |
 | `@heddleagent/execution-host-client/testing` | Node-only loopback v1 fixture plus durable-turn store conformance for real adapters |
 | `@heddleagent/execution-host-client/node` | Optional Node JWKS/conversation HTTP edge plus safe local signing-key helpers |
 
