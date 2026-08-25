@@ -1,4 +1,4 @@
-import type { ToolCall, ToolResult } from '@/core/types.js';
+import type { ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 import type { ToolRegistry } from './registry.js';
 import { ToolPolicyResolutionService } from './policy-envelope/index.js';
 
@@ -6,7 +6,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 export type ToolExecutionOptions = {
   signal?: AbortSignal;
-  timeoutMs?: number;
+  timeoutMs?: number | null;
 };
 
 /**
@@ -28,7 +28,7 @@ export class ToolExecutionService {
 
     try {
       const resolvedOptions = typeof options === 'number' ? { timeoutMs: options } : options;
-      const timeoutMs = resolvedOptions.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const timeoutMs = ToolExecutionService.resolveTimeoutMs(tool, resolvedOptions);
       const timeoutController = new AbortController();
       const signal = resolvedOptions.signal
         ? AbortSignal.any([resolvedOptions.signal, timeoutController.signal])
@@ -46,7 +46,9 @@ export class ToolExecutionService {
         };
       }
 
-      const timeoutError = new Error(`Tool "${call.tool}" timed out after ${timeoutMs}ms`);
+      const timeoutError = timeoutMs === null
+        ? undefined
+        : new Error(`Tool "${call.tool}" timed out after ${timeoutMs}ms`);
       let rejectOnAbort: (() => void) | undefined;
       const cancellation = new Promise<never>((_, reject) => {
         rejectOnAbort = () => reject(
@@ -56,7 +58,9 @@ export class ToolExecutionService {
         );
         signal.addEventListener('abort', rejectOnAbort, { once: true });
       });
-      const timer = setTimeout(() => timeoutController.abort(timeoutError), timeoutMs);
+      const timer = timeoutMs === null
+        ? undefined
+        : setTimeout(() => timeoutController.abort(timeoutError), timeoutMs);
 
       try {
         return await Promise.race([
@@ -64,7 +68,9 @@ export class ToolExecutionService {
           cancellation,
         ]);
       } finally {
-        clearTimeout(timer);
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
         if (rejectOnAbort) {
           signal.removeEventListener('abort', rejectOnAbort);
         }
@@ -75,6 +81,21 @@ export class ToolExecutionService {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  private static resolveTimeoutMs(
+    tool: ToolDefinition,
+    options: ToolExecutionOptions,
+  ): number | null {
+    const timeoutMs = options.timeoutMs !== undefined
+      ? options.timeoutMs
+      : tool.timeoutMs !== undefined ? tool.timeoutMs : DEFAULT_TIMEOUT_MS;
+    if (timeoutMs !== null && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+      throw new RangeError(
+        `Tool "${tool.name}" timeoutMs must be null or a positive finite number`,
+      );
+    }
+    return timeoutMs;
   }
 
 }

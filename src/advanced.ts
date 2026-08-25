@@ -241,6 +241,40 @@ export type {
 export { AgentLoopCheckpointService, AgentLoopRuntimeService } from './core/runtime/loop/index.js';
 export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
 
+// --- Specialized runtimes: read-only delegation ---------------------------
+export {
+  DEFAULT_DELEGATION_MAX_CHILDREN,
+  DEFAULT_DELEGATION_MAX_CONCURRENT_CHILDREN,
+  DEFAULT_DELEGATION_MAX_STEPS_PER_CHILD,
+  MAX_DELEGATED_SUMMARY_LENGTH,
+  MAX_DELEGATED_TASK_LENGTH,
+  MAX_DELEGATION_CHILDREN,
+  MAX_DELEGATION_CONCURRENT_CHILDREN,
+  MAX_DELEGATION_STEPS_PER_CHILD,
+  DelegationPolicyService,
+  DelegationRootScope,
+  DelegationService,
+} from './core/delegation/index.js';
+export type {
+  CreateDelegationRootScopeOptions,
+  DelegateTaskError,
+  DelegateTaskExecutionContext,
+  DelegateTaskInput,
+  DelegateTaskOutput,
+  DelegatedRunRecord,
+  DelegatedRunStatus,
+  DelegationAgentProfileId,
+  DelegationAgentSnapshotResolver,
+  DelegationChildLlmFactory,
+  DelegationChildLlmFactoryInput,
+  DelegationChildRuntimeOptions,
+  DelegationPolicy,
+  DelegationPolicyInput,
+  DelegationRejectionCode,
+  DelegationRootScopeSnapshot,
+  DelegationServiceOptions,
+} from './core/delegation/index.js';
+
 // --- Specialized runtimes: heartbeat ---------------------------------------
 export { HeartbeatRunnerAgent } from './core/heartbeat/agent/index.js';
 export type {

@@ -56,7 +56,11 @@ workspace.
 - `ToolExecutionService`: executes one tool call against a registry with
   timeout/error normalization. It removes the shared policy envelope before
   calling the tool implementation and forwards an optional `AbortSignal`
-  through `ToolExecutionContext`.
+  through `ToolExecutionContext`. The wrapper defaults to 30 seconds; a
+  host-owned `ToolDefinition.timeoutMs` can override that duration or use
+  `null` when a cancellable long-running tool owns its lifecycle. Numeric
+  values must be positive and finite; invalid definitions or call overrides
+  fail before tool execution.
 - `ToolBundleComposer`: toolkit composition API used by runtime default-tool
   assembly.
 - `policy-envelope/*`: the cross-tool declaration shape used by approval
@@ -85,6 +89,9 @@ workspace.
   concurrency safety.
 - Long-running tools should observe `ToolExecutionContext.signal` so host
   cancellation can stop in-flight work promptly.
+- Use `ToolDefinition.timeoutMs: null` only when the tool owns a bounded or
+  host-cancellable lifecycle that must not race the generic wrapper timeout.
+  This field is host-only and is never projected into model-visible schemas.
 - Extend the shared `ToolPolicyEnvelope` only when all tool families can use
   the field consistently. Tool-specific arguments stay in each tool schema.
 
