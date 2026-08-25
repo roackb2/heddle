@@ -1,8 +1,4 @@
-import {
-  createRemoteJWKSet,
-  errors,
-  jwtVerify,
-} from 'jose';
+import { jwtVerify } from 'jose';
 import { z } from 'zod';
 import {
   JwtAudienceSchema,
@@ -18,6 +14,10 @@ import {
   McpCapabilityUnavailableError,
   McpCapabilityVerificationError,
 } from './errors.js';
+import {
+  createJwtKeyResolver,
+  resolveJwtVerificationUnavailableCategory,
+} from '../internal/jwt-verification.js';
 import type {
   JwtMcpCapabilityVerifierConfig,
   JwtMcpCapabilityVerifierOptions,
@@ -66,14 +66,8 @@ implements McpCapabilityVerifier<TToolName> {
       supportedTools: Object.freeze([...parsed.supportedTools]),
     });
     this.#supportedTools = new Set(this.#config.supportedTools);
-    this.#keyResolver = options.keyResolver ?? createRemoteJWKSet(
-      this.#config.jwksUrl,
-      {
-        cacheMaxAge: 10 * 60_000,
-        cooldownDuration: 30_000,
-        timeoutDuration: 3_000,
-      },
-    );
+    this.#keyResolver = options.keyResolver
+      ?? createJwtKeyResolver(this.#config.jwksUrl);
     this.#now = options.now ?? (() => new Date());
   }
 
@@ -118,9 +112,13 @@ implements McpCapabilityVerifier<TToolName> {
       ) {
         throw error;
       }
-      const unavailableCategory = resolveUnavailableCategory(error);
+      const unavailableCategory = resolveJwtVerificationUnavailableCategory(
+        error,
+      );
       if (unavailableCategory) {
-        throw new McpCapabilityUnavailableError(unavailableCategory);
+        throw new McpCapabilityUnavailableError(
+          unavailableCategory === 'network' ? 'network' : 'jwks',
+        );
       }
       throw new McpCapabilityVerificationError();
     }
@@ -175,27 +173,4 @@ function freezeVerifiedCapability<TToolName extends string>(
     allowedTools: Object.freeze([...capability.allowedTools]),
     scope: Object.freeze({ ...capability.scope }),
   });
-}
-
-const UNAVAILABLE_JOSE_CODES = new Set([
-  'ERR_JOSE_GENERIC',
-  'ERR_JWK_INVALID',
-  'ERR_JWKS_INVALID',
-  'ERR_JWKS_MULTIPLE_MATCHING_KEYS',
-  'ERR_JWKS_TIMEOUT',
-]);
-
-function resolveUnavailableCategory(
-  error: unknown,
-): 'network' | 'jwks' | undefined {
-  if (error instanceof TypeError) {
-    return 'network';
-  }
-  if (
-    error instanceof errors.JOSEError
-    && UNAVAILABLE_JOSE_CODES.has(error.code)
-  ) {
-    return 'jwks';
-  }
-  return undefined;
 }
