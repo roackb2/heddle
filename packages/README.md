@@ -8,9 +8,9 @@ public `@heddleagent/execution-host-client@6.6.1` and
 `@heddleagent/postgres@6.1.2` packages are maintained and released from the
 separate permissioned Execution Host repository. `@heddleagent/run-client@6.0.0`
 ships the existing browser-safe run client under its final coordinate.
-`@heddleagent/runtime@6.4.0` ships the existing embeddable SDK, prompt-free
+`@heddleagent/runtime@6.5.0` ships the existing embeddable SDK, prompt-free
 permission modes, read-only delegation, and the stable memory checkpoint
-boundary used by compatible Execution Hosts.
+boundary and memory-change result used by compatible Execution Hosts.
 `@heddleagent/cli@6.0.0` ships the existing `heddle`
 command, TUI, daemon, and browser control plane. The former `@roackb2/*`
 coordinates are deprecated and remain installable only so existing applications
@@ -20,7 +20,7 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 
 | Package | Responsibility | Migration status |
 | --- | --- | --- |
-| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.4.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and `/advanced` includes read-only delegation and portable memory checkpoints |
+| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.5.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and `/advanced` includes read-only delegation and portable memory checkpoints |
 | `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.6.1`; canonical source and release lane are in the permissioned Execution Host repository |
