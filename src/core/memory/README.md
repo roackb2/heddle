@@ -13,6 +13,8 @@ guidance.
 - Memory maintenance integration after chat turns.
 - Memory note templates and slug generation.
 - Host-facing memory visibility helpers.
+- Stable, opaque memory scope derivation from verified subject and agent or
+  workspace identity.
 
 ## Does Not Own
 
@@ -21,12 +23,19 @@ guidance.
 - UI rendering for memory status or notes.
 - General file tools outside memory-specific note access.
 - Provider credential resolution.
+- Authentication, tenant lookup, or authorization of the identity supplied to
+  memory scope derivation.
+- Runtime-session, conversation-session, or storage-key selection.
 
 ## Public Entry Points
 
 - `types.ts`: memory-domain contracts for catalogs, candidates, runs, visibility,
   validation, and note operations.
 - `schemas.ts`: zod validation for persisted memory JSONL records and locks.
+- `scope.ts`: versioned, deterministic memory scope derivation. The host passes
+  already verified adopter, tenant, and subject ids plus one stable agent or
+  workspace owner. Runtime-session and conversation-session ids are excluded
+  so the same subject and owner resolve the same memory after a fresh session.
 - `catalog.ts`: `MemoryCatalogService` owns catalog bootstrap, root catalog
   loading, startup system-context assembly, and required catalog shape.
 - `domain-prompt.ts`: memory-specific system context.
@@ -85,6 +94,39 @@ or maintainer semantics.
   once it exists.
 - Add persisted memory records by updating `types.ts`, `schemas.ts`, and the
   owning repository together.
+- Change memory identity only by introducing a new scope version. Changing the
+  v1 canonical fields or hash would orphan existing hosted memory.
+
+## Hosted Memory Scope
+
+`deriveMemoryScopeId()` creates the durable address for one subject's memory.
+It does not authenticate a request and it does not accept a caller-selected S3
+key. A hosted authority must first verify the adopter, tenant, and subject, then
+select the stable Heddle agent or workspace that owns the memory:
+
+```ts
+import { deriveMemoryScopeId } from '@heddleagent/runtime/advanced';
+
+const memoryScopeId = deriveMemoryScopeId({
+  adopterId: verifiedExecution.scope.adopterId,
+  tenantId: verifiedExecution.scope.tenantId,
+  subjectId: verifiedExecution.scope.subjectId,
+  owner: { kind: 'agent', id: authenticatedAgent.id },
+});
+```
+
+Every input id must be stable and non-recycled within its authority domain.
+Display names, mutable slugs, and version ids are not durable identities.
+
+The resulting `memory-v1-...` value is deterministic and opaque. Different
+adopters, tenants, subjects, owner kinds, or owner ids cannot resolve the same
+scope through this contract. Product conversation ids and Runtime session ids
+must not be substituted for the stable owner id: they would either fragment
+memory on every conversation or incorrectly tie it to an expiring Runtime.
+
+The scope id is an address, not a secret or bearer credential. A future memory
+repository or checkpoint adapter must authorize the verified identity before
+reading, writing, retaining, or deleting that address.
 
 ## Common Changes
 

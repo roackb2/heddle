@@ -72,6 +72,13 @@ version, checksums, generation fencing, conflict policy, secret exclusion,
 retention, and deletion. Uploading at shutdown may reduce loss but cannot be the
 only checkpoint.
 
+The stable address for that future repository is available from
+`deriveMemoryScopeId()` in `@heddleagent/runtime/advanced`. Supply verified
+adopter, tenant, and subject ids plus the stable agent or workspace that owns
+the memory. Do not use a product conversation id, Runtime session id, local
+path, bucket name, or object key. Scope derivation is deterministic addressing;
+the host and storage adapter still own authorization.
+
 ## Minimum Hosted Conversation Promise
 
 To promise that a user can return to a completed conversation and continue it
