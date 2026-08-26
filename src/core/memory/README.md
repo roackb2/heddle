@@ -15,6 +15,7 @@ guidance.
 - Host-facing memory visibility helpers.
 - Stable, opaque memory scope derivation from verified subject and agent or
   workspace identity.
+- Portable, versioned checkpoints for a memory-only working copy.
 
 ## Does Not Own
 
@@ -26,6 +27,7 @@ guidance.
 - Authentication, tenant lookup, or authorization of the identity supplied to
   memory scope derivation.
 - Runtime-session, conversation-session, or storage-key selection.
+- Provider SDKs, checkpoint scheduling, or execution-host lifecycle hooks.
 
 ## Public Entry Points
 
@@ -36,6 +38,10 @@ guidance.
   already verified adopter, tenant, and subject ids plus one stable agent or
   workspace owner. Runtime-session and conversation-session ids are excluded
   so the same subject and owner resolve the same memory after a fresh session.
+- `checkpoint/`: provider-neutral checkpoint schemas, deterministic memory-file
+  capture, integrity validation, restore-before-use, and a manifest-last store
+  contract. The host supplies the durable store and invokes checkpoints at
+  stable memory boundaries; see its [`README`](checkpoint/README.md).
 - `catalog.ts`: `MemoryCatalogService` owns catalog bootstrap, root catalog
   loading, startup system-context assembly, and required catalog shape.
 - `domain-prompt.ts`: memory-specific system context.
@@ -124,9 +130,11 @@ scope through this contract. Product conversation ids and Runtime session ids
 must not be substituted for the stable owner id: they would either fragment
 memory on every conversation or incorrectly tie it to an expiring Runtime.
 
-The scope id is an address, not a secret or bearer credential. A future memory
-repository or checkpoint adapter must authorize the verified identity before
-reading, writing, retaining, or deleting that address.
+The scope id is an address, not a secret or bearer credential. A checkpoint
+adapter must authorize the verified identity before reading, writing,
+retaining, or deleting that address. Heddle now defines the portable checkpoint
+contract; an official object-store adapter and Execution Host lifecycle
+integration remain separate work.
 
 ## Common Changes
 
