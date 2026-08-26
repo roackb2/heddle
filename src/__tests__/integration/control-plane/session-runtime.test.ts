@@ -396,7 +396,7 @@ describe('conversation turn lifecycle', () => {
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
   });
 
-  it('returns persisted trace, session artifacts, and completed tool results to hosts', async () => {
+  it('returns persisted trace, session artifacts, completed tool results, and memory changes to hosts', async () => {
     const storage = await createConversationTurnStorage();
     const artifact = new ArtifactService({ artifactRoot: storage.artifactRoot }).saveText({
       sessionId: storage.sessionId,
@@ -420,6 +420,13 @@ describe('conversation turn lifecycle', () => {
           durationMs: 42,
           step: 1,
           timestamp: '2026-05-03T00:00:01.000Z',
+        },
+        {
+          type: 'memory.candidate_recorded',
+          candidateId: 'candidate-1',
+          path: '_maintenance/candidates.jsonl',
+          step: 1,
+          timestamp: '2026-05-03T00:00:01.500Z',
         },
         {
           type: 'run.finished',
@@ -463,6 +470,7 @@ describe('conversation turn lifecycle', () => {
         timestamp: '2026-05-03T00:00:01.000Z',
       },
     ]);
+    expect(turnResult.memory).toEqual({ changed: true });
   });
 
   it('returns the safe model failure category to programmatic hosts', async () => {
@@ -489,6 +497,7 @@ describe('conversation turn lifecycle', () => {
     });
 
     expect(turnResult.failure).toEqual({ source: 'model', code: 'authentication' });
+    expect(turnResult.memory).toEqual({ changed: false });
   });
 
   it('returns the safe quota failure category and actionable summary to programmatic hosts', async () => {

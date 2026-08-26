@@ -118,6 +118,7 @@ describe('createConversationTextHost', () => {
         step: 1,
         timestamp: '2026-07-02T00:00:01.000Z',
       }],
+      memory: { changed: false },
     };
 
     textHost.renderTurnResult(result);

@@ -40,6 +40,10 @@ fail capture instead of being followed.
 5. A shutdown checkpoint may reduce recent loss, but must not be the only
    checkpoint trigger.
 
+Conversation turns report `result.memory.changed` from Heddle-owned memory
+events. Hosted callers should combine that fact with their own terminal-outcome
+policy instead of interpreting Heddle tool names or tool-result payloads.
+
 `restore()` never merges with or overwrites existing files. The caller must
 serialize bootstrap, restore, and first use for one working copy. It must also
 serialize `checkpoint()` with memory mutations so capture observes one stable

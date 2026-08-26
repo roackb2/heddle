@@ -40,6 +40,7 @@ describe('createConversationEngine', () => {
         session: stored?.session as ChatSession,
         artifacts: [],
         toolResults: [],
+        memory: { changed: false },
       };
     });
   });

@@ -18,4 +18,8 @@ export type ConversationTurnResultSummary = {
   traceFile?: string;
   artifacts: RuntimeArtifact[];
   toolResults: ConversationTurnToolResult[];
+  memory: {
+    /** Whether this turn changed Heddle's portable memory working copy. */
+    changed: boolean;
+  };
 };

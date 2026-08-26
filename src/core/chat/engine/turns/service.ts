@@ -234,6 +234,11 @@ export class EngineConversationTurnService implements ConversationTurnService {
           sessionId: session.id,
         }),
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
+        memory: {
+          changed: resultForPersistence.trace.some(
+            ({ type }) => type === HeddleEventType.memoryCandidateRecorded,
+          ),
+        },
       };
     } finally {
       await leaseHeartbeat.stop();
