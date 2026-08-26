@@ -14,6 +14,13 @@ export { MemoryMaintenanceIntegrationService } from './maintenance-integration.j
 export { createMemoryMaintainerTools } from './maintainer-tools.js';
 export { MemoryNoteService } from './note-service.js';
 export { MemorySchemas } from './schemas.js';
+export {
+  MEMORY_SCOPE_VERSION,
+  MemoryScopeIdentitySchema,
+  MemoryScopeIdSchema,
+  deriveMemoryScopeId,
+} from './scope.js';
+export type { MemoryScopeIdentity, MemoryScopeId } from './scope.js';
 export { createMemoryNoteTemplate, slugifyMemoryTitle } from './templates.js';
 export { MemoryValidationService } from './validation.js';
 export { MemoryVisibilityService } from './visibility.js';

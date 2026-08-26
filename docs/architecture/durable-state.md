@@ -170,6 +170,16 @@ define single-writer/CAS behavior, conflict handling, deletion, and secret
 exclusion. It must not reuse the conversation repository or blindly snapshot
 the entire state root.
 
+Long-lived memory is addressed by the memory domain's versioned opaque scope,
+not by a Runtime session, product conversation, filesystem path, or raw object
+store key. The host derives that scope from already verified adopter, tenant,
+and subject identity plus one stable agent or workspace owner. That keeps two
+subjects isolated while letting the same subject and owner restore memory in a
+new conversation or Runtime session. Scope derivation does not grant access;
+the future repository or checkpoint adapter must enforce the verified
+authority independently. These ids must be stable and non-recycled; mutable
+names, slugs, and workspace-version ids are not valid durable identities.
+
 ### Package boundary
 
 Domain contracts use purpose names and remain with the package that owns their
@@ -291,6 +301,12 @@ universal storage provider shared by unrelated domains.
 knowledge under `.heddle/memory`, including catalog files, notes, append-only
 candidate/run records, and a maintenance lock. This is workspace knowledge, not
 a transcript or application database.
+
+For hosted recovery, `deriveMemoryScopeId()` gives this domain one stable
+address. Its v1 inputs are verified adopter, tenant, and subject ids plus a
+stable agent or workspace owner. Product conversation and Runtime session ids
+are deliberately not part of the address. The derivation is deterministic and
+opaque but is neither authentication nor a storage authorization decision.
 
 Maintenance combines an in-process queue with an exclusive lock file. Invalid
 JSONL entries are skipped during tolerant reads, and a process failure may leave

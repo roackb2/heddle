@@ -165,6 +165,16 @@ export { MemoryMaintenanceRepository } from './core/memory/maintenance-repositor
 export { MemoryMaintenanceService } from './core/memory/maintainer.js';
 export { MemoryMaintenanceIntegrationService } from './core/memory/maintenance-integration.js';
 export { MemoryNoteService } from './core/memory/note-service.js';
+export {
+  MEMORY_SCOPE_VERSION,
+  MemoryScopeIdentitySchema,
+  MemoryScopeIdSchema,
+  deriveMemoryScopeId,
+} from './core/memory/scope.js';
+export type {
+  MemoryScopeIdentity,
+  MemoryScopeId,
+} from './core/memory/scope.js';
 export { MemoryValidationService } from './core/memory/validation.js';
 export { MemoryVisibilityService } from './core/memory/visibility.js';
 export type {
