@@ -154,6 +154,32 @@ export { buildSystemPrompt } from './core/prompts/system-prompt.js';
 // --- Building blocks: memory & knowledge -----------------------------------
 export { buildMemoryDomainSystemContext } from './core/memory/domain-prompt.js';
 export {
+  MEMORY_CHECKPOINT_SCHEMA_VERSION,
+  MemoryCheckpointCaptureError,
+  MemoryCheckpointCodec,
+  MemoryCheckpointConflictError,
+  MemoryCheckpointCorruptionError,
+  MemoryCheckpointFileSchema,
+  MemoryCheckpointGenerationIdSchema,
+  MemoryCheckpointGenerationSchema,
+  MemoryCheckpointManifestSchema,
+  MemoryCheckpointRestoreTargetError,
+  MemoryCheckpointService,
+} from './core/memory/checkpoint/index.js';
+export type {
+  CommitMemoryCheckpointInput,
+  DeleteMemoryCheckpointInput,
+  LoadMemoryCheckpointGenerationInput,
+  MemoryCheckpointBundle,
+  MemoryCheckpointFile,
+  MemoryCheckpointGeneration,
+  MemoryCheckpointGenerationId,
+  MemoryCheckpointManifest,
+  MemoryCheckpointServiceOptions,
+  MemoryCheckpointStore,
+  RestoreMemoryCheckpointResult,
+} from './core/memory/checkpoint/index.js';
+export {
   DEFAULT_MEMORY_CATEGORIES,
   DEFAULT_MEMORY_FOLDER_CATALOG_MAX_BYTES,
   DEFAULT_MEMORY_FOLDER_CATALOG_TARGET_BYTES,

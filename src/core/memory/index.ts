@@ -7,6 +7,7 @@ export {
   MemoryCatalogService,
 } from './catalog.js';
 export { buildMemoryDomainSystemContext } from './domain-prompt.js';
+export * from './checkpoint/index.js';
 export { MemoryMaintenanceRepository } from './maintenance-repository.js';
 export { MemoryMaintainerPrompt } from './maintainer-prompt.js';
 export { MemoryMaintenanceService } from './maintainer.js';

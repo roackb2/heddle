@@ -311,19 +311,22 @@ opaque but is neither authentication nor a storage authorization decision.
 Maintenance combines an in-process queue with an exclusive lock file. Invalid
 JSONL entries are skipped during tolerant reads, and a process failure may leave
 pending candidates or a lock until stale-lock recovery. Memory explicitly must
-not contain credentials or secrets. The selected portable-memory design must be
-a separate domain boundary with conflict and authority rules; it must not be
-inferred from the conversation repository contract.
+not contain credentials or secrets. The memory domain now exposes a separate
+portable checkpoint boundary with its own scope, integrity, restore, and
+manifest compare-and-swap rules; it is not inferred from the conversation
+repository contract.
 
 For an ephemeral Execution Host, provider-managed session storage can preserve
 the working memory directory across ordinary stop/resume, but it remains a
 continuity layer if the provider can expire it or reset it on a runtime update.
-Longer-lived recovery should use a memory-specific repository or checkpoint:
-write an immutable, scoped revision; atomically advance a generation manifest;
-and restore only after validating its schema, scope, checksums, and runtime
-compatibility. Checkpoint after selected memory maintenance boundaries and
-periodically for long sessions. A shutdown checkpoint may reduce loss, but must
-not be the sole commit path.
+Longer-lived recovery uses the memory-specific checkpoint contract in
+[`src/core/memory/checkpoint`](../../src/core/memory/checkpoint/README.md): write
+an immutable, scoped generation; atomically advance a generation manifest; and
+restore only after validating its schema, scope, checksums, and file allowlist.
+Checkpoint after selected memory-changing interactions or maintenance
+boundaries. A shutdown checkpoint may reduce loss, but must not be the sole
+commit path. An official object-store adapter, periodic long-session trigger,
+and Execution Host recovery integration are not implemented yet.
 
 ### Approval policy and project configuration
 
