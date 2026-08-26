@@ -11,7 +11,7 @@ export type RunInlineTurnMemoryMaintenanceArgs = {
   onEvent?: (event: AgentLoopEvent) => void;
 };
 
-export type ScheduleBackgroundTurnMemoryMaintenanceArgs = {
+export type RunBackgroundTurnMemoryMaintenanceArgs = {
   memoryRoot: string;
   llm: LlmAdapter;
   source: string;
@@ -36,7 +36,7 @@ export type TurnMemoryMaintenanceRuntimeInput = Pick<
 >;
 
 export type AppendTurnMemoryMaintenanceEventsArgs = Pick<
-  ScheduleBackgroundTurnMemoryMaintenanceArgs,
+  RunBackgroundTurnMemoryMaintenanceArgs,
   'traceFile' | 'sessionService' | 'sessionId'
 > & {
   events: AgentLoopResult['trace'];

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
+import { ConversationTurnMemoryMaintenance } from '@/core/chat/engine/turns/memory/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import {
   ChatSessionLeases,
@@ -471,6 +472,53 @@ describe('conversation turn lifecycle', () => {
       },
     ]);
     expect(turnResult.memory).toEqual({ changed: true });
+  });
+
+  it('waits for background memory maintenance before reporting a memory change', async () => {
+    const storage = await createConversationTurnStorage();
+    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Remember this.',
+      summary: 'Remembered.',
+      trace: [{
+        type: 'memory.candidate_recorded',
+        candidateId: 'candidate-1',
+        path: '_maintenance/candidates.jsonl',
+        step: 1,
+        timestamp: '2026-05-03T00:00:01.000Z',
+      }],
+    }) as never);
+
+    let completeMaintenance!: () => void;
+    const maintenanceBoundary = new Promise<void>((resolvePromise) => {
+      completeMaintenance = resolvePromise;
+    });
+    const maintenanceSpy = vi.spyOn(ConversationTurnMemoryMaintenance, 'runBackground')
+      .mockReturnValue(maintenanceBoundary);
+
+    let settled = false;
+    const turn = EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Remember this.',
+      apiKey: 'explicit-key',
+      memoryMaintenanceMode: 'background',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    }).finally(() => {
+      settled = true;
+    });
+
+    await vi.waitFor(() => expect(maintenanceSpy).toHaveBeenCalledOnce());
+    expect(settled).toBe(false);
+
+    completeMaintenance();
+    await expect(turn).resolves.toEqual(expect.objectContaining({
+      memory: { changed: true },
+    }));
   });
 
   it('returns the safe model failure category to programmatic hosts', async () => {

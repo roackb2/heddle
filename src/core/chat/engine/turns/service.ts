@@ -211,7 +211,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
       leaseHeartbeat.throwIfFailed();
 
       if (maintenanceMode === 'background') {
-        ConversationTurnMemoryMaintenance.scheduleBackground({
+        await ConversationTurnMemoryMaintenance.runBackground({
           ...memoryRuntime,
           trace: result.trace,
           traceFile: persisted.traceFile,
@@ -235,6 +235,8 @@ export class EngineConversationTurnService implements ConversationTurnService {
         }),
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
         memory: {
+          // Background maintenance runs after the primary turn is persisted,
+          // but the result does not resolve until that working copy is stable.
           changed: resultForPersistence.trace.some(
             ({ type }) => type === HeddleEventType.memoryCandidateRecorded,
           ),
