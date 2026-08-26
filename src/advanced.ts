@@ -4,8 +4,8 @@
 // The deep core-customization surface: the curated SDK (rungs 1-5, re-exported
 // below) plus lower-level building blocks and specialized runtimes. Remote
 // hosting remains an orthogonal opt-in through `@heddleagent/runtime/runs` and
-// the independent `@heddleagent/run-client` and
-// `@heddleagent/execution-host-client` packages.
+// the independent `@heddleagent/run-client` package and separately maintained
+// `@heddleagent/execution-host-client` package.
 // Those surfaces are not re-exported here. Reach for this entry when
 // you need LLM adapters, individual
 // ready-made tools, trace/memory internals, the agent loop, heartbeat, or

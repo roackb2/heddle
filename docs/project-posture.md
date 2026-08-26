@@ -81,8 +81,8 @@ At the distribution boundary:
   boundary for a backend invoking a separate compatible Execution Host. It
   owns authority, wire, direct and AgentCore transports, explicit conversation
   and heartbeat workflows, MCP, Node, testing, and the reusable durable-turn
-  lifecycle over an adopter-implemented atomic store, with shared
-  TypeScript/Python fixtures. The former
+  lifecycle over an adopter-implemented atomic store, with public
+  language-neutral fixtures. The former
   `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
   installable only for existing consumers;
 - `@heddleagent/postgres` is the official PostgreSQL adapter family. Its
@@ -91,6 +91,11 @@ At the distribution boundary:
   the hosted lifecycle store with atomic SQL fencing, constraints, ordered
   migrations, and real-database conformance. Adopters still own their pool,
   migration execution, authenticated scope, retention, and product data;
+- `@heddleagent/execution-host-client` and `@heddleagent/postgres` are public
+  npm packages whose canonical source, CI, and release lane live in the
+  separate permissioned Execution Host repository. This repository preserves
+  their public architecture and historical release provenance, but no longer
+  contains or publishes their implementation;
 - the current compatible Execution Host and AgentCore deployment are private
   research. Public docs may describe the contract and evidence goal but must
   not imply that Heddle distributes or operates that service.

@@ -15,7 +15,7 @@
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
 // `@heddleagent/runtime/runs`, the lightweight `@heddleagent/run-client` client,
-// and the independent backend-side
+// and the separately maintained backend-side
 // `@heddleagent/execution-host-client` package.
 // Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,
 // models, awareness, the agent loop, heartbeat, integrations, utilities) lives

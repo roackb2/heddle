@@ -35,7 +35,7 @@ conversation 與 run 基礎之上。
 | Heddle coding agent | 使用建立在相同 runtime 上的 CLI 與 browser control plane | `@heddleagent/cli`（`heddle` command） |
 
 獨立 Execution Host 的穩定套件是
-`@heddleagent/execution-host-client@6.2.0`。舊的
+`@heddleagent/execution-host-client@6.6.1`。舊的
 `@roackb2/heddle-adopter@5.13.0` coordinate 已 deprecated，只為既有使用者保留安裝能力。
 
 穩定的 coding-agent 套件是 `@heddleagent/cli@6.0.0`，安裝後提供
@@ -51,8 +51,9 @@ hosted offering。
 requested／accepted／terminal 的順序、interruption、安全投影、到期協調與 store
 conformance。產品仍擁有經過驗證的 ID、database adapter／schema／migration、history
 query、retention 與 UI。受維護的 embedded runtime 是 TypeScript／Node；獨立 host
-的 wire 與 lifecycle profile 則是 language-neutral。Python 實作是 clean-room
-conformance proof，不是已發布或受支援的 Python SDK。
+的 wire 與 lifecycle profile 則是 language-neutral。公開套件包含 canonical wire
+artifacts；permissioned canonical source 中的 Python 實作提供 clean-room
+conformance proof，但不是已發布或受支援的 Python SDK。
 
 完整邊界、可用狀態與選擇路徑請參考
 [component and deployment model](docs/guides/programmatic/component-model.md)。
@@ -214,7 +215,7 @@ mechanics 的最低層即可：
 | 一般 Node HTTP/SSE | `@heddleagent/runtime/runs/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
 | Remote browser 或 client | `@heddleagent/run-client` | Browser-safe protocol validation 與 transport-neutral run consumption |
 | 一般 browser REST/SSE | `@heddleagent/run-client/http-sse` | Authenticated fetch、incremental SSE parsing 與 transport validation |
-| Backend 呼叫獨立 Execution Host | `@heddleagent/execution-host-client` | Contract、authority/JWKS、conversation 與 heartbeat orchestration、durable conversation persistence、product-MCP verification、direct 與 AgentCore client、store conformance 與 TypeScript/Python fixture |
+| Backend 呼叫獨立 Execution Host | `@heddleagent/execution-host-client` | Contract、authority/JWKS、conversation 與 heartbeat orchestration、durable conversation persistence、product-MCP verification、direct 與 AgentCore client、store conformance 與公開 language-neutral fixture |
 | 以 PostgreSQL 保存 Execution Host lifecycle | `@heddleagent/postgres/execution-host/conversations` | Atomic scope fencing、由 adopter 執行的 ordered migration、SQL constraint、expiry 與 real-PostgreSQL conformance |
 | PostgreSQL heartbeat worker | `@heddleagent/postgres/heartbeat` | Heartbeat task 的 claim fencing、lease recovery、checkpoint、history 與 atomic operator control；不是一般 product database adapter |
 | 更底層的 runtime 組裝 | `@heddleagent/runtime/advanced` | Model adapter、individual tool、trace、memory、heartbeat 與 core runtime service |

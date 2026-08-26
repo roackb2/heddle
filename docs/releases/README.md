@@ -21,12 +21,13 @@ For a user-facing release:
 
 1. Choose the version to ship.
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
-3. Update only the selected `@heddleagent/*` package manifest. The deprecated
+3. Update only the selected package manifest owned by this repository. The deprecated
    `@roackb2/*` packages are frozen at `5.13.0`; their source remains
    recoverable from that release tag and they are not part of another 5.x
    release. The five stable `@heddleagent/*` packages documented in
    [`packages/README.md`](../../packages/README.md) use independent release
-   lanes and never inherit a root-package version implicitly.
+   lanes and never inherit a root-package version implicitly; this repository
+   owns the runtime, CLI, and run-client lanes.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
@@ -47,8 +48,9 @@ Add more verification if the release changes a workflow that needs manual valida
 
 ## Manual v6 Package Publication
 
-The five `@heddleagent/*` packages are independently versioned, but all use the
-same deliberately manual release shape:
+The three `@heddleagent/*` packages whose canonical source remains in this
+repository are independently versioned and use the same deliberately manual
+release shape:
 
 1. bump only the package being released and write its curated release note;
 2. run that package's normal build and relevant tests;
@@ -71,13 +73,16 @@ Use these package-specific checks and publish commands:
 | `@heddleagent/run-client` | `yarn run-client:build` | `npm publish ./packages/run-client --access public --tag latest` | `run-client-v<version>` |
 | `@heddleagent/runtime` | `yarn runtime:build` | `npm publish ./packages/runtime --access public --tag latest` | `runtime-v<version>` |
 | `@heddleagent/cli` | `yarn cli:build` | `npm publish ./packages/cli --access public --tag latest` | `cli-v<version>` |
-| `@heddleagent/execution-host-client` | `yarn execution-host-client:test && yarn execution-host-client:conformance:python-v1 && yarn execution-host-client:build` | `npm publish ./packages/execution-host-client --access public --tag latest` | `execution-host-client-v<version>` |
-| `@heddleagent/postgres` | `HEDDLE_POSTGRES_TEST_URL=postgresql:///heddle_test yarn postgres:test && yarn postgres:build` | `npm publish ./packages/postgres --access public --tag latest` | `postgres-v<version>` |
 
 Publish a changed runtime before a CLI version that depends on it. Publish a
-changed Execution Host client before a PostgreSQL adapter version that depends
-on it. Apply the PostgreSQL package's ordered migration to the explicit test
-database before its real-database test.
+changed run client independently when its browser-safe protocol surface changes.
+
+`@heddleagent/execution-host-client` and `@heddleagent/postgres` remain public
+npm packages, but their canonical source and release lane moved to the
+permissioned Execution Host repository after `6.6.0` and `6.1.1`. Their first
+releases from that repository are `6.6.1` and `6.1.2`. Historical release notes
+and tags remain here as provenance; do not prepare or publish new versions of
+those packages from this repository.
 
 Stable publication moves `latest`; any historical prerelease tag remains
 independent. Keep the published `@roackb2/*` packages available for

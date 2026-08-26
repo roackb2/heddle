@@ -6,11 +6,6 @@ const OUTPUT_DIRECTORIES = new Map([
   ['runtime', new URL('../packages/runtime/dist/', import.meta.url)],
   ['cli', new URL('../packages/cli/dist/', import.meta.url)],
   ['run-client', new URL('../packages/run-client/dist/', import.meta.url)],
-  [
-    'execution-host-client',
-    new URL('../packages/execution-host-client/dist/', import.meta.url),
-  ],
-  ['postgres', new URL('../packages/postgres/dist/', import.meta.url)],
 ]);
 
 const requestedTargets = process.argv.slice(2);
