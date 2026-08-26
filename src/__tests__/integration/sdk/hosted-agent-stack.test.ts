@@ -321,6 +321,7 @@ function createTurnResult(sessionId: string, prompt: string): ConversationTurnRe
     session: { id: sessionId } as ConversationTurnResultSummary['session'],
     artifacts: [],
     toolResults: [],
+    memory: { changed: false },
   };
 }
 

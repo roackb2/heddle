@@ -1,6 +1,6 @@
 export { ConversationTurnMemoryMaintenance } from './turn-memory-maintenance.js';
 export type {
+  RunBackgroundTurnMemoryMaintenanceArgs,
   RunInlineTurnMemoryMaintenanceArgs,
-  ScheduleBackgroundTurnMemoryMaintenanceArgs,
   TurnMemoryMaintenanceRuntimeInput,
 } from './types.js';

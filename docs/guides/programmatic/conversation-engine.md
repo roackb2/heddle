@@ -80,6 +80,12 @@ controls the memory tools visible to the model, while
 turn selects a custom agent, that agent's tool profile overrides the engine
 default for the turn.
 
+`background` runs maintenance after the primary turn is persisted, so streamed
+assistant output is not held back. The returned turn promise still waits for
+maintenance to reach a stable boundary before reporting memory changes to
+checkpointing hosts. `inline` includes maintenance events in the primary
+persisted turn result; `none` leaves recorded candidates pending.
+
 For host event adapters, import `HeddleEventType` instead of duplicating event
 name strings:
 

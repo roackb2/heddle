@@ -30,6 +30,7 @@ describe('ConversationAgentService', () => {
         session: session?.session,
         artifacts: [],
         toolResults: [],
+        memory: { changed: false },
       } as Awaited<ReturnType<typeof EngineConversationTurnService.run>>;
     });
   });

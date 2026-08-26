@@ -400,6 +400,7 @@ function turnResult(): ConversationTurnResultSummary {
     }),
     artifacts: [],
     toolResults: [],
+    memory: { changed: false },
   };
 }
 

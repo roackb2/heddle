@@ -18,4 +18,12 @@ export type ConversationTurnResultSummary = {
   traceFile?: string;
   artifacts: RuntimeArtifact[];
   toolResults: ConversationTurnToolResult[];
+  memory: {
+    /**
+     * Whether this turn changed Heddle's portable memory working copy.
+     * The turn result resolves only after configured memory maintenance reaches
+     * a stable boundary, so checkpointing callers may act on this value.
+     */
+    changed: boolean;
+  };
 };

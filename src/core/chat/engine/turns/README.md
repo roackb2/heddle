@@ -21,8 +21,8 @@ the class that owns that phase.
   turn. Engine turns renew themselves; hosts must not duplicate that heartbeat.
 - `persistence/`: builds turn artifacts and writes completed turns back to
   session storage.
-- `memory/`: runs inline/background memory maintenance and records its trace
-  evidence.
+- `memory/`: runs inline or post-persistence memory maintenance, records its
+  trace evidence, and establishes the stable boundary before turn settlement.
 - `host/`: normalizes public host callbacks into turn-runtime ports.
 - `trace/`: writes persisted trace files.
 

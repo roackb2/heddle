@@ -5,9 +5,9 @@ import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-i
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type {
   AppendTurnMemoryMaintenanceEventsArgs,
+  RunBackgroundTurnMemoryMaintenanceArgs,
   RunMemoryMaintenanceCoreArgs,
   RunInlineTurnMemoryMaintenanceArgs,
-  ScheduleBackgroundTurnMemoryMaintenanceArgs,
 } from './types.js';
 
 /**
@@ -38,21 +38,7 @@ export class ConversationTurnMemoryMaintenance {
     return ConversationTurnMemoryMaintenance.appendAgentLoopTrace(args.result, maintenance.events);
   }
 
-  static scheduleBackground(args: ScheduleBackgroundTurnMemoryMaintenanceArgs) {
-    void ConversationTurnMemoryMaintenance.runBackground(args).catch((error) => {
-      args.onEvent?.({
-        type: 'trace',
-        runId: args.runId,
-        event: ConversationTurnMemoryMaintenance.createFailureEvent({
-          error,
-          trace: args.trace,
-        }),
-        timestamp: new Date().toISOString(),
-      });
-    });
-  }
-
-  static async runBackground(args: ScheduleBackgroundTurnMemoryMaintenanceArgs) {
+  static async runBackground(args: RunBackgroundTurnMemoryMaintenanceArgs): Promise<void> {
     const maintenanceInput: RunMemoryMaintenanceCoreArgs = args;
     const maintenance = await new MemoryMaintenanceIntegrationService(maintenanceInput.memoryRoot).runForRecordedCandidates({
       llm: maintenanceInput.llm,
@@ -123,23 +109,5 @@ export class ConversationTurnMemoryMaintenance {
     } catch {
       return [];
     }
-  }
-
-  private static createFailureEvent(args: {
-    error: unknown;
-    trace: TraceEvent[];
-  }): Extract<TraceEvent, { type: 'memory.maintenance_failed' }> {
-    return {
-      type: 'memory.maintenance_failed',
-      runId: `memory-run-${Date.now()}`,
-      error: args.error instanceof Error ? args.error.message : String(args.error),
-      candidateIds: [],
-      step: ConversationTurnMemoryMaintenance.nextTraceStep(args.trace),
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  private static nextTraceStep(trace: TraceEvent[]): number {
-    return trace.reduce((max, event) => ('step' in event ? Math.max(max, event.step) : max), 0) + 1;
   }
 }
