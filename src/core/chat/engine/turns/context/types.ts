@@ -26,6 +26,7 @@ export type PrepareConversationTurnContextArgs = {
   artifactRepository?: ArtifactRepository;
   artifactsEnabled: boolean;
   toolProfile?: RuntimeToolSelectionProfile;
+  agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;

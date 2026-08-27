@@ -7,6 +7,7 @@ import type { AgentRunEvent } from '@/core/agent/index.js';
 import { AgentSkillsRuntimeContextService } from '@/core/skills/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, LlmRuntimeContext, ReasoningEffort } from '@/core/llm/types.js';
+import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import { createLogger } from '@/core/utils/logger.js';
 import type {
@@ -16,7 +17,7 @@ import type {
 import { LlmProviderRuntimeService } from '../provider-runtime/index.js';
 import { RuntimeToolService } from '../tools/index.js';
 import { AgentLoopCheckpointService } from './checkpoint.js';
-import type { AgentLoopResult, RunAgentLoopOptions } from './types.js';
+import type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './types.js';
 
 /**
  * Main programmatic runtime boundary for one evented agent loop execution.
@@ -147,6 +148,14 @@ export class AgentLoopRuntimeService {
       workspaceRoot,
       state,
     };
+  }
+
+  static isConversationActivity(
+    event: AgentLoopEvent,
+  ): event is Extract<AgentLoopEvent, ConversationAgentLoopActivity> {
+    return event.type !== HeddleEventType.trace
+      && event.type !== HeddleEventType.loopResumed
+      && event.type !== HeddleEventType.checkpointSaved;
   }
 
   private static emitAgentRunEvent(args: {

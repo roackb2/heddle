@@ -1,5 +1,6 @@
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 import type { PersistChatTurnCompactionStatus } from '../persistence/index.js';
 import type { ChatTurnPreflightCompactionStatus } from '../preflight/index.js';
 
@@ -9,6 +10,7 @@ export type ChatTurnCompactionStatus = ChatTurnPreflightCompactionStatus | Persi
 
 export type ChatTurnHostPort = {
   onEvent?: (event: AgentLoopEvent) => void;
+  onActivity?: (activity: ConversationActivity) => void;
   approveToolCall?: RunAgentLoopOptions['approveToolCall'];
   onCompactionStatus?: (event: ChatTurnCompactionStatus, phase: ChatTurnCompactionPhase) => void;
 };

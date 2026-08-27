@@ -107,12 +107,12 @@ export class EngineConversationTurnService implements ConversationTurnService {
       leaseOwner,
       agentSnapshot,
     } = context;
-    const delegationScope = EngineConversationTurnService.createDelegationScope(args, context);
+    const host = EngineConversationTurnService.turnHost(args);
+    const delegationScope = EngineConversationTurnService.createDelegationScope(args, context, host);
     const rootTools = delegationScope
       ? [...tools, delegationScope.createTool()]
       : tools;
     const toolNames = rootTools.map((tool) => tool.name);
-    const host = EngineConversationTurnService.turnHost(args);
     const source = `chat session ${session.id}`;
     const preflightInput: TurnPreflightInput = args;
     const agentLoopInput: AgentLoopTurnInput = args;
@@ -316,6 +316,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
   private static createDelegationScope(
     args: RunConversationTurnArgs,
     context: ConversationTurnContext,
+    host: ChatTurnHostPort,
   ): DelegationRootScope | undefined {
     const policy = args.delegationPolicy
       ?? ConversationDelegationPolicyService.resolveEnginePolicy(undefined);
@@ -331,6 +332,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
     return new DelegationService({ policy }).createRootScope({
       workspaceRoot: args.workspaceRoot,
+      onActivity: host.onActivity,
       runtime: {
         model: context.runtime.model,
         reasoningEffort: context.runtime.reasoningEffort,

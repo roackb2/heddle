@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
-import { CustomAgentRuntimeContextService } from '@/core/custom-agents/index.js';
+import {
+  CustomAgentRuntimeContextService,
+  CustomAgentService,
+} from '@/core/custom-agents/index.js';
 import { ConversationTurnRuntimeResolver } from '../runtime/index.js';
 import type {
   ConversationTurnContext,
@@ -20,6 +23,9 @@ const DEFAULT_LEASE_OWNER_ID = `submit-${randomUUID()}`;
 export class ConversationTurnContextBuilder {
   static async build(args: PrepareConversationTurnContextArgs): Promise<ConversationTurnContext> {
     const session = await args.sessionService.require(args.sessionId);
+    const agentSnapshot = new CustomAgentService({
+      workspaceRoot: args.workspaceRoot,
+    }).resolveTurnSnapshot(args);
 
     const runtimeConfig: ConversationTurnRuntimeConfig = args;
     const baseRuntime = ConversationTurnRuntimeResolver.resolve({ config: runtimeConfig, session });
@@ -27,12 +33,12 @@ export class ConversationTurnContextBuilder {
       ...baseRuntime,
       systemContext: CustomAgentRuntimeContextService.appendAgentInstructions({
         systemContext: baseRuntime.systemContext,
-        snapshot: args.agentSnapshot,
+        snapshot: agentSnapshot,
       }),
     };
     const toolContext: ConversationTurnToolContextArgs = args;
     const toolRuntime: ConversationTurnToolRuntimeArgs = runtime;
-    const toolProfile = args.agentSnapshot?.toolProfile ?? args.toolProfile;
+    const toolProfile = agentSnapshot?.toolProfile ?? args.toolProfile;
     const tools = RuntimeToolService.createDefaultAgentTools({
       ...toolContext,
       ...toolRuntime,
@@ -46,7 +52,7 @@ export class ConversationTurnContextBuilder {
       session,
       baseSystemContext: baseRuntime.systemContext,
       runtime,
-      agentSnapshot: args.agentSnapshot,
+      agentSnapshot,
       tools,
       toolNames: tools.map((tool) => tool.name),
       leaseOwner: args.leaseOwner ?? {

@@ -37,7 +37,7 @@ import type {
 } from '@/core/chat/engine/types.js';
 import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import type { ChatSession } from '@/core/chat/types.js';
+import type { ChatSession, ConversationDelegationMode } from '@/core/chat/types.js';
 import {
   ConversationRunService,
   type ConversationRunContext,
@@ -119,6 +119,7 @@ type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  delegationMode?: ConversationDelegationMode;
   systemContext?: string;
   maxSteps?: number;
   searchIgnoreDirs?: string[];
@@ -500,6 +501,7 @@ export class ControlPlaneChatSessionsController {
       agentProfileId: args.agentProfileId,
       agentSnapshot: args.agentSnapshot,
       systemContext: args.systemContext,
+      delegation: args.delegationMode,
     });
     this.publishQueueUpdated(args, queued.session);
 
@@ -536,6 +538,7 @@ export class ControlPlaneChatSessionsController {
         agentProfileId: dequeued.item.agentProfileId,
         agentSnapshot: dequeued.item.agentSnapshot,
         systemContext: dequeued.item.systemContext,
+        delegationMode: dequeued.item.delegation,
       }));
     } catch (error) {
       const restored = await sessions.enqueuePrompt(args.sessionId, {
@@ -543,6 +546,7 @@ export class ControlPlaneChatSessionsController {
         agentProfileId: dequeued.item.agentProfileId,
         agentSnapshot: dequeued.item.agentSnapshot,
         systemContext: dequeued.item.systemContext,
+        delegation: dequeued.item.delegation,
       });
       this.publishQueueUpdated(args, restored.session);
       args.logger?.debug(
@@ -598,9 +602,10 @@ export class ControlPlaneChatSessionsController {
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
               // Engine config already owns the composed permission chain.
-              ...omit(args, ['approvalPolicies', 'delegation', 'permissionGrant']),
+              ...omit(args, ['approvalPolicies', 'delegation', 'delegationMode', 'permissionGrant']),
               agentProfileId: args.agentProfileId,
               agentSnapshot: args.agentSnapshot,
+              delegation: args.delegationMode,
               host,
               abortSignal,
               shouldStop,
@@ -758,15 +763,9 @@ export class ControlPlaneChatSessionsController {
   }
 
   private prepareSubmitPromptArgs(args: SubmitChatPromptArgs): SubmitChatPromptArgs {
-    if (!args.agentProfileId || args.agentSnapshot) {
-      return args;
-    }
-
     return {
       ...args,
-      agentSnapshot: new CustomAgentService({
-        workspaceRoot: args.workspaceRoot,
-      }).resolveExecutionSnapshot(args.agentProfileId),
+      agentSnapshot: new CustomAgentService({ workspaceRoot: args.workspaceRoot }).resolveTurnSnapshot(args),
     };
   }
 
@@ -839,8 +838,8 @@ export class ControlPlaneChatSessionsController {
     });
   }
 
-  private createEngine(args: ControlPlaneSessionReadArgs): ConversationEngine {
-    const { permissionGrant, ...engineArgs } = args;
+  private createEngine(args: ControlPlaneSessionReadArgs & { delegationMode?: ConversationDelegationMode }): ConversationEngine {
+    const { permissionGrant, delegationMode: _delegationMode, ...engineArgs } = args;
     const approvalService = this.createApprovalService(args);
     return createConversationEngine({
       ...engineArgs,

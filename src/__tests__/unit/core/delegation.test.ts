@@ -12,6 +12,7 @@ import {
   type DelegationPolicyInput,
 } from '@/core/delegation/index.js';
 import type { LlmAdapter, LlmResponse } from '@/core/llm/types.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 import {
   AgentLoopRuntimeService,
   type AgentLoopResult,
@@ -33,10 +34,12 @@ afterEach(() => {
 describe('delegation policy and scope', () => {
   it('is disabled by default and does not add delegation to the default runtime tools', async () => {
     const workspaceRoot = workspace();
+    const activities: ConversationActivity[] = [];
     const service = new DelegationService();
     const scope = service.createRootScope({
       workspaceRoot,
       runtime: { model: 'gpt-test', logger: silentLogger },
+      onActivity: (activity) => activities.push(activity),
     });
 
     const result = await scope.createTool().execute({ task: 'Inspect the repository.' });
@@ -48,6 +51,13 @@ describe('delegation policy and scope', () => {
     expect(service.enabled).toBe(false);
     expect(output(result).error?.code).toBe('delegation_disabled');
     expect(scope.records()).toEqual([]);
+    expect(activities).toEqual([
+      expect.objectContaining({
+        type: 'delegation.rejected',
+        rootRunId: scope.rootRunId,
+        error: { code: 'delegation_disabled', message: 'Delegation is disabled for this root run.' },
+      }),
+    ]);
     expect(defaultTools.map((tool) => tool.name)).not.toContain('delegate_task');
   });
 
@@ -148,11 +158,13 @@ describe('delegation policy and scope', () => {
   });
 
   it('consumes the total slot after success, provider failure, and cancellation', async () => {
+    const activities: ConversationActivity[] = [];
     let cancelStarted!: () => void;
     const started = new Promise<void>((resolveStarted) => {
       cancelStarted = resolveStarted;
     });
     const { scope } = activeScope({
+      onActivity: (activity) => activities.push(activity),
       createChildLlm: ({ task }) => taskAdapter(task, cancelStarted),
     });
 
@@ -187,6 +199,23 @@ describe('delegation policy and scope', () => {
       'interrupted',
       'done',
     ]);
+    expect(activities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'delegation.finished',
+        outcome: 'error',
+        failure: expect.any(Object),
+      }),
+      expect.objectContaining({
+        type: 'delegation.cancelled',
+        outcome: 'interrupted',
+        error: expect.objectContaining({ code: 'cancelled' }),
+      }),
+      expect.objectContaining({
+        type: 'delegation.rejected',
+        error: expect.objectContaining({ code: 'child_limit' }),
+      }),
+    ]));
+    expect(JSON.stringify(activities)).not.toContain('raw-provider-secret');
   });
 
   it('never executes more than three reserved children concurrently', async () => {
@@ -368,6 +397,7 @@ describe('delegation policy and scope', () => {
   });
 
   it('cancels the active child and settles queued reservations without starting them', async () => {
+    const activities: ConversationActivity[] = [];
     let adaptersCreated = 0;
     let active = 0;
     let firstStarted!: () => void;
@@ -376,6 +406,7 @@ describe('delegation policy and scope', () => {
     });
     const { scope } = activeScope({
       policy: { maxConcurrentChildren: 1 },
+      onActivity: (activity) => activities.push(activity),
       createChildLlm: () => {
         adaptersCreated += 1;
         return finalAdapter(async (_messages, _tools, signal) => {
@@ -407,6 +438,7 @@ describe('delegation policy and scope', () => {
     expect(adaptersCreated).toBe(1);
     expect(active).toBe(0);
     expect(scope.records().every((record) => record.status === 'cancelled')).toBe(true);
+    expect(activities.filter(({ type }) => type === 'delegation.cancelled')).toHaveLength(3);
   });
 
   it('settles a child with a distinct timeout after its execution deadline', async () => {
@@ -453,6 +485,7 @@ describe('delegation policy and scope', () => {
 function activeScope(options: {
   policy?: DelegationPolicyInput;
   createChildLlm?: DelegationChildLlmFactory;
+  onActivity?: (activity: ConversationActivity) => void;
 } = {}) {
   const workspaceRoot = workspace();
   const service = new DelegationService({
@@ -464,6 +497,7 @@ function activeScope(options: {
   const scope = service.createRootScope({
     rootRunId: 'run_delegation-unit-root',
     workspaceRoot,
+    onActivity: options.onActivity,
     runtime: {
       model: 'gpt-test',
       logger: silentLogger,

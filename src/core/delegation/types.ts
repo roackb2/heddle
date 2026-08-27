@@ -8,6 +8,10 @@ import type {
 } from '@/core/llm/types.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type {
+  ConversationDelegationActivity,
+  ConversationDelegationErrorCode,
+} from '@/core/live/index.js';
+import type {
   RunFailure,
   StopReason,
   ToolExecutionContext,
@@ -53,16 +57,7 @@ export type DelegateTaskExecutionContext = ToolExecutionContext & {
   parentDepth?: number;
 };
 
-export type DelegationRejectionCode =
-  | 'delegation_disabled'
-  | 'depth_limit'
-  | 'child_limit'
-  | 'agent_not_allowed'
-  | 'agent_not_read_only'
-  | 'invalid_task'
-  | 'cancelled'
-  | 'child_timeout'
-  | 'child_failed';
+export type DelegationRejectionCode = ConversationDelegationErrorCode;
 
 export type DelegateTaskError = {
   code: DelegationRejectionCode;
@@ -162,4 +157,5 @@ export type CreateDelegationRootScopeOptions = {
   runtime: DelegationChildRuntimeOptions;
   homeDir?: string;
   agentSnapshotResolver?: DelegationAgentSnapshotResolver;
+  onActivity?: (activity: ConversationDelegationActivity) => void;
 };

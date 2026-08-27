@@ -69,6 +69,11 @@ export type CustomAgentExecutionSnapshot = {
   systemContextAppendix: string;
 };
 
+export type ResolveCustomAgentTurnSnapshotInput = {
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
+};
+
 export type CustomAgentOption = {
   id: string;
   name: string;

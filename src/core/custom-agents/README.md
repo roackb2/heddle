@@ -5,10 +5,12 @@ turn execution snapshots. A custom agent is a named runtime profile: prompt
 appendix, tool profile, approval profile, and optional runtime defaults.
 
 This domain does not run agents, mutate chat sessions, decide UI state, or own
-workflow triggers. Chat/control-plane callers resolve a selected `agentProfileId`
-at prompt acceptance time and persist the resulting `CustomAgentExecutionSnapshot`
-with that accepted turn. Runtime code then applies the snapshot while building
-the concrete prompt, tools, and approval policies for that turn.
+workflow triggers. `CustomAgentService.resolveTurnSnapshot(...)` owns the
+identity/snapshot consistency rule. Queueing hosts resolve the selected
+`agentProfileId` at prompt acceptance time so later definition changes cannot
+alter accepted work; the conversation turn context performs the same resolution
+for direct engine and SDK callers. Runtime code then applies the snapshot while
+building the concrete prompt, tools, and approval policies for that turn.
 
 Definition sources:
 

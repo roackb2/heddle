@@ -39,6 +39,18 @@ describe('custom agents', () => {
     expect(snapshot?.systemContextAppendix).toContain('You are running in ask mode.');
   });
 
+  it('rejects a selected profile paired with a different execution snapshot', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-mismatch-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-home-'));
+    const service = new CustomAgentService({ workspaceRoot, homeDir });
+    const reviewSnapshot = service.resolveExecutionSnapshot('builtin:review');
+
+    expect(() => service.resolveTurnSnapshot({
+      agentProfileId: 'builtin:ask',
+      agentSnapshot: reviewSnapshot,
+    })).toThrow('Custom agent snapshot builtin:review does not match selected profile builtin:ask');
+  });
+
   it('loads project definitions and lets project agents override user agents by id', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-project-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-user-'));

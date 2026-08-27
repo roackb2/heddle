@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chdir } from 'node:process';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';
 import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';
 import { ChatCliV2CommandEdgeService } from '@/cli-v2/commands/chat-v2-command.js';
@@ -87,6 +87,7 @@ async function main() {
     .option('--new-session [name]', 'create a fresh chat session and run this ask inside it')
     .option('--agent <id>', 'custom agent id for this ask turn')
     .option('--mode <mode>', 'built-in custom agent mode: ask, code, or review')
+    .addOption(new Option('--delegation <mode>', 'subagent delegation for this turn').choices(['auto', 'off']))
     .option('--prompt-file <path>', 'read the prompt from a UTF-8 file; use - for stdin')
     .option('--output <format>', 'output format: text or jsonl', 'text')
     .action(async (goalParts: string[], askOptions: {
@@ -95,6 +96,7 @@ async function main() {
       newSession?: string | boolean;
       agent?: string;
       mode?: string;
+      delegation?: 'auto' | 'off';
       promptFile?: string;
       output?: string;
     }) => {
@@ -118,6 +120,7 @@ async function main() {
           : askOptions.newSession === true ? ''
           : askOptions.newSession,
         agentProfileId: resolveAskAgentProfileId(askOptions),
+        delegation: askOptions.delegation,
         promptFile: askOptions.promptFile,
         output: askOptions.output,
       });

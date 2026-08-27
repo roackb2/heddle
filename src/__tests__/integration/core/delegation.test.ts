@@ -6,6 +6,7 @@ import {
   AgentLoopRuntimeService,
   DelegationService,
   type ChatMessage,
+  type ConversationActivity,
   type DelegateTaskOutput,
   type DelegatedRunRecord,
   type LlmAdapter,
@@ -37,6 +38,24 @@ describe('headless read-only delegation', () => {
       !('trace' in output) && !('transcript' in output) && !('usage' in output)
     ))).toBe(true);
     expect(fixture.records).toHaveLength(2);
+    const lifecycle = fixture.activities.filter(({ source }) => source === 'delegation');
+    expect(lifecycle.filter(({ type }) => type === 'delegation.started')).toHaveLength(2);
+    expect(lifecycle.filter(({ type }) => type === 'delegation.finished')).toHaveLength(2);
+    expect(lifecycle.some(({ type }) => type === 'delegation.child.activity')).toBe(true);
+    expect(lifecycle.some((activity) => (
+      activity.type === 'delegation.child.activity'
+      && activity.activity.type === 'assistant.stream'
+    ))).toBe(false);
+    expect(lifecycle.every((activity) => (
+      activity.type === 'delegation.rejected'
+      || (
+        activity.rootRunId === fixture.rootResult.state.runId
+        && activity.parentRunId === fixture.rootResult.state.runId
+        && activity.depth === 1
+        && typeof activity.delegationId === 'string'
+        && typeof activity.childRunId === 'string'
+      )
+    ))).toBe(true);
     expect(fixture.records.every((record) => (
       record.rootRunId === fixture.rootResult.state.runId
       && record.parentRunId === fixture.rootResult.state.runId
@@ -177,6 +196,7 @@ async function runFixture(rootSupportsParallel: boolean): Promise<{
   childFactoryInputs: Array<{ childRunId: string; delegationId: string; task: string }>;
   childAdapters: Set<LlmAdapter>;
   peakActiveChildren: number;
+  activities: ConversationActivity[];
 }> {
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-delegation-integration-'));
   const childMessages: ChatMessage[][] = [];
@@ -184,6 +204,7 @@ async function runFixture(rootSupportsParallel: boolean): Promise<{
   const childFactoryInputs: Array<{ childRunId: string; delegationId: string; task: string }> = [];
   const childAdapters = new Set<LlmAdapter>();
   const rootToolOutputs: DelegateTaskOutput[] = [];
+  const activities: ConversationActivity[] = [];
   let activeChildren = 0;
   let peakActiveChildren = 0;
   let rootRequest = 0;
@@ -199,6 +220,7 @@ async function runFixture(rootSupportsParallel: boolean): Promise<{
   const scope = delegation.createRootScope({
     rootRunId: 'run_root-two-child-fixture',
     workspaceRoot,
+    onActivity: (activity) => activities.push(structuredClone(activity)),
     runtime: {
       model: 'gpt-test',
       baseSystemContext: 'BASE_PROJECT_CONTEXT',
@@ -303,6 +325,7 @@ async function runFixture(rootSupportsParallel: boolean): Promise<{
     childFactoryInputs,
     childAdapters,
     peakActiveChildren,
+    activities,
   };
 }
 
@@ -324,11 +347,13 @@ function childAdapter(input: {
         parallelToolCalls: true,
       },
     },
-    async chat(messages, tools): Promise<LlmResponse> {
+    async chat(messages, tools, _signal, onStreamEvent): Promise<LlmResponse> {
       input.onRequest(messages, tools);
       input.onStart();
       try {
         await delay(input.delayMs ?? (input.task.startsWith('Inspect') ? 20 : 5));
+        onStreamEvent?.({ type: 'content.delta', delta: 'Draft child result.' });
+        onStreamEvent?.({ type: 'content.done', content: 'Completed child result.' });
         return {
           content: input.task.startsWith('Inspect')
             ? 'Module inspection found the runtime boundary.'

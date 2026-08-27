@@ -37,6 +37,11 @@ export const HeddleEventType = {
   compactionFailed: 'compaction.failed',
   directShellStarted: 'direct_shell.started',
   directShellCompleted: 'direct_shell.completed',
+  delegationStarted: 'delegation.started',
+  delegationChildActivity: 'delegation.child.activity',
+  delegationFinished: 'delegation.finished',
+  delegationCancelled: 'delegation.cancelled',
+  delegationRejected: 'delegation.rejected',
 } as const;
 
 export type HeddleEventTypeValue = typeof HeddleEventType[keyof typeof HeddleEventType];

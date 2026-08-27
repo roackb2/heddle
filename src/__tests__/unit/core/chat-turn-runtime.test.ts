@@ -358,7 +358,7 @@ describe('chat turn preparation modules', () => {
       sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
-      agentSnapshot: askAgentSnapshot(),
+      agentProfileId: 'builtin:ask',
       artifactRoot: join(root, '.heddle', 'artifacts'),
       artifactsEnabled: true,
     });

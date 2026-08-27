@@ -16,6 +16,7 @@ This domain owns:
 - the mandatory child read-only tool and approval envelopes;
 - fresh child context, adapter creation, cancellation, step clamping, and a
   validated per-child execution deadline;
+- correlated delegation lifecycle and wrapped child conversation activity;
 - bounded model-facing results and richer in-memory host records.
 
 `DelegationRootScope` owns the mutable per-root graph, reservation semaphore,
@@ -25,7 +26,7 @@ split intact: graph state must not leak into the single-run runtime, and child
 authority must not be reconstructed by host callers.
 
 It does not own chat sessions, turn activation, durable records, live UI
-projection, provider-native delegation, child worktrees, write authority, or
+rendering, provider-native delegation, child worktrees, write authority, or
 recursive delegation. Those concerns must stay in their existing host/domain
 owners or later feature slices.
 
@@ -41,6 +42,7 @@ const delegation = new DelegationService({
 });
 const scope = delegation.createRootScope({
   workspaceRoot,
+  onActivity: (activity) => host.publishActivity(activity),
   runtime: {
     model,
     apiKey,
@@ -89,8 +91,18 @@ turn and exposes `delegate_task` unless the engine or turn selects `off`.
 The root model decides whether a task benefits from delegation; there is no
 per-turn enable gate. An engine-level `off` is an authority ceiling, so a turn
 cannot re-enable it. The conversation turn result includes the scope snapshot
-in memory and omits it when delegation is off. Durable child records and live
-child activity remain later slices.
+in memory and omits it when delegation is off.
+
+Conversation hosts receive `delegation.started`, `delegation.finished`,
+`delegation.cancelled`, and `delegation.rejected` lifecycle activities with the
+root, parent, delegation, and child run IDs. Child conversation activity is
+published as `delegation.child.activity` with the same correlation fields. It
+must stay wrapped: publishing a child `loop.finished` as an ordinary root
+activity would let existing clients mistake child settlement for root-turn
+settlement. Redundant child `assistant.stream` draft snapshots are omitted;
+`delegation.finished.summary` carries the completed child answer while tool,
+reasoning, warning, cancellation, and loop progress remain visible. Durable
+child records and purpose-built UI rendering remain later slices.
 
 ## V1 Safety Invariants
 
