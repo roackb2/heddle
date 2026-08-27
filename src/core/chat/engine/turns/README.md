@@ -19,8 +19,8 @@ the class that owns that phase.
   that model request once, without replaying completed tools.
 - `lease/`: owns wall-clock renewal for the fenced lease held by an in-flight
   turn. Engine turns renew themselves; hosts must not duplicate that heartbeat.
-- `persistence/`: builds turn artifacts and writes completed turns back to
-  session storage.
+- `persistence/`: builds turn artifacts, projects settled child-run records,
+  and writes completed turns back to session storage.
 - `memory/`: runs inline or post-persistence memory maintenance, records its
   trace evidence, and establishes the stable boundary before turn settlement.
 - `host/`: normalizes public host callbacks into turn-runtime ports.
@@ -35,3 +35,9 @@ the class that owns that phase.
   loose functions.
 - Use `@/...` imports for cross-domain references; reserve relative imports for
   same-folder files and local subdomain indexes.
+- Persist only terminal delegation records on the parent `TurnSummary`. Raw
+  child traces, child transcripts, top-level model/provider fields, and active
+  child execution state are not conversation recovery data.
+- Delegation records inherit the parent turn's repository and recent-summary
+  retention. Do not create a separate child repository or retention system
+  without a new durability decision.

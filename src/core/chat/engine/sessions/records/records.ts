@@ -6,6 +6,7 @@
  * session service can compose them without growing scattered helper functions.
  */
 import { truncate } from '@/core/utils/text.js';
+import omit from 'lodash/omit.js';
 import type { ChatSession, ConversationLine } from '@/core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
@@ -57,6 +58,10 @@ export class ChatSessionRecords {
   }
 
   static buildTurnSummary(input: BuildChatTurnSummaryInput) {
+    const delegations = input.delegation?.records.map((record) => (
+      omit(record, ['trace', 'model', 'provider'])
+    ));
+
     return {
       id: input.id,
       prompt: input.prompt,
@@ -80,6 +85,7 @@ export class ChatSessionRecords {
         definitionHash: input.agentSnapshot.definitionHash,
       } : undefined,
       agentSnapshot: input.agentSnapshot,
+      ...(delegations?.length ? { delegations } : {}),
     };
   }
 

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import omit from 'lodash/omit.js';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { ArtifactService } from '@/core/artifacts/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
@@ -401,12 +402,12 @@ describe('conversation turn lifecycle', () => {
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
   });
 
-  it('makes delegation available by default and returns completed child evidence to the host', async () => {
+  it('persists two completed child records and reopens them with the parent turn', async () => {
     const storage = await createConversationTurnStorage();
     const childMessages: ChatMessage[][] = [];
     const childToolNames: string[][] = [];
     let rootToolNames: string[] = [];
-    let rootToolOutput: unknown;
+    let rootToolOutputs: unknown[] = [];
     const activities: ConversationActivity[] = [];
     let rootRequest = 0;
     const rootAdapter = testAdapter(async (messages, tools) => {
@@ -415,31 +416,50 @@ describe('conversation turn lifecycle', () => {
       if (rootRequest === 1) {
         return {
           content: 'I will delegate an independent inspection.',
-          toolCalls: [{
-            id: 'delegate-one',
-            tool: 'delegate_task',
-            input: {
-              task: 'Inspect the conversation engine boundary.',
-              agentProfileId: 'builtin:ask',
+          toolCalls: [
+            {
+              id: 'delegate-one',
+              tool: 'delegate_task',
+              input: {
+                task: 'Inspect the conversation engine boundary.',
+                agentProfileId: 'builtin:ask',
+              },
             },
-          }],
+            {
+              id: 'delegate-two',
+              tool: 'delegate_task',
+              input: {
+                task: 'Review the conversation persistence boundary.',
+                agentProfileId: 'builtin:review',
+              },
+            },
+          ],
         };
       }
 
-      const toolMessage = [...messages].reverse().find(
+      const toolMessages = messages.filter(
         (message): message is Extract<ChatMessage, { role: 'tool' }> => message.role === 'tool',
       );
-      rootToolOutput = toolMessage ? JSON.parse(toolMessage.content) : undefined;
+      rootToolOutputs = toolMessages.map((message) => JSON.parse(message.content));
       return { content: 'Root synthesized the delegated inspection.' };
     });
-    const childAdapter = testAdapter(async (messages, tools) => {
+    const childAdapter = (summary: string) => testAdapter(async (messages, tools) => {
       childMessages.push(structuredClone(messages));
       childToolNames.push((tools ?? []).map((tool) => tool.name));
-      return { content: 'The conversation engine owns the persisted turn boundary.' };
+      return {
+        content: summary,
+        usage: {
+          inputTokens: 12,
+          outputTokens: 8,
+          totalTokens: 20,
+          requests: 1,
+        },
+      };
     });
     vi.spyOn(LlmAdapterService, 'create')
       .mockReturnValueOnce(rootAdapter)
-      .mockReturnValueOnce(childAdapter);
+      .mockReturnValueOnce(childAdapter('The conversation engine owns the persisted turn boundary.'))
+      .mockReturnValueOnce(childAdapter('The session repository owns durable turn summaries.'));
 
     const turnResult = await EngineConversationTurnService.run({
       workspaceRoot: storage.workspaceRoot,
@@ -460,35 +480,57 @@ describe('conversation turn lifecycle', () => {
     });
 
     expect(rootToolNames).toContain('delegate_task');
-    expect(childToolNames).toEqual([[
-      'project_dashboard',
-      'list_files',
-      'read_file',
-      'search_files',
-    ]]);
+    expect(childToolNames).toEqual([
+      ['project_dashboard', 'list_files', 'read_file', 'search_files'],
+      ['project_dashboard', 'list_files', 'read_file', 'search_files'],
+    ]);
     expect(JSON.stringify(childMessages)).toContain('BASE_SYSTEM_CONTEXT');
     expect(JSON.stringify(childMessages)).not.toContain('ROOT_PROFILE_SENTINEL');
-    expect(rootToolOutput).toEqual(expect.objectContaining({
-      ok: true,
-      output: expect.objectContaining({
-        status: 'finished',
-        outcome: 'done',
+    expect(rootToolOutputs).toHaveLength(2);
+    expect(rootToolOutputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ok: true,
+        output: expect.objectContaining({ status: 'finished', outcome: 'done' }),
       }),
-    }));
+    ]));
     expect(turnResult).toEqual(expect.objectContaining({
       outcome: 'done',
       summary: 'Root synthesized the delegated inspection.',
       delegation: expect.objectContaining({
         policy: expect.objectContaining({ enabled: true }),
-        records: [expect.objectContaining({
-          task: 'Inspect the conversation engine boundary.',
-          status: 'finished',
-          outcome: 'done',
-          summary: 'The conversation engine owns the persisted turn boundary.',
-        })],
+        records: [
+          expect.objectContaining({
+            task: 'Inspect the conversation engine boundary.',
+            status: 'finished',
+            outcome: 'done',
+            summary: 'The conversation engine owns the persisted turn boundary.',
+          }),
+          expect.objectContaining({
+            task: 'Review the conversation persistence boundary.',
+            status: 'finished',
+            outcome: 'done',
+            summary: 'The session repository owns durable turn summaries.',
+          }),
+        ],
       }),
     }));
     expect(turnResult.delegation?.records[0]?.rootRunId).toBe(turnResult.delegation?.rootRunId);
+    const reopened = await readStoredChatSession(
+      new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+      storage.sessionId,
+    );
+    const persistedDelegations = reopened?.turns.at(-1)?.delegations;
+    expect(persistedDelegations).toEqual(
+      turnResult.delegation?.records.map((record) => omit(record, ['trace', 'model', 'provider'])),
+    );
+    expect(persistedDelegations?.every((record) => (
+      !('trace' in record)
+      && !('transcript' in record)
+      && !('model' in record)
+      && !('provider' in record)
+      && record.agentSnapshot.definitionHash.length > 0
+      && record.usage?.requests === 1
+    ))).toBe(true);
     expect(activities).toEqual(expect.arrayContaining([
       expect.objectContaining({
         source: 'delegation',
@@ -606,6 +648,11 @@ describe('conversation turn lifecycle', () => {
     expect(loopSpy.mock.calls[0]?.[0].tools?.map((tool) => tool.name)).not.toContain('delegate_task');
     expect(loopSpy.mock.calls[0]?.[0].runId).toBeUndefined();
     expect(turnResult.delegation).toBeUndefined();
+    const reopened = await readStoredChatSession(
+      new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+      storage.sessionId,
+    );
+    expect(reopened?.turns.at(-1)).not.toHaveProperty('delegations');
   });
 
   it('returns persisted trace, session artifacts, completed tool results, and memory changes to hosts', async () => {

@@ -33,6 +33,8 @@ import type {
   DelegationRejectionCode,
   DelegationRootScopeSnapshot,
   DelegationServiceOptions,
+  SettledDelegatedRunRecord,
+  SettledDelegationRootScopeSnapshot,
 } from './types.js';
 import { DelegationChildRuntimeService } from './child-runtime.js';
 
@@ -199,6 +201,28 @@ export class DelegationRootScope {
       rootRunId: this.rootRunId,
       policy: cloneDeep(this.policy),
       records: this.records(),
+    };
+  }
+
+  /**
+   * Returns the durable parent-turn view only after every reserved child has
+   * reached a terminal record. A running child is an ownership invariant
+   * violation at the completed-turn persistence boundary.
+   */
+  settledSnapshot(): SettledDelegationRootScopeSnapshot {
+    const records = this.records();
+    if (!records.every(isSettledDelegatedRunRecord)) {
+      const running = records.find((record) => record.status === 'running');
+      throw new Error(
+        `Cannot persist delegation while child run is still running: ${running?.childRunId ?? 'unknown'}`,
+      );
+    }
+
+    return {
+      schemaVersion: 1,
+      rootRunId: this.rootRunId,
+      policy: cloneDeep(this.policy),
+      records,
     };
   }
 
@@ -487,4 +511,13 @@ export class DelegationRootScope {
       depth: record.depth,
     };
   }
+}
+
+function isSettledDelegatedRunRecord(
+  record: DelegatedRunRecord,
+): record is SettledDelegatedRunRecord {
+  return record.status !== 'running'
+    && record.outcome !== undefined
+    && record.summary !== undefined
+    && record.finishedAt !== undefined;
 }

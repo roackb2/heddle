@@ -3,6 +3,7 @@ import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
 import type { ToolApprovalUserDecision } from '../approvals/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import type { SettledDelegatedRunRecord } from '@/core/delegation/index.js';
 
 export type ChatTurnAgent = {
   id: string;
@@ -11,6 +12,12 @@ export type ChatTurnAgent = {
   source: 'project' | 'user' | 'built-in';
   definitionHash: string;
 };
+
+/** Durable child-run evidence retained with its completed parent turn. */
+export type ConversationTurnDelegationRecord = Omit<
+  SettledDelegatedRunRecord,
+  'trace' | 'model' | 'provider'
+>;
 
 export type TurnSummary = {
   id: string;
@@ -23,6 +30,7 @@ export type TurnSummary = {
   presentation?: ConversationTurnPresentation;
   agent?: ChatTurnAgent;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  delegations?: ConversationTurnDelegationRecord[];
 };
 
 export type ConversationTurnPresentation = {

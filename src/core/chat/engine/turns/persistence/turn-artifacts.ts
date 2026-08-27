@@ -43,6 +43,7 @@ export class ConversationTurnArtifacts {
       traceFile,
       traceSummarizerRegistry: args.traceSummarizerRegistry,
       agentSnapshot: args.agentSnapshot,
+      delegation: args.delegation,
     });
     const summary =
       args.result.outcome === 'error'

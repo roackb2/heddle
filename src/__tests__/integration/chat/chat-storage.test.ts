@@ -180,6 +180,38 @@ describe('chat session storage layout', () => {
         steps: 1,
         traceFile: '/tmp/trace-1.json',
         events: ['done'],
+        delegations: [
+          {
+            schemaVersion: 1,
+            delegationId: 'delegation-valid',
+            rootRunId: 'run-root',
+            parentRunId: 'run-root',
+            childRunId: 'run-child',
+            depth: 1,
+            task: 'Inspect the durable boundary.',
+            agentSnapshot: {
+              agentProfileId: 'builtin:ask',
+              agentName: 'Ask',
+              modeAlias: 'ask',
+              source: 'built-in',
+              definitionHash: 'ask-definition',
+              runtime: { maxSteps: 24 },
+              toolProfile: { preset: 'inspect', memoryMode: 'none' },
+              approvalProfile: { preset: 'read_only' },
+              systemContextAppendix: 'Read only.',
+            },
+            status: 'finished',
+            outcome: 'done',
+            summary: 'Inspected the durable boundary.',
+            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15, requests: 1 },
+            startedAt: '2026-04-13T00:00:00.000Z',
+            finishedAt: '2026-04-13T00:00:01.000Z',
+          },
+          {
+            schemaVersion: 1,
+            status: 'running',
+          },
+        ],
       }],
     }, null, 2));
 
@@ -194,7 +226,14 @@ describe('chat session storage layout', () => {
         pinned: false,
         history: [{ role: 'user', content: 'valid prompt' }],
         messages: [{ id: 'm1', role: 'assistant', text: 'valid visible message' }],
-        turns: [expect.objectContaining({ id: 't1', summary: 'valid turn' })],
+        turns: [expect.objectContaining({
+          id: 't1',
+          summary: 'valid turn',
+          delegations: [expect.objectContaining({
+            childRunId: 'run-child',
+            status: 'finished',
+          })],
+        })],
       }),
     });
   });

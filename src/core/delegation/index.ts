@@ -34,4 +34,6 @@ export type {
   DelegationRejectionCode,
   DelegationRootScopeSnapshot,
   DelegationServiceOptions,
+  SettledDelegatedRunRecord,
+  SettledDelegationRootScopeSnapshot,
 } from './types.js';

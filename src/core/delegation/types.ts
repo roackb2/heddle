@@ -103,11 +103,29 @@ export type DelegatedRunRecord = {
   trace: TraceEvent[];
 };
 
+/** Completed child-run evidence safe to attach to a durable parent turn. */
+export type SettledDelegatedRunRecord = Omit<
+  DelegatedRunRecord,
+  'status' | 'outcome' | 'summary' | 'finishedAt'
+> & {
+  status: Exclude<DelegatedRunStatus, 'running'>;
+  outcome: StopReason;
+  summary: string;
+  finishedAt: string;
+};
+
 export type DelegationRootScopeSnapshot = {
   schemaVersion: 1;
   rootRunId: string;
   policy: DelegationPolicy;
   records: DelegatedRunRecord[];
+};
+
+export type SettledDelegationRootScopeSnapshot = Omit<
+  DelegationRootScopeSnapshot,
+  'records'
+> & {
+  records: SettledDelegatedRunRecord[];
 };
 
 export type DelegationChildLlmFactoryInput = {

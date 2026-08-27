@@ -11,6 +11,7 @@ import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/pre
 import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import { REASONING_EFFORTS } from '@/core/llm/types.js';
+import { MODEL_RUN_FAILURE_CODES } from '@/core/types.js';
 
 const ReasoningEffortSchema = z.enum(REASONING_EFFORTS);
 const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
@@ -95,6 +96,41 @@ const ChatTurnAgentSchema = z.object({
   definitionHash: z.string().describe('Hash of the custom-agent definition snapshot used for this turn.'),
 });
 
+const ModelRunFailureSchema = z.object({
+  source: z.literal('model'),
+  code: z.enum(MODEL_RUN_FAILURE_CODES),
+}).strict();
+
+const ConversationTurnDelegationRecordSchema = z.object({
+  schemaVersion: z.literal(1).describe('Delegation record schema version.'),
+  delegationId: z.string().min(1).describe('Stable identifier for this child delegation.'),
+  rootRunId: z.string().min(1).describe('Owning root run identifier.'),
+  parentRunId: z.string().min(1).describe('Immediate parent run identifier.'),
+  childRunId: z.string().min(1).describe('Delegated child run identifier.'),
+  depth: z.literal(1).describe('Delegation depth supported by the current bounded runtime.'),
+  task: z.string().min(1).describe('Self-contained task assigned to the child.'),
+  agentSnapshot: CustomAgentExecutionSnapshotSchema
+    .describe('Exact custom-agent execution snapshot resolved for the child.'),
+  status: z.enum(['finished', 'cancelled']).describe('Terminal child-run status.'),
+  outcome: z.enum(['done', 'max_steps', 'error', 'interrupted'])
+    .describe('Final child-run stop reason.'),
+  summary: z.string().describe('Safe child result returned to the root agent.'),
+  failure: ModelRunFailureSchema
+    .describe('Safe model failure classification, when the child failed at the provider boundary.')
+    .optional(),
+  usage: LlmUsageSchema
+    .describe('Normalized usage attributed to this child run.')
+    .optional(),
+  startedAt: z.string().describe('Timestamp when the child reservation started.'),
+  finishedAt: z.string().describe('Timestamp when the child reached a terminal record.'),
+}).strict();
+
+const ConversationTurnDelegationsReadSchema = z.array(z.unknown())
+  .transform((records) => records.flatMap((record) => {
+    const parsed = ConversationTurnDelegationRecordSchema.safeParse(record);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
 const TurnSummarySchema = z.object({
   id: z.string().describe('Stable identifier for this completed turn summary.'),
   prompt: z.string().describe('User prompt that started the turn.'),
@@ -112,12 +148,16 @@ const TurnSummarySchema = z.object({
   agentSnapshot: CustomAgentExecutionSnapshotSchema
     .describe('Resolved custom-agent execution snapshot used by this completed turn.')
     .optional(),
+  delegations: z.array(ConversationTurnDelegationRecordSchema)
+    .describe('Settled child-run evidence retained with this completed parent turn.')
+    .optional(),
 });
 
 const TurnSummaryReadSchema = TurnSummarySchema.extend({
   presentation: ConversationTurnPresentationSchema.optional().catch(undefined),
   agent: ChatTurnAgentSchema.optional().catch(undefined),
   agentSnapshot: CustomAgentExecutionSnapshotSchema.optional().catch(undefined),
+  delegations: ConversationTurnDelegationsReadSchema.optional().catch(undefined),
 });
 
 const TurnSummariesSchema = z.array(z.unknown())

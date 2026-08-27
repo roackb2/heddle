@@ -266,6 +266,8 @@ export type {
   DelegatedRunRecord,
   DelegationPolicy,
   DelegationRootScopeSnapshot,
+  SettledDelegatedRunRecord,
+  SettledDelegationRootScopeSnapshot,
 } from './core/delegation/index.js';
 export type {
   ConversationPersistence,
@@ -385,6 +387,7 @@ export type {
   ChatArchiveManifest,
   ChatArchiveRecord,
   ChatSession,
+  ConversationTurnDelegationRecord,
 } from './core/chat/types.js';
 export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
 export type {
