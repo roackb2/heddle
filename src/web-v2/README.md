@@ -69,3 +69,10 @@ Run cursor, duplicate, sequence-gap, and reconnect rules belong to
 `ConversationRunConsumerService` from the public remote-run SDK layer, shared
 with cli-v2 through `client-shared`. React hooks own only tRPC binding, cache
 refresh, and browser presentation state.
+
+Subagent visibility follows the same boundary. Web-v2 keeps one local,
+default-on composer switch and sends the existing per-turn `delegation` field.
+`client-shared` reduces correlated lifecycle events into live rows, while the
+session detail API supplies settled per-turn records after reload. The web UI
+does not expose child permissions, transcripts, raw traces, model, or provider
+details.

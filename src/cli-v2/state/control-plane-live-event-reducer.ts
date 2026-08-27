@@ -1,6 +1,7 @@
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
 import { ClientSharedNotificationIntentService } from '@/client-shared/services/notifications/index.js';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
+import { ClientSharedSessionDelegationService } from '@/client-shared/services/session-delegations/index.js';
 import type {
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionRunEventEnvelope,
@@ -77,6 +78,13 @@ export class ControlPlaneLiveEventReducer {
     }
 
     const activity = event.activity;
+    this.options.state.patch((current) => {
+      const liveDelegations = ClientSharedSessionDelegationService.reduceActivity(
+        current.liveDelegations,
+        activity,
+      );
+      return liveDelegations === current.liveDelegations ? {} : { liveDelegations };
+    });
     this.options.notificationService?.deliver(ClientSharedNotificationIntentService.projectSessionActivity({
       workspaceId,
       sessionId,

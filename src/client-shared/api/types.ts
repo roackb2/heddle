@@ -24,6 +24,10 @@ export type ControlPlaneSessionTurn = NonNullable<ControlPlaneSessionDetail>['tu
 export type ControlPlaneApprovalDecision = RouterInputs['controlPlane']['sessionResolveApproval']['decision'];
 export type ControlPlaneSessionSendPromptResult = RouterOutputs['controlPlane']['sessionSendPrompt'];
 export type ControlPlaneSessionSendPromptAsyncResult = RouterOutputs['controlPlane']['sessionSendPromptAsync'];
+export type ControlPlaneConversationDelegationMode = Exclude<
+  RouterInputs['controlPlane']['sessionSendPromptAsync']['delegation'],
+  undefined
+>;
 export type ControlPlaneSessionDirectShellPreflight = RouterOutputs['controlPlane']['sessionDirectShellPreflight'];
 export type ControlPlaneSessionDirectShellAsyncResult = RouterOutputs['controlPlane']['sessionDirectShellAsync'];
 export type ControlPlaneSessionRunState = RouterOutputs['controlPlane']['sessionRunState'];

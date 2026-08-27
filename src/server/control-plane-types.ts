@@ -15,6 +15,7 @@ import type { ConversationRunStreamItem } from '@/core/chat/runs/index.js';
 import type {
   ChatSessionRetention,
   ConversationDirectShellLineResult,
+  ConversationTurnDelegationRecord,
   ConversationTurnPresentation,
   QueuedConversationPrompt,
 } from '@/core/chat/types.js';
@@ -96,6 +97,7 @@ export type ChatTurnView = {
   events: string[];
   presentation?: ConversationTurnPresentation;
   agent?: ChatTurnAgentView;
+  delegations?: ConversationTurnDelegationRecord[];
 };
 
 export type CommandEvidenceView = {

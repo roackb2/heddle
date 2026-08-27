@@ -25,6 +25,13 @@
       "useAction": "使用瀏覽器",
       "useDescription": "提示代理為這個任務檢查或操作相關頁面。"
     },
+    "subagents": {
+      "ariaLabel": "子代理",
+      "description": "當平行研究有幫助時，允許 Heddle 啟動唯讀助手。",
+      "disabled": "後續訊息關閉",
+      "enabled": "後續訊息開啟",
+      "title": "子代理"
+    },
     "drift": {
       "ariaLabel": "語意漂移",
       "disabled": "漂移關閉",
@@ -157,6 +164,19 @@
     "searchModels": "搜尋模型",
     "send": "送出",
     "stop": "停止"
+  },
+  "subagents": {
+    "historyLabel": "子代理結果",
+    "liveLabel": "即時子代理活動",
+    "status": {
+      "cancelled": "已取消",
+      "done": "完成",
+      "failed": "失敗",
+      "finished": "已結束",
+      "running": "處理中",
+      "stepLimit": "已達步數上限"
+    },
+    "title": "子代理"
   },
   "diffPreview": {
     "binary": "二進位",

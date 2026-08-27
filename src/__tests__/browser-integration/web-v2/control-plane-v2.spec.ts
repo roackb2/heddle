@@ -76,6 +76,29 @@ test('opens side panels as mobile overlays', async ({ page }) => {
   await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
 });
 
+test('keeps the upcoming-turn subagent switch keyboard-accessible on narrow screens', async ({ page }) => {
+  const state = await trpc.controlPlane.state.query();
+  const session = await trpc.controlPlane.sessionCreate.mutate({
+    name: `Subagent control smoke ${Date.now()}`,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/workspaces/${state.activeWorkspaceId}/sessions/${session.id}`);
+
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await page.getByRole('button', { name: /Add context/ }).click();
+
+  const subagents = page.getByRole('switch', { name: /Subagents/ });
+  await expect(subagents).toHaveAttribute('data-state', 'checked');
+  await expect(page.getByText('Permission mode', { exact: true })).toBeVisible();
+
+  await subagents.press('Space');
+  await expect(subagents).toHaveAttribute('data-state', 'unchecked');
+  await expect(page.getByText('Off for upcoming messages', { exact: true })).toBeVisible();
+
+  await subagents.press('Space');
+  await expect(subagents).toHaveAttribute('data-state', 'checked');
+});
+
 test('navigates primary and settings routes without hash routing', async ({ page }) => {
   await page.goto('/sessions');
 

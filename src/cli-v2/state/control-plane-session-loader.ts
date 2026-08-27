@@ -56,6 +56,8 @@ export class ControlPlaneSessionLoader {
       liveStatus: undefined,
       currentActivity: undefined,
       activePlan: undefined,
+      liveDelegations: [],
+      delegationMode: 'auto',
       recentEditDiffs: [],
       latestUpdate: undefined,
       activeRun: undefined,

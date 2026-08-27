@@ -25,6 +25,13 @@
       "useAction": "使用浏览器",
       "useDescription": "提示代理为这个任务检查或操作相关页面。"
     },
+    "subagents": {
+      "ariaLabel": "子代理",
+      "description": "当并行研究有帮助时，允许 Heddle 启动只读助手。",
+      "disabled": "后续消息关闭",
+      "enabled": "后续消息开启",
+      "title": "子代理"
+    },
     "drift": {
       "ariaLabel": "语义漂移",
       "disabled": "漂移关闭",
@@ -157,6 +164,19 @@
     "searchModels": "搜索模型",
     "send": "发送",
     "stop": "停止"
+  },
+  "subagents": {
+    "historyLabel": "子代理结果",
+    "liveLabel": "实时子代理活动",
+    "status": {
+      "cancelled": "已取消",
+      "done": "完成",
+      "failed": "失败",
+      "finished": "已结束",
+      "running": "处理中",
+      "stepLimit": "已达步数上限"
+    },
+    "title": "子代理"
   },
   "diffPreview": {
     "binary": "二进制",

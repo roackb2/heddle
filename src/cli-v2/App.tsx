@@ -15,6 +15,7 @@ import { QueuedPromptPanel } from './components/QueuedPromptPanel.js';
 import { RecentEditDiffPanel } from './components/RecentEditDiffPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
+import { SubagentActivityPanel } from './components/SubagentActivityPanel.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { useRecentEditDiffReview } from './hooks/useRecentEditDiffReview.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
@@ -95,7 +96,22 @@ export function App({
 
       recentEditDiffReview.open();
     },
-  }), [hasCommandResults, hasConversationActivityGroups, recentEditDiffReview, store]);
+    subagentsStatus: () => {
+      store.showLocalCommandMessage(
+        snapshot.delegationMode === 'auto'
+          ? 'Subagents are on for upcoming messages.'
+          : 'Subagents are off for upcoming messages.',
+      );
+    },
+    subagentsOn: () => {
+      store.setDelegationMode('auto');
+      store.showLocalCommandMessage('Subagents are on for upcoming messages.');
+    },
+    subagentsOff: () => {
+      store.setDelegationMode('off');
+      store.showLocalCommandMessage('Subagents are off for upcoming messages.');
+    },
+  }), [hasCommandResults, hasConversationActivityGroups, recentEditDiffReview, snapshot.delegationMode, store]);
   const localSlashCommandHints = useMemo(
     () => TuiLocalSlashCommandService.hints(),
     [],
@@ -150,6 +166,7 @@ export function App({
         onCancel={cancelRun}
       />
       <AgentPlanPanel plan={snapshot.activePlan} />
+      {snapshot.running ? <SubagentActivityPanel delegations={snapshot.liveDelegations} /> : null}
       <ChangedFilesPanel files={snapshot.workspaceChanges} />
       <PromptStatusPanel
         currentActivity={snapshot.currentActivity}

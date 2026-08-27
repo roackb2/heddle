@@ -12,6 +12,7 @@ export class RuntimeStatusService {
       `model=${context.model}`,
       `reasoning=${RuntimeStatusService.formatReasoning(context)}`,
       `permissions=${context.permissionMode}`,
+      `subagents=${snapshot.delegationMode === 'off' ? 'off' : 'on'}`,
       RuntimeStatusService.formatAuth(context),
       RuntimeStatusService.formatContextWindow(context),
       `drift=${context.driftEnabled ? context.driftLevel ?? 'unknown' : 'off'}`,

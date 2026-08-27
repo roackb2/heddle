@@ -32,7 +32,7 @@ snapshot and call user-intent methods.
   replayable run stream remains the source of truth.
 - `control-plane-live-event-reducer.ts` owns reduction of control-plane live
   events into the TUI snapshot. Shared activity semantics stay in
-  `client-shared`.
+  `client-shared`, including replay-safe subagent lifecycle rows.
 - `control-plane-workspace-changes-controller.ts` owns coalesced refresh of the
   control-plane's canonical Git workspace-change projection after shared
   workspace-change activity triggers. It does not infer changes from terminal
@@ -55,3 +55,6 @@ snapshot and call user-intent methods.
 - Do not duplicate domain policy in this folder. If a rule belongs to slash
   commands, shell policy, model capabilities, approvals, or activity semantics,
   move it to the owning core/control-plane/client-shared module instead.
+- `delegationMode` is a TUI-local, default-on next-turn preference. It resets
+  when a session is opened and is sent through the existing per-turn API field;
+  it is not a durable permission or runtime-policy setting.

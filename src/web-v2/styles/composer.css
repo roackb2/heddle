@@ -615,6 +615,13 @@
     flex-direction: column;
   }
 
+  .v2-subagents-menu-section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
   .v2-permission-mode-menu-section {
     display: flex;
     min-width: 0;
@@ -625,12 +632,14 @@
   .v2-composer-context-menu > :is(
     .v2-upload-menu-section,
     .v2-browser-intent-menu-section,
+    .v2-subagents-menu-section,
     .v2-permission-mode-menu-section,
     .v2-agent-menu-section,
     .v2-drift-menu-section
   ) + :is(
     .v2-upload-menu-section,
     .v2-browser-intent-menu-section,
+    .v2-subagents-menu-section,
     .v2-permission-mode-menu-section,
     .v2-agent-menu-section,
     .v2-drift-menu-section

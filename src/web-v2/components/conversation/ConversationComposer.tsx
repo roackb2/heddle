@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Globe2, X } from 'lucide-react';
-import type { ControlPlaneCustomAgents, ControlPlaneModelOptions, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
+import type {
+  ControlPlaneConversationDelegationMode,
+  ControlPlaneCustomAgents,
+  ControlPlaneModelOptions,
+  ControlPlanePermissionMode,
+  ControlPlaneSessionRuntimeContext,
+} from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { Textarea } from '@web/components/ui/textarea';
 import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
@@ -70,7 +76,11 @@ export function ConversationComposer({
   submitting?: boolean;
   running?: boolean;
   cancelling?: boolean;
-  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string; browserIntent?: 'preferred' }) => Promise<void>;
+  onSubmitPrompt: (prompt: string, options?: {
+    agentProfileId?: string;
+    browserIntent?: 'preferred';
+    delegation?: ControlPlaneConversationDelegationMode;
+  }) => Promise<void>;
   onCancelRun?: () => Promise<void>;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
@@ -83,6 +93,7 @@ export function ConversationComposer({
   const [draft, setDraft] = useState('');
   const [selectedAgentProfileId, setSelectedAgentProfileId] = useState<string>(BUILT_IN_COMPOSER_AGENT_IDS.code);
   const [browserIntentEnabled, setBrowserIntentEnabled] = useState(false);
+  const [subagentsEnabled, setSubagentsEnabled] = useState(true);
   const {
     attachments: imageUploadAttachments,
     clearUploadedAttachments,
@@ -141,12 +152,13 @@ export function ConversationComposer({
     await onSubmitPrompt(prompt, {
       agentProfileId: selectedAgentProfileId,
       browserIntent: browserIntentEnabled ? 'preferred' : undefined,
+      delegation: subagentsEnabled ? 'auto' : 'off',
     });
     recordPrompt(prompt);
     setDraft('');
     setBrowserIntentEnabled(false);
     clearUploadedAttachments();
-  }, [browserIntentEnabled, clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, selectedAgentProfileId, sendDisabled, uploadedImagePaths]);
+  }, [browserIntentEnabled, clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, selectedAgentProfileId, sendDisabled, subagentsEnabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     workspaceId,
     value: draft,
@@ -234,11 +246,13 @@ export function ConversationComposer({
           permissionMode={permissionMode}
           permissionModeOptions={permissionModeOptions}
           browserIntentEnabled={browserIntentEnabled}
+          subagentsEnabled={subagentsEnabled}
           selectedAgentProfileId={selectedAgentProfileId}
           settingsUpdating={settingsUpdating}
           uploadDisabled={imageUploadDisabled}
           onSelectAgentProfileId={setSelectedAgentProfileId}
           onToggleBrowserIntent={() => setBrowserIntentEnabled((current) => !current)}
+          onSubagentsEnabledChange={setSubagentsEnabled}
           onUploadImagesClick={() => imageUploadControlsRef.current?.openFilePicker()}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
           onUpdatePermissionMode={onUpdatePermissionMode}

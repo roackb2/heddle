@@ -18,6 +18,7 @@ import {
 } from './control-plane-session-state.js';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneConversationDelegationMode,
   ControlPlanePermissionMode,
   ControlPlaneSessionView,
   ControlPlaneSlashCommandHint,
@@ -257,6 +258,10 @@ export class ControlPlaneSessionStore {
 
   async selectPermissionModeFromPicker(mode: ControlPlanePermissionMode): Promise<void> {
     await this.slashCommands.execute(`/permissions ${mode}`);
+  }
+
+  setDelegationMode(mode: ControlPlaneConversationDelegationMode): void {
+    this.state.patch({ delegationMode: mode });
   }
 
   async cancelRun(): Promise<void> {

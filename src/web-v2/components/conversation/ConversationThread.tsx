@@ -13,6 +13,7 @@ import type {
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
 import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
+import type { ClientSharedDelegationView } from '@/client-shared/services/session-delegations';
 import type {
   ClientSharedAgentActivityStatus,
   ClientSharedSessionLatestUpdate,
@@ -24,6 +25,8 @@ import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
 import { ConversationTurnActivityGroup } from './ConversationTurnActivity';
+import { ConversationTurnDelegationGroup } from './ConversationTurnDelegation';
+import { SubagentActivityPanel } from './SubagentActivityPanel';
 import { ConversationWelcomePanel } from './ConversationWelcomePanel';
 import { DirectShellConfirmDialog } from './DirectShellConfirmDialog';
 import { QueuedPromptStrip } from './QueuedPromptStrip';
@@ -40,6 +43,7 @@ interface ConversationThreadProps {
   currentActivity?: ClientSharedAgentActivityStatus;
   latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
+  liveDelegations: ClientSharedDelegationView[];
   runtimeContext?: ControlPlaneSessionRuntimeContext;
   agents?: ControlPlaneCustomAgents;
   pendingApproval: ControlPlanePendingApproval;
@@ -51,7 +55,11 @@ interface ConversationThreadProps {
   queueUpdating: boolean;
   directShellConfirmation?: ControlPlaneSessionDirectShellPreflight;
   emptyTitle: string;
-  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string }) => Promise<void>;
+  onSubmitPrompt: (prompt: string, options?: {
+    agentProfileId?: string;
+    browserIntent?: 'preferred';
+    delegation?: 'auto' | 'off';
+  }) => Promise<void>;
   onConfirmDirectShell: () => Promise<void>;
   onCancelDirectShellConfirmation: () => void;
   onUpdateQueuedPrompt: (queueItemId: string, prompt: string) => Promise<void>;
@@ -76,6 +84,7 @@ export function ConversationThread({
   currentActivity,
   latestUpdate,
   activePlan,
+  liveDelegations,
   runtimeContext,
   agents,
   pendingApproval,
@@ -158,6 +167,8 @@ export function ConversationThread({
           {conversationTimeline.map((item) => (
             item.type === 'message' ? (
               <ConversationMessage key={item.id} message={item.message} turnAgent={item.turnAgent} />
+            ) : item.type === 'turn_delegation_group' ? (
+              <ConversationTurnDelegationGroup key={item.id} item={item} />
             ) : (
               <ConversationTurnActivityGroup key={item.id} item={item} />
             )
@@ -177,6 +188,11 @@ export function ConversationThread({
       {activePlan ? (
         <div className="v2-agent-plan-region">
           <AgentPlanPanel plan={activePlan} />
+        </div>
+      ) : null}
+      {running && liveDelegations.length > 0 ? (
+        <div className="v2-subagent-activity-region">
+          <SubagentActivityPanel delegations={liveDelegations} />
         </div>
       ) : null}
       {currentActivity || latestUpdate ? (

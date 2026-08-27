@@ -357,6 +357,119 @@
     padding: 0 1.5rem 0.45rem;
   }
 
+  .v2-subagent-activity-region {
+    padding: 0 1.5rem 0.5rem;
+  }
+
+  .v2-subagent-activity-panel {
+    margin-inline: auto;
+    width: min(100%, 48rem);
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    background: color-mix(in oklab, var(--color-background) 90%, var(--color-muted));
+    padding: 0.625rem 0.75rem;
+  }
+
+  .v2-subagent-activity-panel-settled {
+    margin-inline: 0;
+    width: min(100%, 46rem);
+  }
+
+  .v2-subagent-activity-title-row,
+  .v2-subagent-activity-header {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .v2-subagent-activity-title-row {
+    color: var(--color-foreground);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  .v2-subagent-activity-title-row svg {
+    height: 0.875rem;
+    width: 0.875rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-subagent-activity-count {
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+
+  .v2-subagent-activity-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.55rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .v2-subagent-activity-item {
+    min-width: 0;
+    border-left: 2px solid color-mix(in oklab, var(--color-border) 82%, transparent);
+    padding-left: 0.625rem;
+  }
+
+  .v2-subagent-activity-item[data-status="running"] {
+    border-left-color: color-mix(in oklab, var(--color-primary) 60%, var(--color-border));
+  }
+
+  .v2-subagent-activity-item[data-status="failed"],
+  .v2-subagent-activity-item[data-status="cancelled"] {
+    border-left-color: color-mix(in oklab, var(--color-destructive) 58%, var(--color-border));
+  }
+
+  .v2-subagent-activity-agent {
+    color: var(--color-foreground);
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  .v2-subagent-activity-status,
+  .v2-subagent-activity-duration,
+  .v2-subagent-activity-detail {
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .v2-subagent-activity-duration {
+    margin-left: auto;
+  }
+
+  .v2-subagent-activity-task,
+  .v2-subagent-activity-summary,
+  .v2-subagent-activity-error,
+  .v2-subagent-activity-detail {
+    margin: 0.15rem 0 0;
+  }
+
+  .v2-subagent-activity-task,
+  .v2-subagent-activity-summary,
+  .v2-subagent-activity-error {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .v2-subagent-activity-task {
+    color: color-mix(in oklab, var(--color-foreground) 88%, var(--color-muted-foreground));
+  }
+
+  .v2-subagent-activity-summary {
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-subagent-activity-error {
+    color: var(--color-destructive);
+  }
+
   .v2-agent-activity-stack {
     margin-inline: auto;
     display: flex;
