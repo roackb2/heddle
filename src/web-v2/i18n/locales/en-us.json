@@ -27,7 +27,7 @@
     },
     "subagents": {
       "ariaLabel": "Subagents",
-      "description": "Let Heddle start read-only helpers when parallel research would be useful.",
+      "description": "Let Heddle start bounded helpers for parallel research or focused approved coding actions.",
       "disabled": "Off for upcoming messages",
       "enabled": "On for upcoming messages",
       "title": "Subagents"

@@ -34,6 +34,7 @@ export type ClientSharedDelegationView = {
 
 const BUILT_IN_AGENT_NAMES: Record<string, string> = {
   'builtin:ask': 'Ask',
+  'builtin:code': 'Code',
   'builtin:review': 'Review',
 };
 

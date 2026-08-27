@@ -1,4 +1,5 @@
 import type { Logger } from 'pino';
+import type { ToolApprovalPolicy } from '@/core/approvals/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type {
   LlmAdapter,
@@ -7,6 +8,7 @@ import type {
   ReasoningEffort,
 } from '@/core/llm/types.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
+import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type {
   ConversationDelegationActivity,
   ConversationDelegationErrorCode,
@@ -14,11 +16,12 @@ import type {
 import type {
   RunFailure,
   StopReason,
+  ToolDefinition,
   ToolExecutionContext,
   TraceEvent,
 } from '@/core/types.js';
 
-export type DelegationAgentProfileId = 'builtin:ask' | 'builtin:review';
+export type DelegationAgentProfileId = 'builtin:ask' | 'builtin:review' | 'builtin:code';
 
 export type DelegationPolicy = {
   readonly enabled: boolean;
@@ -147,7 +150,8 @@ export type DelegationChildLlmFactory = (
 
 /**
  * Root runtime facts inherited by every child. Snapshot model/reasoning
- * defaults do not override these values in read-only delegation v1.
+ * defaults do not override these values, and Code children cannot widen the
+ * root tool or permission ceilings.
  */
 export type DelegationChildRuntimeOptions = {
   model: string;
@@ -163,6 +167,12 @@ export type DelegationChildRuntimeOptions = {
   baseSystemContext?: string;
   logger?: Logger;
   createChildLlm?: DelegationChildLlmFactory;
+  /** Effective root tools. Action-capable children can never widen this ceiling. */
+  parentTools?: readonly ToolDefinition[];
+  /** Effective root approval chain, including the active permission mode. */
+  approvalPolicies?: readonly ToolApprovalPolicy[];
+  /** Existing host approval surface reused by action-capable children. */
+  approveToolCall?: RunAgentLoopOptions['approveToolCall'];
 };
 
 export type DelegationAgentSnapshotResolver = {

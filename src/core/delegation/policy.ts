@@ -21,6 +21,7 @@ export const MAX_DELEGATED_SUMMARY_LENGTH = 8_000;
 const SUPPORTED_AGENT_PROFILE_IDS = new Set<DelegationAgentProfileId>([
   'builtin:ask',
   'builtin:review',
+  'builtin:code',
 ]);
 
 const DEFAULT_AGENT_PROFILE_IDS: DelegationAgentProfileId[] = [
@@ -95,7 +96,7 @@ export class DelegationPolicyService {
     );
     if (unsupportedProfile) {
       throw new Error(
-        `Delegation v1 only supports builtin:ask and builtin:review; received ${unsupportedProfile}`,
+        `Delegation only supports builtin:ask, builtin:review, and builtin:code; received ${unsupportedProfile}`,
       );
     }
 

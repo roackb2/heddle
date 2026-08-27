@@ -27,7 +27,7 @@
     },
     "subagents": {
       "ariaLabel": "子代理",
-      "description": "當平行研究有幫助時，允許 Heddle 啟動唯讀助手。",
+      "description": "允許 Heddle 啟動受限助手，進行平行研究或經核准的聚焦程式碼操作。",
       "disabled": "後續訊息關閉",
       "enabled": "後續訊息開啟",
       "title": "子代理"

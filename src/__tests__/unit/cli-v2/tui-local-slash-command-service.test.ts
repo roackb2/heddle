@@ -11,7 +11,7 @@ describe('TuiLocalSlashCommandService', () => {
       { command: '/c', description: 'toggle terminal command output' },
       { command: '/commands', description: 'toggle terminal command output' },
       { command: '/subagents', description: 'show the local subagent preference' },
-      { command: '/subagents on', description: 'allow read-only subagents for upcoming messages' },
+      { command: '/subagents on', description: 'allow bounded subagents for upcoming messages' },
       { command: '/subagents off', description: 'disable subagents for upcoming messages' },
     ]);
   });

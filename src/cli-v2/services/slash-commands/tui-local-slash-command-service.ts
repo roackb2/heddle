@@ -62,7 +62,7 @@ export class TuiLocalSlashCommandService {
     {
       action: 'subagentsOn',
       commands: ['/subagents on'],
-      description: 'allow read-only subagents for upcoming messages',
+      description: 'allow bounded subagents for upcoming messages',
     },
     {
       action: 'subagentsOff',

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ToolApprovalService } from '@/core/approvals/index.js';
+import type { ToolApprovalPolicy, ToolApprovalSurface } from '@/core/approvals/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import {
   DelegationService,
@@ -101,7 +102,7 @@ describe('delegation policy and scope', () => {
       { enabled: true, maxChildDurationMs: 999 },
       { enabled: true, maxChildDurationMs: 15 * 60_000 + 1 },
       { enabled: true, allowedAgentProfileIds: [] },
-      { enabled: true, allowedAgentProfileIds: ['builtin:code'] },
+      { enabled: true, allowedAgentProfileIds: ['builtin:unknown'] },
     ];
 
     invalidPolicies.forEach((policy) => {
@@ -150,7 +151,7 @@ describe('delegation policy and scope', () => {
     expect(tool.parameters).toMatchObject({
       properties: {
         agentProfileId: {
-          description: 'Read-only child profile. Omit to use builtin:review.',
+          description: 'Child authority profile. Omit for read-only builtin:review; select builtin:code only when the task requires actions.',
         },
       },
     });
@@ -418,6 +419,193 @@ describe('delegation policy and scope', () => {
     expect(output(result)).not.toHaveProperty('usage');
   });
 
+  it('grants an explicit code child only the bounded action catalog and inherited approvals', async () => {
+    const workspaceRoot = workspace();
+    const parentTools = RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-test',
+      workspaceRoot,
+    });
+    const inheritedPolicy: ToolApprovalPolicy = ({ tool }) => tool.name === 'edit_file'
+      ? { type: 'request', reason: 'Inherited root permission policy' }
+      : undefined;
+    const approveToolCall = vi.fn<ToolApprovalSurface>(async () => ({
+      approved: true,
+      reason: 'Approved through the root host',
+    }));
+    let captured: RunAgentLoopOptions | undefined;
+    vi.spyOn(AgentLoopRuntimeService, 'run').mockImplementation(async (options) => {
+      captured = options;
+      return completedResult(options, 'Action child result.');
+    });
+    const scope = new DelegationService({
+      policy: { enabled: true, allowedAgentProfileIds: ['builtin:code'] },
+    }).createRootScope({
+      rootRunId: 'run_action-root',
+      workspaceRoot,
+      runtime: {
+        model: 'gpt-test',
+        logger: silentLogger,
+        parentTools,
+        approvalPolicies: [inheritedPolicy],
+        approveToolCall,
+      },
+      agentSnapshotResolver: {
+        resolveExecutionSnapshot: () => codeSnapshot(),
+      },
+    });
+
+    const result = await scope.delegateTask({
+      task: 'Make the focused code change.',
+      agentProfileId: 'builtin:code',
+    });
+    const tools = captured?.tools ?? [];
+    const approvalService = new ToolApprovalService();
+    const editFile = tools.find((tool) => tool.name === 'edit_file');
+    const inheritedDecision = editFile
+      ? await approvalService.evaluate({
+          policies: captured?.approvalPolicies ?? [],
+          context: {
+            call: { id: 'call-edit-file', tool: editFile.name, input: { path: 'README.md' } },
+            tool: editFile,
+            workspaceRoot,
+          },
+        })
+      : undefined;
+    const forgedDelegation: ToolDefinition = {
+      name: 'delegate_task',
+      description: 'Forged recursive delegation tool.',
+      capabilities: ['agent.delegate'],
+      parameters: {},
+      execute: async () => ({ ok: true }),
+    };
+    const forgedDecision = await approvalService.evaluate({
+      policies: captured?.approvalPolicies ?? [],
+      context: {
+        call: { id: 'call-forged-delegation', tool: forgedDelegation.name, input: {} },
+        tool: forgedDelegation,
+        workspaceRoot,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(scope.createTool().parameters).toMatchObject({
+      properties: { agentProfileId: { enum: ['builtin:code'] } },
+    });
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'delete_file',
+      'edit_file',
+      'list_files',
+      'move_file',
+      'project_dashboard',
+      'read_file',
+      'run_shell_inspect',
+      'run_shell_mutate',
+      'search_files',
+    ]);
+    expect(tools.map((tool) => tool.name)).not.toEqual(expect.arrayContaining([
+      'delegate_task',
+      'memory_search',
+      'read_artifact',
+      'read_agent_skill',
+      'mcp_call_tool',
+      'browser_action',
+    ]));
+    expect(inheritedDecision).toEqual({
+      type: 'request',
+      reason: 'Inherited root permission policy',
+    });
+    expect(forgedDecision).toEqual({
+      type: 'deny',
+      reason: 'delegate_task is outside the delegated action tool allowlist',
+    });
+    expect(captured?.approveToolCall).toBe(approveToolCall);
+    expect(captured?.systemContext).toContain('bounded action-capable child agent');
+    expect(captured?.systemContext).toContain('do not delegate further');
+    expect(scope.records()[0]?.agentSnapshot.agentProfileId).toBe('builtin:code');
+  });
+
+  it('does not advertise code delegation above the effective root tool ceiling', async () => {
+    const workspaceRoot = workspace();
+    const readOnlyParentTools = RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-test',
+      workspaceRoot,
+      toolProfile: { preset: 'inspect' },
+    });
+    const scope = new DelegationService({
+      policy: {
+        enabled: true,
+        allowedAgentProfileIds: ['builtin:ask', 'builtin:code'],
+      },
+    }).createRootScope({
+      workspaceRoot,
+      runtime: {
+        model: 'gpt-test',
+        logger: silentLogger,
+        parentTools: readOnlyParentTools,
+        createChildLlm: () => finalAdapter(async () => ({ content: 'Read-only result.' })),
+      },
+      agentSnapshotResolver: {
+        resolveExecutionSnapshot: (agentProfileId) => agentProfileId === 'builtin:code'
+          ? codeSnapshot()
+          : askSnapshot(),
+      },
+    });
+
+    expect(scope.createTool().parameters).toMatchObject({
+      properties: { agentProfileId: { enum: ['builtin:ask'] } },
+    });
+    await expect(scope.delegateTask({
+      task: 'Try to mutate.',
+      agentProfileId: 'builtin:code',
+    })).resolves.toMatchObject({
+      ok: false,
+      output: { error: { code: 'agent_not_allowed' } },
+    });
+  });
+
+  it('serializes action-capable children while preserving the global child limit', async () => {
+    const workspaceRoot = workspace();
+    let active = 0;
+    let peak = 0;
+    const scope = new DelegationService({
+      policy: {
+        enabled: true,
+        maxConcurrentChildren: 3,
+        allowedAgentProfileIds: ['builtin:code'],
+      },
+    }).createRootScope({
+      workspaceRoot,
+      runtime: {
+        model: 'gpt-test',
+        logger: silentLogger,
+        parentTools: RuntimeToolService.createDefaultAgentTools({
+          model: 'gpt-test',
+          workspaceRoot,
+        }),
+        createChildLlm: ({ task }) => finalAdapter(async () => {
+          active += 1;
+          peak = Math.max(peak, active);
+          await delay(20);
+          active -= 1;
+          return { content: `Completed ${task}.` };
+        }),
+      },
+      agentSnapshotResolver: {
+        resolveExecutionSnapshot: () => codeSnapshot(),
+      },
+    });
+
+    const results = await Promise.all([
+      scope.delegateTask({ task: 'action-one', agentProfileId: 'builtin:code' }),
+      scope.delegateTask({ task: 'action-two', agentProfileId: 'builtin:code' }),
+      scope.delegateTask({ task: 'action-three', agentProfileId: 'builtin:code' }),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect(peak).toBe(1);
+    expect(active).toBe(0);
+  });
+
   it('fails closed before root execution when an eligible snapshot is not read-only', () => {
     const unsafeSnapshot = askSnapshot({
       toolProfile: { preset: 'default' },
@@ -431,7 +619,7 @@ describe('delegation policy and scope', () => {
       agentSnapshotResolver: {
         resolveExecutionSnapshot: () => unsafeSnapshot,
       },
-    })).toThrow('not safely read-only');
+    })).toThrow('does not satisfy its delegated authority envelope');
   });
 
   it('cancels the active child and settles queued reservations without starting them', async () => {
@@ -621,6 +809,25 @@ function askSnapshot(
     },
     approvalProfile: { preset: 'read_only' },
     systemContextAppendix: 'You are running in ask mode. Inspect without changing project state.',
+    ...overrides,
+  };
+}
+
+function codeSnapshot(
+  overrides: Partial<CustomAgentExecutionSnapshot> = {},
+): CustomAgentExecutionSnapshot {
+  return {
+    agentProfileId: 'builtin:code',
+    agentName: 'Code',
+    modeAlias: 'code',
+    source: 'built-in',
+    definitionHash: 'fedcba9876543210',
+    runtime: { maxSteps: 60 },
+    toolProfile: {
+      preset: 'default',
+    },
+    approvalProfile: { preset: 'interactive' },
+    systemContextAppendix: 'You are running in code mode.',
     ...overrides,
   };
 }

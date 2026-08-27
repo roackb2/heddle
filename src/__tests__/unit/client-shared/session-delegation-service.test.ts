@@ -6,6 +6,27 @@ import type { ClientSharedSessionActivity } from '@/client-shared/services/sessi
 import type { ControlPlaneSessionTurn } from '@/client-shared/api/types.js';
 
 describe('ClientSharedSessionDelegationService', () => {
+  it('uses the Code display name for live action-capable children', () => {
+    const state = ClientSharedSessionDelegationService.reduceActivity([], {
+      source: 'delegation',
+      type: 'delegation.started',
+      rootRunId: 'run-root',
+      parentRunId: 'run-root',
+      delegationId: 'delegation-code',
+      childRunId: 'run-code-child',
+      depth: 1,
+      task: 'Apply the focused change.',
+      agentProfileId: 'builtin:code',
+      timestamp: '2026-08-28T00:00:00.000Z',
+    });
+
+    expect(state[0]).toMatchObject({
+      agentProfileId: 'builtin:code',
+      agentName: 'Code',
+      status: 'running',
+    });
+  });
+
   it('reduces replayed child lifecycle events into one safe live row', () => {
     const started = delegationStarted();
     let state = ClientSharedSessionDelegationService.reduceActivity([], started);
