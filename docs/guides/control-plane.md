@@ -164,16 +164,23 @@ HEDDLE_SERVER_LOG_FILE=/path/to/server.log heddle daemon
 
 ## Development Mode
 
-For local development, run the server and client separately:
+For local development, run the existing watched server and Vite client in
+separate terminals:
 
 ```bash
-yarn daemon:dev
+yarn server:dev
 yarn client:dev
 ```
 
-`yarn daemon:dev` starts the real daemon runtime at `127.0.0.1:8765`, including daemon ownership registration, registry heartbeats, and the built web-v2 app from `dist/src/web-v2`.
+`yarn server:dev` uses `tsx watch` to run the daemon-mode control-plane server
+at `127.0.0.1:8765` without static browser assets. It retains daemon registry
+and heartbeat behavior while restarting for backend source changes.
 
 `yarn client:dev` starts the web-v2 Vite client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server.
+
+Open `http://127.0.0.1:5173` so Vite handles source freshness and HMR directly.
+Stop another local Heddle daemon before starting this pair; the host-local
+registry has one live daemon owner.
 
 In other words:
 
@@ -183,14 +190,20 @@ In other words:
 - built daemon mode uses one service:
   - `heddle daemon` serves both the built web client and the backend API on the same port
 
-If you only want a lighter backend API process without daemon registration or built static serving, `yarn server:dev` still exists. That path is for server development, not for testing daemon ownership behavior.
-
-When using `yarn daemon:dev`, rebuild after frontend changes:
+For a production-like single-process source run, use:
 
 ```bash
-yarn build
 yarn daemon:dev
 ```
+
+That command runs `yarn client:build` before starting the real daemon with
+static assets at `127.0.0.1:8765`, so it cannot silently reuse an older bundle.
+It intentionally has no HMR. To observe the same workspace through terminal
+and web during development, keep `yarn server:dev` and `yarn client:dev`
+running and launch `yarn chat:dev` in a third terminal. The standalone chat
+script also runs the same unconditional client build before it starts because
+it may need to own an embedded static control plane when no daemon is
+available.
 
 For built/local operator usage inside this repository, run:
 

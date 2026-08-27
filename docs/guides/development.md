@@ -93,7 +93,11 @@ yarn cli:dev --help
 yarn chat:dev
 ```
 
-`yarn chat:dev` runs the same source CLI entry point as the packaged `heddle chat` command. The `examples/` directory is reserved for programmatic host/runtime examples rather than the main terminal chat UI.
+`yarn chat:dev` builds the browser client and then runs the same source CLI
+entry point as the packaged `heddle chat` command. The unconditional build
+keeps the embedded browser control plane current without maintaining a custom
+asset-fingerprint cache. The `examples/` directory is reserved for
+programmatic host/runtime examples rather than the main terminal chat UI.
 
 `yarn chat:dev` uses the API-backed terminal UI.
 
@@ -142,20 +146,32 @@ machine that only has Ollama installed.
 
 ### Control plane
 
-For control-plane development, run the backend and frontend separately:
+For normal control-plane development, use the existing watched server and Vite
+client in separate terminals:
 
 ```bash
-yarn daemon:dev
+yarn server:dev
 yarn client:dev
 ```
 
-The daemon-backed backend runs on `127.0.0.1:8765` and the Vite client runs on `127.0.0.1:5173`.
+`server:dev` already uses `tsx watch` to restart the daemon-mode control-plane
+server at `127.0.0.1:8765` without static browser assets. `client:dev` already
+uses Vite to serve the browser client with HMR at `127.0.0.1:5173` and proxy
+Heddle APIs to that server. Open the Vite URL for development; it does not
+depend on `dist/src/web-v2`.
 
-`yarn daemon:dev` uses the real daemon path, including live server registry refreshes and built default control-plane static assets from `dist/src/web-v2`. This is the closest development path to the shipped `heddle daemon` behavior.
+To inspect one session in both clients, keep those two commands running and
+start `yarn chat:dev` in a third terminal; web-v2 and cli-v2 attach to the same
+daemon-backed workspace state. The chat command still performs its one-time
+browser build so it remains safe to run standalone.
 
-Because it serves built assets, run `yarn build` after frontend changes before relying on `yarn daemon:dev` for UI validation.
+`yarn daemon:dev` remains the production-like one-process path. It runs the
+existing `client:build` first and then serves those static assets from the real
+daemon at `127.0.0.1:8765`. Use it to validate built/static behavior, not for
+frontend HMR.
 
-`yarn server:dev` remains a lighter backend-only path for server work. It starts the Express/tRPC app directly for API development rather than running the full daemon command wrapper.
+Stop any other local Heddle daemon before starting `server:dev`; Heddle keeps a
+single live daemon owner in its host-local registry.
 
 For a production-style local run of the built daemon:
 

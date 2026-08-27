@@ -267,6 +267,15 @@ yarn eslint
 yarn typecheck
 ```
 
+For normal browser development, `yarn server:dev` uses `tsx watch` for the
+daemon-mode backend and `yarn client:dev` uses Vite for web-v2 HMR at
+`http://127.0.0.1:5173`; run them in separate terminals. Run `yarn chat:dev` in
+a third terminal when you want the TUI and web client attached to the same
+daemon. The `chat:dev` and `daemon:dev` scripts perform the existing client
+build before starting, so their standalone embedded/static browser surfaces
+cannot reuse stale assets. The generic `cli:dev` command remains a direct
+source CLI entry point and does not prepare command-specific assets.
+
 ## Notes
 
 - The installed command is `heddle`.
