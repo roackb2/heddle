@@ -177,6 +177,36 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('docs/index.md');
     expect(view.container.textContent).toContain('+new');
   });
+
+  it('renders compact durable subagent results without a child transcript', () => {
+    const view = render(
+      <ConversationPanel
+        session={createSessionDetail({
+          messages: [
+            { id: 'message-1', role: 'user', text: 'Inspect the runtime' },
+            { id: 'message-2', role: 'assistant', text: 'Done.' },
+          ],
+          turns: [{
+            id: 'turn-1',
+            prompt: 'Inspect the runtime',
+            outcome: 'done',
+            summary: 'Done.',
+            steps: 2,
+            traceFile: '/tmp/trace.json',
+            events: [],
+            delegations: [createSettledDelegation()],
+          }],
+        })}
+        runtimeContext={createRuntimeContext()}
+      />,
+    );
+
+    expect(view.container.textContent).toContain('Subagent results');
+    expect(view.container.textContent).toContain('Ask · done · 3s');
+    expect(view.container.textContent).toContain('Inspect the client boundary.');
+    expect(view.container.textContent).toContain('Found the shared seam.');
+    expect(view.container.textContent).not.toContain('child transcript');
+  });
 });
 
 function createSessionDetail(
@@ -233,5 +263,33 @@ function createRuntimeContext(
       carriesTranscriptAcrossTurns: true,
     },
     ...overrides,
+  };
+}
+
+function createSettledDelegation(): NonNullable<NonNullable<ControlPlaneSessionDetail>['turns'][number]['delegations']>[number] {
+  return {
+    schemaVersion: 1,
+    delegationId: 'delegation-1',
+    rootRunId: 'run-root-1',
+    parentRunId: 'run-root-1',
+    childRunId: 'run-child-1',
+    depth: 1,
+    task: 'Inspect the client boundary.',
+    agentSnapshot: {
+      agentProfileId: 'builtin:ask',
+      agentName: 'Ask',
+      modeAlias: 'ask',
+      source: 'built-in',
+      definitionHash: 'ask-definition',
+      runtime: { maxSteps: 24 },
+      toolProfile: { preset: 'inspect', memoryMode: 'none' },
+      approvalProfile: { preset: 'read_only' },
+      systemContextAppendix: 'Read only.',
+    },
+    status: 'finished',
+    outcome: 'done',
+    summary: 'Found the shared seam.',
+    startedAt: '2026-08-27T08:00:00.000Z',
+    finishedAt: '2026-08-27T08:00:03.000Z',
   };
 }

@@ -3,9 +3,11 @@ import type {
   ClientSharedRecentEditDiff,
   ClientSharedSessionPlan,
 } from '@/client-shared/services/session-activities/index.js';
+import type { ClientSharedDelegationView } from '@/client-shared/services/session-delegations/index.js';
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneConversationDelegationMode,
   ControlPlaneModelOptions,
   ControlPlanePendingApproval,
   ControlPlaneSessionDirectShellPreflight,
@@ -55,6 +57,9 @@ export type ControlPlaneSessionStoreSnapshot = {
   liveStatus?: string;
   currentActivity?: ClientSharedAgentActivityStatus;
   activePlan?: ClientSharedSessionPlan;
+  liveDelegations: ClientSharedDelegationView[];
+  /** TUI-local next-turn preference. It is not a durable session policy. */
+  delegationMode: ControlPlaneConversationDelegationMode;
   recentEditDiffs: ClientSharedRecentEditDiff[];
   workspaceChanges: ControlPlaneWorkspaceChangedFile[];
   latestUpdate?: ControlPlaneSessionLatestUpdate;
@@ -82,6 +87,8 @@ export const INITIAL_CONTROL_PLANE_SESSION_SNAPSHOT: ControlPlaneSessionStoreSna
   activeRun: undefined,
   cancelling: false,
   streamConnected: false,
+  liveDelegations: [],
+  delegationMode: 'auto',
   recentEditDiffs: [],
   workspaceChanges: [],
   commandResults: [],

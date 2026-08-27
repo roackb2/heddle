@@ -126,6 +126,57 @@ describe('daemon CLI helpers', () => {
     }]);
   });
 
+  it('projects settled delegation evidence into session detail without raw child runtime fields', () => {
+    const detail = ControlPlaneChatSessionPresenter.projectDetail({
+      id: 'session-1',
+      name: 'Subagent work',
+      pinned: false,
+      messages: [{ id: 'message-1', role: 'user', text: 'Inspect the runtime' }],
+      turns: [{
+        id: 'turn-1',
+        prompt: 'Inspect the runtime',
+        outcome: 'done',
+        summary: 'Done.',
+        steps: 2,
+        traceFile: '/tmp/root-trace.json',
+        events: [],
+        delegations: [{
+          schemaVersion: 1,
+          delegationId: 'delegation-1',
+          rootRunId: 'run-root-1',
+          parentRunId: 'run-root-1',
+          childRunId: 'run-child-1',
+          depth: 1,
+          task: 'Inspect the shared client.',
+          agentSnapshot: {
+            agentProfileId: 'builtin:ask',
+            agentName: 'Ask',
+            modeAlias: 'ask',
+            source: 'built-in',
+            definitionHash: 'ask-definition',
+            runtime: { maxSteps: 24 },
+            toolProfile: { preset: 'inspect', memoryMode: 'none' },
+            approvalProfile: { preset: 'read_only' },
+            systemContextAppendix: 'Read only.',
+          },
+          status: 'finished',
+          outcome: 'done',
+          summary: 'Found the projection.',
+          startedAt: '2026-08-27T08:00:00.000Z',
+          finishedAt: '2026-08-27T08:00:03.000Z',
+        }],
+      }],
+    })[0];
+
+    expect(detail?.turns[0]?.delegations).toEqual([expect.objectContaining({
+      delegationId: 'delegation-1',
+      summary: 'Found the projection.',
+    })]);
+    expect(detail?.turns[0]?.delegations?.[0]).not.toHaveProperty('trace');
+    expect(detail?.turns[0]?.delegations?.[0]).not.toHaveProperty('model');
+    expect(detail?.turns[0]?.delegations?.[0]).not.toHaveProperty('provider');
+  });
+
   it('ignores invalid chat session records', () => {
     expect(ControlPlaneChatSessionPresenter.projectView({ id: 'missing-name' })).toEqual([]);
     expect(ControlPlaneChatSessionPresenter.projectView(null)).toEqual([]);

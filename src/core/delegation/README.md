@@ -107,7 +107,10 @@ activity would let existing clients mistake child settlement for root-turn
 settlement. Redundant child `assistant.stream` draft snapshots are omitted;
 `delegation.finished.summary` carries the completed child answer while tool,
 reasoning, warning, cancellation, and loop progress remain visible.
-Purpose-built UI rendering remains a later slice.
+The first purpose-built client projection shows correlated live child rows and
+settled task/profile/status/summary records in both web-v2 and cli-v2. It does
+not expose raw child transcripts, traces, model/provider details, or child
+permission controls; those remain outside this slice.
 
 ## V1 Safety Invariants
 

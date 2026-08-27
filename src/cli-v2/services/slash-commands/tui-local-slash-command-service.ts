@@ -1,6 +1,12 @@
 import type { ControlPlaneSlashCommandHint } from '@/client-shared/api/types.js';
 
-export type TuiLocalSlashCommandAction = 'activity' | 'diff' | 'commandResults';
+export type TuiLocalSlashCommandAction =
+  | 'activity'
+  | 'diff'
+  | 'commandResults'
+  | 'subagentsStatus'
+  | 'subagentsOn'
+  | 'subagentsOff';
 
 export type TuiLocalSlashCommandHandlers = Record<TuiLocalSlashCommandAction, () => void>;
 
@@ -26,6 +32,10 @@ type TuiLocalSlashCommandDefinition = {
  * If a future command needs both shared effects and TUI presentation changes,
  * keep the shared operation in core/control-plane and let cli-v2 react to the
  * returned state instead of moving core policy into this service.
+ *
+ * `/subagents on|off` is the one submission-preference exception: it changes
+ * only the TUI-local value sent in the existing per-turn `delegation` field.
+ * It does not mutate runtime policy or durable session settings.
  */
 export class TuiLocalSlashCommandService {
   private static readonly definitions: TuiLocalSlashCommandDefinition[] = [
@@ -43,6 +53,21 @@ export class TuiLocalSlashCommandService {
       action: 'commandResults',
       commands: ['/c', '/commands'],
       description: 'toggle terminal command output',
+    },
+    {
+      action: 'subagentsStatus',
+      commands: ['/subagents'],
+      description: 'show the local subagent preference',
+    },
+    {
+      action: 'subagentsOn',
+      commands: ['/subagents on'],
+      description: 'allow read-only subagents for upcoming messages',
+    },
+    {
+      action: 'subagentsOff',
+      commands: ['/subagents off'],
+      description: 'disable subagents for upcoming messages',
     },
   ];
 

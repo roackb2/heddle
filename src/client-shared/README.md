@@ -21,7 +21,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
   frontends. These classes may consume tRPC-derived types, but must not import
   core services, server controllers, or UI renderers. Shared services own
   API-derived behavior such as transient session messages, session activity
-  effect dispatch, and approval input display metadata.
+  effect dispatch, replay-safe subagent lifecycle projection, and approval
+  input display metadata.
 - `hooks/`: React hooks. Files in this folder use `useXxx` naming and return
   hook-shaped values.
 
@@ -34,6 +35,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
 - shared API-consumer services such as transient conversation message
   shaping, session activity effect dispatch, and approval payload display
   shaping;
+- shared live and settled subagent rows derived from correlated lifecycle
+  events and durable turn records, excluding raw child transcripts and traces;
 - shared conversation-run cursor, duplicate suppression, terminal detection,
   and bounded reconnect policy;
 - `trpcReact` for React Query tRPC usage in React interfaces;

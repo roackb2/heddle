@@ -117,6 +117,34 @@ describe('ClientSharedSessionTurnPresentationService', () => {
       'turn-1:activity-group',
     ]);
   });
+
+  it('projects durable subagent results immediately after the owning prompt', () => {
+    const session = createSessionDetail({
+      messages: [
+        { id: 'message-1', role: 'user', text: 'Inspect the runtime' },
+        { id: 'message-2', role: 'assistant', text: 'Done.' },
+      ],
+      turns: [createTurn({
+        id: 'turn-1',
+        prompt: 'Inspect the runtime',
+        delegations: [createSettledDelegation()],
+      })],
+    });
+
+    const timeline = ClientSharedSessionTurnPresentationService.projectConversationTimeline(session);
+    expect(timeline.map((item) => item.id)).toEqual([
+      'message-1',
+      'turn-1:delegation-group',
+      'message-2',
+    ]);
+    expect(timeline.find((item) => item.type === 'turn_delegation_group')).toEqual(expect.objectContaining({
+      delegations: [expect.objectContaining({
+        agentName: 'Ask',
+        status: 'finished',
+        summary: 'Found the client boundary.',
+      })],
+    }));
+  });
 });
 
 function createSessionDetail(
@@ -148,5 +176,33 @@ function createTurn(
     traceFile: '/tmp/trace.json',
     events: [],
     ...overrides,
+  };
+}
+
+function createSettledDelegation(): NonNullable<NonNullable<ControlPlaneSessionDetail>['turns'][number]['delegations']>[number] {
+  return {
+    schemaVersion: 1,
+    delegationId: 'delegation-1',
+    rootRunId: 'run-root-1',
+    parentRunId: 'run-root-1',
+    childRunId: 'run-child-1',
+    depth: 1,
+    task: 'Inspect the client boundary.',
+    agentSnapshot: {
+      agentProfileId: 'builtin:ask',
+      agentName: 'Ask',
+      modeAlias: 'ask',
+      source: 'built-in',
+      definitionHash: 'ask-definition',
+      runtime: { maxSteps: 24 },
+      toolProfile: { preset: 'inspect', memoryMode: 'none' },
+      approvalProfile: { preset: 'read_only' },
+      systemContextAppendix: 'Read only.',
+    },
+    status: 'finished',
+    outcome: 'done',
+    summary: 'Found the client boundary.',
+    startedAt: '2026-08-27T08:00:00.000Z',
+    finishedAt: '2026-08-27T08:00:03.000Z',
   };
 }

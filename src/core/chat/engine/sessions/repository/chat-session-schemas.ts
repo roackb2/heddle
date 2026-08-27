@@ -125,7 +125,7 @@ const ConversationTurnDelegationRecordSchema = z.object({
   finishedAt: z.string().describe('Timestamp when the child reached a terminal record.'),
 }).strict();
 
-const ConversationTurnDelegationsReadSchema = z.array(z.unknown())
+export const ConversationTurnDelegationsReadSchema = z.array(z.unknown())
   .transform((records) => records.flatMap((record) => {
     const parsed = ConversationTurnDelegationRecordSchema.safeParse(record);
     return parsed.success ? [parsed.data] : [];

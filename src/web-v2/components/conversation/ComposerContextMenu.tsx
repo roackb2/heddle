@@ -16,6 +16,7 @@ import {
   SessionDriftStatusGlyph,
   type SessionDriftLevel,
 } from './SessionDriftControl';
+import { ComposerSubagentControl } from './ComposerSubagentControl';
 
 type ComposerContextMenuProps = {
   agents?: ControlPlaneCustomAgents;
@@ -23,6 +24,7 @@ type ComposerContextMenuProps = {
   driftEnabled: boolean;
   driftLevel: SessionDriftLevel;
   browserIntentEnabled?: boolean;
+  subagentsEnabled: boolean;
   permissionMode?: ControlPlanePermissionMode;
   permissionModeOptions?: ControlPlaneSessionRuntimeContext['permissionModeOptions'];
   selectedAgentProfileId: string;
@@ -30,6 +32,7 @@ type ComposerContextMenuProps = {
   uploadDisabled?: boolean;
   onSelectAgentProfileId: (agentProfileId: string) => void;
   onToggleBrowserIntent?: () => void;
+  onSubagentsEnabledChange: (enabled: boolean) => void;
   onUploadImagesClick?: () => void;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
@@ -99,6 +102,7 @@ export function ComposerContextMenu({
   driftEnabled,
   driftLevel,
   browserIntentEnabled,
+  subagentsEnabled,
   permissionMode,
   permissionModeOptions,
   selectedAgentProfileId,
@@ -106,6 +110,7 @@ export function ComposerContextMenu({
   uploadDisabled,
   onSelectAgentProfileId,
   onToggleBrowserIntent,
+  onSubagentsEnabledChange,
   onUploadImagesClick,
   onUpdateDriftEnabled,
   onUpdatePermissionMode,
@@ -211,6 +216,11 @@ export function ComposerContextMenu({
             </Button>
           </div>
         ) : null}
+        <ComposerSubagentControl
+          disabled={disabled}
+          enabled={subagentsEnabled}
+          onEnabledChange={onSubagentsEnabledChange}
+        />
         {onUpdatePermissionMode && permissionModeOptions?.length ? (
           <div className="v2-permission-mode-menu-section">
             <div className="v2-permission-mode-menu-header">

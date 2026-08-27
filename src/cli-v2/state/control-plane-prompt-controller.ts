@@ -62,6 +62,7 @@ export class ControlPlanePromptController {
       commandResultExpanded: false,
       error: undefined,
       activePlan: undefined,
+      liveDelegations: current.running ? current.liveDelegations : [],
       currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: current.streamConnected
         ? 'Heddle is working...'
@@ -78,6 +79,7 @@ export class ControlPlanePromptController {
         workspaceId,
         sessionId,
         prompt,
+        delegation: this.options.state.getSnapshot().delegationMode,
       });
       if ('queued' in result) {
         this.options.state.patch({

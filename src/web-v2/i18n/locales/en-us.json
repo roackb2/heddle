@@ -25,6 +25,13 @@
       "useAction": "Use browser",
       "useDescription": "Nudge the agent to inspect or operate the relevant page for this task."
     },
+    "subagents": {
+      "ariaLabel": "Subagents",
+      "description": "Let Heddle start read-only helpers when parallel research would be useful.",
+      "disabled": "Off for upcoming messages",
+      "enabled": "On for upcoming messages",
+      "title": "Subagents"
+    },
     "drift": {
       "ariaLabel": "Semantic drift",
       "disabled": "Drift off",
@@ -157,6 +164,19 @@
     "searchModels": "Search models",
     "send": "Send",
     "stop": "Stop"
+  },
+  "subagents": {
+    "historyLabel": "Subagent results",
+    "liveLabel": "Live subagent activity",
+    "status": {
+      "cancelled": "Cancelled",
+      "done": "Done",
+      "failed": "Failed",
+      "finished": "Finished",
+      "running": "Working",
+      "stepLimit": "Step limit"
+    },
+    "title": "Subagents"
   },
   "diffPreview": {
     "binary": "binary",

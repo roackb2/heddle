@@ -7,9 +7,11 @@ import {
 } from '@/client-shared/services/session-activities';
 import { ClientSharedPromptInputService } from '@/client-shared/services/prompt-input';
 import type {
+  ControlPlaneConversationDelegationMode,
   ControlPlaneSessionDirectShellPreflight,
   ControlPlaneSessionRunReference,
 } from '@/client-shared/api/types';
+import type { ClientSharedDelegationView } from '@/client-shared/services/session-delegations';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
@@ -20,12 +22,17 @@ type UseControlPlaneSessionPromptSubmitArgs = {
   setError: Dispatch<SetStateAction<string | undefined>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
+  setLiveDelegations: Dispatch<SetStateAction<ClientSharedDelegationView[]>>;
   onRunAccepted: (run: ControlPlaneSessionRunReference) => void;
 };
 
 export type ControlPlaneSessionPromptSubmitState = {
   submitting: boolean;
-  submitPrompt: (prompt: string, options?: { agentProfileId?: string; browserIntent?: 'preferred' }) => Promise<void>;
+  submitPrompt: (prompt: string, options?: {
+    agentProfileId?: string;
+    browserIntent?: 'preferred';
+    delegation?: ControlPlaneConversationDelegationMode;
+  }) => Promise<void>;
   directShellConfirmation?: ControlPlaneSessionDirectShellPreflight;
   confirmDirectShell: () => Promise<void>;
   cancelDirectShellConfirmation: () => void;
@@ -47,6 +54,7 @@ export function useControlPlaneSessionPromptSubmit({
   setError,
   setLiveStatus,
   setCurrentActivity,
+  setLiveDelegations,
   onRunAccepted,
 }: UseControlPlaneSessionPromptSubmitArgs): ControlPlaneSessionPromptSubmitState {
   const { t } = useI18n();
@@ -68,6 +76,7 @@ export function useControlPlaneSessionPromptSubmit({
     prompt: string;
     agentProfileId?: string;
     browserIntent?: 'preferred';
+    delegation?: ControlPlaneConversationDelegationMode;
     directShell?: { command: string; riskAccepted?: boolean };
   }) => {
     if (!workspaceId || !sessionId || submitting) {
@@ -96,6 +105,7 @@ export function useControlPlaneSessionPromptSubmit({
     setRunning(true);
     setError(undefined);
     if (!running) {
+      setLiveDelegations([]);
       setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
       setCurrentActivity(ClientSharedSessionActivityService.createThinkingStatus());
     }
@@ -114,6 +124,7 @@ export function useControlPlaneSessionPromptSubmit({
           prompt: input.prompt,
           agentProfileId: input.agentProfileId,
           browserIntent: input.browserIntent,
+          delegation: input.delegation,
         });
       if ('queued' in result) {
         if (isCurrentSubmission()) {
@@ -153,6 +164,7 @@ export function useControlPlaneSessionPromptSubmit({
     setError,
     setLiveStatus,
     setCurrentActivity,
+    setLiveDelegations,
     setRunning,
     running,
     onRunAccepted,
@@ -168,7 +180,11 @@ export function useControlPlaneSessionPromptSubmit({
     workspaceId,
   ]);
 
-  const submitPrompt = useCallback(async (prompt: string, options?: { agentProfileId?: string; browserIntent?: 'preferred' }) => {
+  const submitPrompt = useCallback(async (prompt: string, options?: {
+    agentProfileId?: string;
+    browserIntent?: 'preferred';
+    delegation?: ControlPlaneConversationDelegationMode;
+  }) => {
     const trimmed = prompt.trim();
     if (!workspaceId || !sessionId || !trimmed || submitting) {
       return;
@@ -208,6 +224,7 @@ export function useControlPlaneSessionPromptSubmit({
       prompt: trimmed,
       agentProfileId: options?.agentProfileId,
       browserIntent: options?.browserIntent,
+      delegation: options?.delegation,
     });
   }, [
     running,

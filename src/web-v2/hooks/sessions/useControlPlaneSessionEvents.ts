@@ -20,6 +20,10 @@ import type {
   ClientSharedSessionPlan,
 } from '@/client-shared/services/session-activities';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
+import {
+  ClientSharedSessionDelegationService,
+  type ClientSharedDelegationView,
+} from '@/client-shared/services/session-delegations';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
 type SessionRunUpdate = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.run.updated' }>;
@@ -42,6 +46,7 @@ type UseControlPlaneSessionEventsArgs = {
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
   setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
+  setLiveDelegations: Dispatch<SetStateAction<ClientSharedDelegationView[]>>;
   onNotificationIntent?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
@@ -65,6 +70,7 @@ export function useControlPlaneSessionEvents({
   setActivePlan,
   setCurrentActivity,
   setLatestUpdate,
+  setLiveDelegations,
   onNotificationIntent,
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
@@ -183,13 +189,14 @@ export function useControlPlaneSessionEvents({
         setActivePlan,
         setCurrentActivity,
         setLatestUpdate,
+        setLiveDelegations,
         notify: onNotificationIntent,
         workspaceId: activeWorkspaceId,
       });
     } catch (error) {
       scheduleReconnect(asError(error));
     }
-  }, [finishRun, invalidateWorkspaceDiff, onNotificationIntent, refresh, refreshPendingApproval, scheduleReconnect, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setSession, utils.controlPlane.session]);
+  }, [finishRun, invalidateWorkspaceDiff, onNotificationIntent, refresh, refreshPendingApproval, scheduleReconnect, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveDelegations, setLiveStatus, setSession, utils.controlPlane.session]);
 
   trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -228,6 +235,7 @@ export function useControlPlaneSessionEvents({
       setActivePlan(undefined);
       setCurrentActivity(undefined);
       setLatestUpdate(undefined);
+      setLiveDelegations([]);
       return;
     }
 
@@ -235,7 +243,8 @@ export function useControlPlaneSessionEvents({
     setActivePlan(undefined);
     setCurrentActivity(undefined);
     setLatestUpdate(undefined);
-  }, [sessionId, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, workspaceId]);
+    setLiveDelegations([]);
+  }, [sessionId, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveDelegations, setLiveStatus, workspaceId]);
 
   useEffect(() => {
     if (activeRun) {
@@ -284,6 +293,7 @@ type SessionActivityContext = {
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
   setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
+  setLiveDelegations: Dispatch<SetStateAction<ClientSharedDelegationView[]>>;
   notify?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
@@ -295,6 +305,10 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
     sessionId: context.sessionId,
     activity,
   }));
+
+  context.setLiveDelegations((current) => (
+    ClientSharedSessionDelegationService.reduceActivity(current, activity)
+  ));
 
   const latestUpdate = ClientSharedSessionActivityService.resolveLatestUpdate(activity);
   if (latestUpdate) {

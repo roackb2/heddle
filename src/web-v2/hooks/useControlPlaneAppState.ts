@@ -417,6 +417,7 @@ export function useControlPlaneAppState() {
         currentActivity: selectedSession.currentActivity,
         latestUpdate: selectedSession.latestUpdate,
         activePlan: selectedSession.activePlan,
+        liveDelegations: selectedSession.liveDelegations,
         runtimeContext: selectedSession.runtimeContext,
         agents: customAgentsQuery.data,
         pendingApproval: selectedSession.pendingApproval,

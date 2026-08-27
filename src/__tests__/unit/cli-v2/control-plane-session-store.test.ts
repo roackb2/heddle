@@ -81,6 +81,51 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('reduces live subagent lifecycle events into the shared terminal snapshot', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    fixture.emitRunActivity({
+      source: 'delegation',
+      type: 'delegation.started',
+      rootRunId: 'run-root-1',
+      parentRunId: 'run-root-1',
+      delegationId: 'delegation-1',
+      childRunId: 'run-child-1',
+      depth: 1,
+      task: 'Inspect the shared client.',
+      agentProfileId: 'builtin:ask',
+      timestamp: '2026-08-27T08:00:00.000Z',
+    });
+
+    expect(store.getSnapshot().liveDelegations).toEqual([expect.objectContaining({
+      delegationId: 'delegation-1',
+      status: 'running',
+    })]);
+
+    fixture.emitRunActivity({
+      source: 'delegation',
+      type: 'delegation.finished',
+      rootRunId: 'run-root-1',
+      parentRunId: 'run-root-1',
+      delegationId: 'delegation-1',
+      childRunId: 'run-child-1',
+      depth: 1,
+      task: 'Inspect the shared client.',
+      agentProfileId: 'builtin:ask',
+      outcome: 'done',
+      summary: 'Found the projection.',
+      timestamp: '2026-08-27T08:00:03.000Z',
+    });
+
+    expect(store.getSnapshot().liveDelegations).toEqual([expect.objectContaining({
+      status: 'finished',
+      summary: 'Found the projection.',
+    })]);
+    store.dispose();
+  });
+
   it('recovers and subscribes to an active run when loading a session', async () => {
     const fixture = createClientFixture();
     fixture.calls.sessionRunStateQuery.mockResolvedValueOnce({
@@ -190,6 +235,7 @@ describe('ControlPlaneSessionStore', () => {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       prompt: 'Build the next slice',
+      delegation: 'auto',
       maxSteps: 12,
       searchIgnoreDirs: ['node_modules'],
       apiKey: undefined,
@@ -202,6 +248,23 @@ describe('ControlPlaneSessionStore', () => {
       text: 'Build the next slice',
       isPending: true,
     });
+    store.dispose();
+  });
+
+  it('submits the TUI-local off preference without changing permission mode', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    store.setDelegationMode('off');
+    await store.submitPrompt('Work without helpers');
+
+    expect(fixture.calls.sessionSendPromptAsyncMutate).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Work without helpers',
+      delegation: 'off',
+    }));
+    expect(fixture.calls.workspacePermissionModeUpdateMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot().delegationMode).toBe('off');
     store.dispose();
   });
 
@@ -718,6 +781,19 @@ describe('ControlPlaneSessionStore', () => {
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
+    fixture.emitRunActivity({
+      source: 'delegation',
+      type: 'delegation.started',
+      rootRunId: 'run-root-1',
+      parentRunId: 'run-root-1',
+      delegationId: 'delegation-1',
+      childRunId: 'run-child-1',
+      depth: 1,
+      task: 'Keep inspecting the current turn.',
+      agentProfileId: 'builtin:ask',
+      timestamp: '2026-08-27T08:00:00.000Z',
+    });
+
     await store.submitPrompt('Next prompt');
 
     expect(fixture.calls.sessionSendPromptAsyncMutate).toHaveBeenCalledWith(expect.objectContaining({
@@ -727,6 +803,7 @@ describe('ControlPlaneSessionStore', () => {
     }));
     expect(store.getSnapshot()).toMatchObject({
       running: true,
+      liveDelegations: [expect.objectContaining({ delegationId: 'delegation-1' })],
       latestUpdate: {
         label: 'Prompt queued',
         detail: 'position 1',
@@ -1358,12 +1435,13 @@ function createClientFixture(options: {
   };
 
   const emitRunActivity = (activity: ControlPlaneRunActivity) => {
-    if (activeRunId !== activity.runId || !runEvents) {
-      announceRun(activity.runId);
+    const runId = 'runId' in activity ? activity.runId : activity.rootRunId;
+    if (activeRunId !== runId || !runEvents) {
+      announceRun(runId);
     }
     runEvents?.onData?.({
       kind: 'activity',
-      runId: activity.runId,
+      runId,
       sequence: ++runSequence,
       timestamp: activity.timestamp,
       activity,

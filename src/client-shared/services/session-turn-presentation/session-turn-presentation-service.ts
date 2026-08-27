@@ -4,6 +4,10 @@ import type {
   ControlPlaneSessionTurn,
 } from '../../api/types.js';
 import type { ConversationTurnPresentationTimelineItem } from '@heddleagent/runtime/cli';
+import {
+  ClientSharedSessionDelegationService,
+  type ClientSharedDelegationView,
+} from '../session-delegations/index.js';
 
 export type ClientSharedSessionTurnPresentationItem = {
   id: string;
@@ -27,8 +31,17 @@ export type ClientSharedConversationTimelineActivityGroupItem = {
   activities: ConversationTurnPresentationTimelineItem[];
 };
 
+export type ClientSharedConversationTimelineDelegationGroupItem = {
+  type: 'turn_delegation_group';
+  id: string;
+  turnId: string;
+  turnPrompt: string;
+  delegations: ClientSharedDelegationView[];
+};
+
 export type ClientSharedConversationTimelineItem =
   | ClientSharedConversationTimelineMessageItem
+  | ClientSharedConversationTimelineDelegationGroupItem
   | ClientSharedConversationTimelineActivityGroupItem;
 
 /**
@@ -75,7 +88,7 @@ export class ClientSharedSessionTurnPresentationService {
       placedTurnIds.add(turn.id);
       return [
         messageItem,
-        ...ClientSharedSessionTurnPresentationService.projectConversationActivityGroup(turn),
+        ...ClientSharedSessionTurnPresentationService.projectConversationTurnGroups(turn),
       ];
     });
 
@@ -83,7 +96,7 @@ export class ClientSharedSessionTurnPresentationService {
       ...timeline,
       ...session.turns
         .filter((turn) => !placedTurnIds.has(turn.id))
-        .flatMap((turn) => ClientSharedSessionTurnPresentationService.projectConversationActivityGroup(turn)),
+        .flatMap((turn) => ClientSharedSessionTurnPresentationService.projectConversationTurnGroups(turn)),
     ];
   }
 
@@ -117,6 +130,28 @@ export class ClientSharedSessionTurnPresentationService {
       turnPrompt: turn.prompt,
       activities,
     }];
+  }
+
+  private static projectConversationDelegationGroup(turn: ControlPlaneSessionTurn): ClientSharedConversationTimelineDelegationGroupItem[] {
+    const delegations = ClientSharedSessionDelegationService.projectSettled(turn.delegations ?? []);
+    if (delegations.length === 0) {
+      return [];
+    }
+
+    return [{
+      type: 'turn_delegation_group',
+      id: `${turn.id}:delegation-group`,
+      turnId: turn.id,
+      turnPrompt: turn.prompt,
+      delegations,
+    }];
+  }
+
+  private static projectConversationTurnGroups(turn: ControlPlaneSessionTurn): ClientSharedConversationTimelineItem[] {
+    return [
+      ...ClientSharedSessionTurnPresentationService.projectConversationDelegationGroup(turn),
+      ...ClientSharedSessionTurnPresentationService.projectConversationActivityGroup(turn),
+    ];
   }
 
   private static findUnplacedTurnForPrompt({

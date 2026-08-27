@@ -10,6 +10,7 @@ import {
   type ClientSharedSessionPlan,
 } from '@/client-shared/services/session-activities';
 import type { ClientSharedNotificationIntent } from '@/client-shared/services/notifications';
+import type { ClientSharedDelegationView } from '@/client-shared/services/session-delegations';
 import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
 import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
@@ -38,6 +39,7 @@ type ControlPlaneSessionDetailState = {
   currentActivity?: ClientSharedAgentActivityStatus;
   latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
+  liveDelegations: ClientSharedDelegationView[];
   runtimeContext?: ControlPlaneSessionRuntimeContext;
   cancelError?: string;
   pendingApproval: ReturnType<typeof useControlPlanePendingApproval>['pendingApproval'];
@@ -78,6 +80,7 @@ export function useControlPlaneSessionDetail({
   const [currentActivity, setCurrentActivity] = useState<ClientSharedAgentActivityStatus | undefined>();
   const [latestUpdate, setLatestUpdate] = useState<ClientSharedSessionLatestUpdate | undefined>();
   const [activePlan, setActivePlan] = useState<ClientSharedSessionPlan | undefined>();
+  const [liveDelegations, setLiveDelegations] = useState<ClientSharedDelegationView[]>([]);
   const loader = useControlPlaneSessionLoader({ workspaceId, sessionId });
   const runControl = useControlPlaneSessionRunControl({
     workspaceId,
@@ -110,6 +113,7 @@ export function useControlPlaneSessionDetail({
     setActivePlan,
     setCurrentActivity,
     setLatestUpdate,
+    setLiveDelegations,
     onNotificationIntent,
   });
   const promptSubmit = useControlPlaneSessionPromptSubmit({
@@ -121,6 +125,7 @@ export function useControlPlaneSessionDetail({
     setError: loader.setError,
     setLiveStatus,
     setCurrentActivity,
+    setLiveDelegations,
     onRunAccepted: runControl.trackAcceptedRun,
   });
   const settings = useControlPlaneSessionSettings({
@@ -153,6 +158,7 @@ export function useControlPlaneSessionDetail({
     currentActivity,
     latestUpdate,
     activePlan,
+    liveDelegations,
     runtimeContext: runtimeContext.runtimeContext,
     cancelError: runControl.cancelError,
     pendingApproval: approval.pendingApproval,
@@ -183,6 +189,7 @@ export function useControlPlaneSessionDetail({
     currentActivity,
     latestUpdate,
     liveStatus,
+    liveDelegations,
     loader.error,
     loader.loading,
     loader.session,

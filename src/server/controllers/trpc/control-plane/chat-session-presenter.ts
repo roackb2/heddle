@@ -3,6 +3,7 @@ import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import { REASONING_EFFORTS, type ReasoningEffort } from '@/core/llm/types.js';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
 import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
+import { ConversationTurnDelegationsReadSchema } from '@/core/chat/engine/sessions/repository/chat-session-schemas.js';
 import type {
   ChatSessionDetail,
   ChatSessionMessage,
@@ -237,7 +238,13 @@ export class ControlPlaneChatSessionPresenter {
       events,
       presentation: ConversationTurnPresentationService.read(candidate.presentation),
       agent: ControlPlaneChatSessionPresenter.projectTurnAgent(candidate.agent),
+      delegations: ControlPlaneChatSessionPresenter.projectTurnDelegations(candidate.delegations),
     }];
+  }
+
+  private static projectTurnDelegations(raw: unknown): ChatTurnView['delegations'] | undefined {
+    const parsed = ConversationTurnDelegationsReadSchema.safeParse(raw);
+    return parsed.success && parsed.data.length > 0 ? parsed.data : undefined;
   }
 
   private static projectTurnAgent(raw: unknown): ChatTurnView['agent'] | undefined {

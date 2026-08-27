@@ -5,6 +5,7 @@ import { ClientSharedSessionTurnPresentationService } from '@/client-shared/serv
 import type { ClientSharedConversationTimelineItem } from '@/client-shared/services/session-turn-presentation/index.js';
 import { AssistantMarkdown } from './AssistantMarkdown.js';
 import { ConversationTurnActivityBlock } from './ConversationTurnActivityBlock.js';
+import { ConversationTurnDelegationBlock } from './ConversationTurnDelegationBlock.js';
 
 type ConversationMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
 const MAX_VISIBLE_TIMELINE_ITEMS = 14;
@@ -49,6 +50,18 @@ function ConversationTimelineItemView({
   item: ClientSharedConversationTimelineItem;
   last: boolean;
 }) {
+  if (item.type === 'turn_delegation_group') {
+    return (
+      <Box flexDirection="column" marginBottom={1}>
+        <Text dimColor>┌ Subagents</Text>
+        <Box paddingLeft={2} flexDirection="column">
+          <ConversationTurnDelegationBlock item={item} />
+        </Box>
+        <TimelineFooter last={last} />
+      </Box>
+    );
+  }
+
   if (item.type === 'turn_activity_group') {
     return (
       <Box flexDirection="column" marginBottom={1}>
