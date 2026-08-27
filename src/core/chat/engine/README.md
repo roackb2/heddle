@@ -26,6 +26,9 @@ not each invent their own version.
   surfaces and artifact behavior.
 - Host-facing turn result summaries, including trace file, completed tool
   results, session artifacts, and safe model-failure categories.
+- Default-auto root delegation composition, explicit engine/turn `off`
+  semantics, and in-memory child-run evidence. The lower-level delegation
+  domain continues to own child safety and execution limits.
 
 ## Domain Ownership Rule
 

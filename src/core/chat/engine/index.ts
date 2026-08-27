@@ -92,6 +92,8 @@ export type {
 export type {
   AppendConversationMessageInput,
   ClearConversationTurnLeaseInput,
+  ConversationDelegationConfig,
+  ConversationDelegationMode,
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,

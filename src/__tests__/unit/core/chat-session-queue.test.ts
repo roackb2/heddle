@@ -16,10 +16,16 @@ describe('chat session queued prompts', () => {
     const session = await sessions.create({ id: 'session-1', name: 'Session 1' });
     const agentSnapshot = askAgentSnapshot();
 
+    await expect(sessions.enqueuePrompt(session.id, {
+      prompt: 'Invalid delegation mode.',
+      delegation: 'invalid' as never,
+    })).rejects.toThrow('conversation delegation mode must be auto or off');
+
     const queued = await sessions.enqueuePrompt(session.id, {
       prompt: 'Review this change.',
       agentProfileId: 'builtin:review',
       agentSnapshot,
+      delegation: 'off',
     });
     const dequeued = await sessions.dequeueQueuedPrompt(session.id);
 
@@ -29,6 +35,7 @@ describe('chat session queued prompts', () => {
       prompt: 'Review this change.',
       agentProfileId: 'builtin:review',
       agentSnapshot,
+      delegation: 'off',
     }));
     expect(dequeued.session.queuedPrompts).toEqual([]);
   });

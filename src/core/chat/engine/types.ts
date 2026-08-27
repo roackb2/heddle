@@ -21,8 +21,14 @@ import type {
   ChatSessionRepository,
   ListChatSessionsInput,
 } from './sessions/repository/index.js';
-import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
+import type {
+  ChatSession,
+  ChatSessionRetention,
+  ConversationDelegationMode,
+  QueuedConversationPrompt,
+} from '../types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import type { DelegationPolicyInput } from '@/core/delegation/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationTurnResultSummary } from './turn-result.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
@@ -55,6 +61,11 @@ export type ConversationEngineConfig = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   /** Default model-visible tool policy. A selected custom agent overrides it for that turn. */
   toolProfile?: RuntimeToolSelectionProfile;
+  /**
+   * Root-agent delegation is available by default. Set mode to `off` to make
+   * `delegate_task` unavailable for every turn owned by this engine.
+   */
+  delegation?: ConversationDelegationConfig;
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   hostExtensions?: ConversationEngineHostExtensionsInput;
@@ -98,6 +109,13 @@ export type ConversationEngineConfig = {
    */
   archiveRepository?: ChatArchiveRepository;
 };
+
+export type ConversationDelegationConfig = Omit<DelegationPolicyInput, 'enabled'> & {
+  /** Defaults to `auto`; the root model decides whether delegation is useful. */
+  mode?: ConversationDelegationMode;
+};
+
+export type { ConversationDelegationMode };
 
 export type ConversationEngineHostExtensions = ConversationEngineHostExtensionBundle;
 export type ConversationEngineHostExtensionsInput = ConversationEngineHostExtensionInput;
@@ -249,6 +267,7 @@ export type EnqueueConversationPromptInput = {
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   systemContext?: string;
+  delegation?: ConversationDelegationMode;
 };
 
 export type UpdateQueuedConversationPromptInput = {
@@ -296,6 +315,8 @@ export type SubmitConversationTurnInput = {
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  /** `off` removes delegation for this turn; `auto` cannot widen an engine-level `off`. */
+  delegation?: ConversationDelegationMode;
   maxSteps?: number;
   maxToolConcurrency?: number;
   searchIgnoreDirs?: string[];
@@ -312,6 +333,8 @@ export type SubmitConversationTurnInput = {
 export type ContinueConversationTurnInput = {
   sessionId: string;
   prompt?: string;
+  /** `off` removes delegation for this turn; `auto` cannot widen an engine-level `off`. */
+  delegation?: ConversationDelegationMode;
   maxSteps?: number;
   maxToolConcurrency?: number;
   searchIgnoreDirs?: string[];

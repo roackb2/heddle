@@ -69,6 +69,7 @@ export class DelegationRootScope {
   private readonly agentSnapshots: ReadonlyMap<DelegationAgentProfileId, CustomAgentExecutionSnapshot>;
   private readonly childRecords: DelegatedRunRecord[] = [];
   private readonly childControllers = new Map<string, AbortController>();
+  private readonly childSettlements = new Set<Promise<ToolResult>>();
   private readonly childRuntime: DelegationChildRuntimeService;
   private readonly defaultAgentProfileId: DelegationAgentProfileId;
   private readonly semaphore: Semaphore;
@@ -172,7 +173,13 @@ export class DelegationRootScope {
       agentProfileId,
       snapshot,
     });
-    return await this.executeReservedChild(reserved, context.signal);
+    const settlement = this.executeReservedChild(reserved, context.signal);
+    this.childSettlements.add(settlement);
+    try {
+      return await settlement;
+    } finally {
+      this.childSettlements.delete(settlement);
+    }
   }
 
   records(): DelegatedRunRecord[] {
@@ -197,6 +204,15 @@ export class DelegationRootScope {
         controller.abort(reason);
       }
     });
+  }
+
+  /**
+   * Cancels this scope and waits for every reserved child to reach a settled
+   * record so a host never detaches delegated work from its owning root turn.
+   */
+  async cancelAndWait(reason?: unknown): Promise<void> {
+    this.cancel(reason);
+    await Promise.allSettled([...this.childSettlements]);
   }
 
   private resolveAgentSnapshots(
@@ -255,7 +271,7 @@ export class DelegationRootScope {
     reserved: ReservedChild,
     parentSignal: AbortSignal | undefined,
   ): Promise<ToolResult> {
-    const signal = AbortSignal.any([
+    const ownershipSignal = AbortSignal.any([
       this.scopeController.signal,
       reserved.controller.signal,
       ...(parentSignal ? [parentSignal] : []),
@@ -263,9 +279,20 @@ export class DelegationRootScope {
 
     try {
       return await this.semaphore.runExclusive(async () => {
-        if (signal.aborted) {
+        if (ownershipSignal.aborted) {
           return this.settleWithoutResult(reserved.record, 'cancelled');
         }
+
+        const deadlineController = new AbortController();
+        const deadline = setTimeout(() => {
+          const error = new Error(DelegationPolicyService.message('child_timeout'));
+          error.name = 'TimeoutError';
+          deadlineController.abort(error);
+        }, this.policy.maxChildDurationMs);
+        const signal = AbortSignal.any([
+          ownershipSignal,
+          deadlineController.signal,
+        ]);
 
         try {
           const result = await this.childRuntime.run({
@@ -273,12 +300,20 @@ export class DelegationRootScope {
             snapshot: reserved.snapshot,
             signal,
           });
-          return this.settleResult(reserved.record, result);
+          return this.settleResult(
+            reserved.record,
+            result,
+            deadlineController.signal.aborted && !ownershipSignal.aborted,
+          );
         } catch {
           return this.settleWithoutResult(
             reserved.record,
-            signal.aborted ? 'cancelled' : 'child_failed',
+            ownershipSignal.aborted
+              ? 'cancelled'
+              : deadlineController.signal.aborted ? 'child_timeout' : 'child_failed',
           );
+        } finally {
+          clearTimeout(deadline);
         }
       });
     } finally {
@@ -289,13 +324,19 @@ export class DelegationRootScope {
   private settleResult(
     record: DelegatedRunRecord,
     result: AgentLoopResult,
+    timedOut: boolean,
   ): ToolResult {
-    const cancelled = result.outcome === 'interrupted';
+    const code = timedOut
+      ? 'child_timeout'
+      : result.outcome === 'done'
+        ? undefined
+        : result.outcome === 'interrupted' ? 'cancelled' : 'child_failed';
+    const cancelled = code === 'cancelled' || code === 'child_timeout';
     Object.assign(record, {
       status: cancelled ? 'cancelled' : 'finished',
-      outcome: result.outcome,
-      summary: result.summary,
-      ...(result.failure ? { failure: result.failure } : {}),
+      outcome: timedOut ? 'interrupted' : result.outcome,
+      summary: timedOut ? DelegationPolicyService.message('child_timeout') : result.summary,
+      ...(!timedOut && result.failure ? { failure: result.failure } : {}),
       model: result.model,
       provider: result.provider,
       ...(result.usage ? { usage: result.usage } : {}),
@@ -303,21 +344,17 @@ export class DelegationRootScope {
       finishedAt: new Date().toISOString(),
     });
 
-    return this.resultForRecord(
-      record,
-      result.outcome === 'done'
-        ? undefined
-        : cancelled ? 'cancelled' : 'child_failed',
-    );
+    return this.resultForRecord(record, code);
   }
 
   private settleWithoutResult(
     record: DelegatedRunRecord,
-    code: 'cancelled' | 'child_failed',
+    code: 'cancelled' | 'child_timeout' | 'child_failed',
   ): ToolResult {
+    const cancelled = code === 'cancelled' || code === 'child_timeout';
     Object.assign(record, {
-      status: code === 'cancelled' ? 'cancelled' : 'finished',
-      outcome: code === 'cancelled' ? 'interrupted' : 'error',
+      status: cancelled ? 'cancelled' : 'finished',
+      outcome: cancelled ? 'interrupted' : 'error',
       summary: DelegationPolicyService.message(code),
       finishedAt: new Date().toISOString(),
     });
@@ -326,11 +363,12 @@ export class DelegationRootScope {
 
   private resultForRecord(
     record: DelegatedRunRecord,
-    code: 'cancelled' | 'child_failed' | undefined,
+    code: 'cancelled' | 'child_timeout' | 'child_failed' | undefined,
   ): ToolResult {
+    const cancelled = code === 'cancelled' || code === 'child_timeout';
     const output: DelegateTaskOutput = {
       schemaVersion: 1,
-      status: code === 'cancelled' ? 'cancelled' : 'finished',
+      status: cancelled ? 'cancelled' : 'finished',
       delegationId: record.delegationId,
       childRunId: record.childRunId,
       agentProfileId: record.agentSnapshot.agentProfileId as DelegationAgentProfileId,

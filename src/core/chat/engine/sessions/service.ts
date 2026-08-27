@@ -36,6 +36,7 @@ import { ConversationCompactionService } from '@/core/chat/engine/compaction/ind
 import { ChatSessionRecords, ChatSessionTitles, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
+import { ConversationDelegationPolicyService } from '../delegation-policy.js';
 import type {
   AppendConversationMessageInput,
   AcceptConversationUserMessageInput,
@@ -289,6 +290,7 @@ export class FileConversationSessionService implements ConversationSessionServic
     if (!prompt) {
       throw new Error('Queued prompt cannot be empty.');
     }
+    ConversationDelegationPolicyService.assertTurnMode(input.delegation);
 
     const now = new Date().toISOString();
     const item = {
@@ -297,6 +299,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       agentProfileId: input.agentProfileId,
       agentSnapshot: input.agentSnapshot,
       systemContext: input.systemContext,
+      delegation: input.delegation,
       createdAt: now,
       updatedAt: now,
     };

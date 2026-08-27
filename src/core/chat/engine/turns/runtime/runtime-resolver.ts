@@ -42,6 +42,18 @@ export class ConversationTurnRuntimeResolver {
     const domainSystemContext = config.artifactsEnabled === false
       ? memorySystemContext
       : appendArtifactDomainSystemContext(memorySystemContext);
+    const createLlm = () => LlmAdapterService.create({
+      model,
+      credentials: {
+        apiKey,
+        credential: providerRuntime.credential,
+        credentialStorePath: config.credentialStorePath,
+      },
+      runtime: {
+        ...providerRuntime.llmRuntime,
+        reasoningEffort: session.reasoningEffort,
+      },
+    });
 
     return {
       model,
@@ -58,18 +70,8 @@ export class ConversationTurnRuntimeResolver {
       memoryDir,
       systemContext: appendAwarenessDomainSystemContext(domainSystemContext),
       reasoningEffort: session.reasoningEffort,
-      llm: LlmAdapterService.create({
-        model,
-        credentials: {
-          apiKey,
-          credential: providerRuntime.credential,
-          credentialStorePath: config.credentialStorePath,
-        },
-        runtime: {
-          ...providerRuntime.llmRuntime,
-          reasoningEffort: session.reasoningEffort,
-        },
-      }),
+      llm: createLlm(),
+      createLlm,
     };
   }
 

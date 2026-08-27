@@ -14,7 +14,8 @@ This domain owns:
 - atomic total-child reservation and a per-root concurrency semaphore;
 - immutable `builtin:ask` / `builtin:review` snapshot selection;
 - the mandatory child read-only tool and approval envelopes;
-- fresh child context, adapter creation, cancellation, and step clamping;
+- fresh child context, adapter creation, cancellation, step clamping, and a
+  validated per-child execution deadline;
 - bounded model-facing results and richer in-memory host records.
 
 `DelegationRootScope` owns the mutable per-root graph, reservation semaphore,
@@ -68,12 +69,28 @@ contract.
 Ordinary `AgentLoopRuntimeService` callers do not receive `delegate_task`, and
 omitting `runId` preserves generated run IDs. Calling `scope.cancel()` aborts
 active and queued children. A root runtime's abort signal also reaches every
-delegate tool call through the existing tool execution context.
+delegate tool call through the existing tool execution context. Hosts that may
+exit the root turn on an exceptional path should await `scope.cancelAndWait()`
+so every reserved child reaches a settled record before the scope is released.
 
 `delegate_task` disables the tools domain's generic 30-second wrapper timeout
-because one call owns a complete child loop. Root cancellation and child step
-limits remain active. Until delegation owns a validated wall-time policy, hosts
-that need a wall-clock bound should provide an abort signal for the root run.
+because one call owns a complete child loop. The delegation domain instead
+owns a five-minute default child deadline, configurable from one second through
+fifteen minutes. Root cancellation and child step limits remain independently
+active.
+
+## Conversation Engine Composition
+
+The lower-level `DelegationService` stays disabled by default so an ordinary
+single-run caller never gains a tool implicitly. `createConversationEngine`
+owns a different product-level default: it creates one enabled root scope per
+turn and exposes `delegate_task` unless the engine or turn selects `off`.
+
+The root model decides whether a task benefits from delegation; there is no
+per-turn enable gate. An engine-level `off` is an authority ceiling, so a turn
+cannot re-enable it. The conversation turn result includes the scope snapshot
+in memory and omits it when delegation is off. Durable child records and live
+child activity remain later slices.
 
 ## V1 Safety Invariants
 
@@ -82,6 +99,7 @@ that need a wall-clock bound should provide an abort signal for the root run.
   default.
 - A reservation remains consumed after completion, failure, or cancellation.
 - Child step budgets default to 24 and cannot exceed 32.
+- Child wall time defaults to five minutes and cannot exceed fifteen minutes.
 - Only built-in ask/review snapshots are eligible.
 - Snapshot tool selection is intersected with a mandatory capability envelope.
 - Children receive only `project_dashboard`, `list_files`, `read_file`, and

@@ -236,6 +236,8 @@ export type {
 } from './core/chat/runs/index.js';
 export type {
   ClearConversationTurnLeaseInput,
+  ConversationDelegationConfig,
+  ConversationDelegationMode,
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
@@ -252,6 +254,11 @@ export type {
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,
 } from './core/chat/engine/types.js';
+export type {
+  DelegatedRunRecord,
+  DelegationPolicy,
+  DelegationRootScopeSnapshot,
+} from './core/delegation/index.js';
 export type {
   ConversationPersistence,
   ConversationPersistenceConfiguration,

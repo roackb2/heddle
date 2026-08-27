@@ -13,6 +13,8 @@ import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
+import type { DelegationPolicy } from '@/core/delegation/index.js';
+import type { ConversationDelegationMode } from '@/core/chat/types.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -35,6 +37,9 @@ export type RunConversationTurnArgs = {
   includePlanTool?: boolean;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   toolProfile?: RuntimeToolSelectionProfile;
+  /** Defaults to the conversation engine's enabled delegation policy. */
+  delegationPolicy?: DelegationPolicy;
+  delegation?: ConversationDelegationMode;
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
@@ -68,6 +73,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'traceDir'
   | 'memoryMaintenanceMode'
   | 'toolProfile'
+  | 'delegationPolicy'
   | 'approvalPolicies'
   | 'tools'
   | 'toolkits'
@@ -90,6 +96,7 @@ export type TurnSubmitInput = Pick<
   | 'leaseOwner'
   | 'agentProfileId'
   | 'agentSnapshot'
+  | 'delegation'
 >;
 
 export type TurnHostInput = Pick<

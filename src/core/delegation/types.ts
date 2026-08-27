@@ -22,6 +22,7 @@ export type DelegationPolicy = {
   readonly maxChildren: number;
   readonly maxConcurrentChildren: number;
   readonly maxStepsPerChild: number;
+  readonly maxChildDurationMs: number;
   readonly allowedAgentProfileIds: readonly DelegationAgentProfileId[];
 };
 
@@ -31,6 +32,7 @@ export type DelegationPolicyInput = {
   maxChildren?: number;
   maxConcurrentChildren?: number;
   maxStepsPerChild?: number;
+  maxChildDurationMs?: number;
   allowedAgentProfileIds?: readonly string[];
 };
 
@@ -59,6 +61,7 @@ export type DelegationRejectionCode =
   | 'agent_not_read_only'
   | 'invalid_task'
   | 'cancelled'
+  | 'child_timeout'
   | 'child_failed';
 
 export type DelegateTaskError = {

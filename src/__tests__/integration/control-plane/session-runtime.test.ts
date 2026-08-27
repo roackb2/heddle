@@ -4,6 +4,9 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { ArtifactService } from '@/core/artifacts/index.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
+import type { ChatMessage, LlmAdapter, LlmResponse } from '@/core/llm/types.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
 import { ConversationTurnMemoryMaintenance } from '@/core/chat/engine/turns/memory/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
@@ -397,6 +400,189 @@ describe('conversation turn lifecycle', () => {
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
   });
 
+  it('makes delegation available by default and returns completed child evidence to the host', async () => {
+    const storage = await createConversationTurnStorage();
+    const childMessages: ChatMessage[][] = [];
+    const childToolNames: string[][] = [];
+    let rootToolNames: string[] = [];
+    let rootToolOutput: unknown;
+    let rootRequest = 0;
+    const rootAdapter = testAdapter(async (messages, tools) => {
+      rootToolNames = (tools ?? []).map((tool) => tool.name);
+      rootRequest += 1;
+      if (rootRequest === 1) {
+        return {
+          content: 'I will delegate an independent inspection.',
+          toolCalls: [{
+            id: 'delegate-one',
+            tool: 'delegate_task',
+            input: {
+              task: 'Inspect the conversation engine boundary.',
+              agentProfileId: 'builtin:ask',
+            },
+          }],
+        };
+      }
+
+      const toolMessage = [...messages].reverse().find(
+        (message): message is Extract<ChatMessage, { role: 'tool' }> => message.role === 'tool',
+      );
+      rootToolOutput = toolMessage ? JSON.parse(toolMessage.content) : undefined;
+      return { content: 'Root synthesized the delegated inspection.' };
+    });
+    const childAdapter = testAdapter(async (messages, tools) => {
+      childMessages.push(structuredClone(messages));
+      childToolNames.push((tools ?? []).map((tool) => tool.name));
+      return { content: 'The conversation engine owns the persisted turn boundary.' };
+    });
+    vi.spyOn(LlmAdapterService, 'create')
+      .mockReturnValueOnce(rootAdapter)
+      .mockReturnValueOnce(childAdapter);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Inspect this architecture with help when useful.',
+      apiKey: 'explicit-key',
+      systemContext: 'BASE_SYSTEM_CONTEXT',
+      agentSnapshot: rootAgentSnapshot(),
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(rootToolNames).toContain('delegate_task');
+    expect(childToolNames).toEqual([[
+      'project_dashboard',
+      'list_files',
+      'read_file',
+      'search_files',
+    ]]);
+    expect(JSON.stringify(childMessages)).toContain('BASE_SYSTEM_CONTEXT');
+    expect(JSON.stringify(childMessages)).not.toContain('ROOT_PROFILE_SENTINEL');
+    expect(rootToolOutput).toEqual(expect.objectContaining({
+      ok: true,
+      output: expect.objectContaining({
+        status: 'finished',
+        outcome: 'done',
+      }),
+    }));
+    expect(turnResult).toEqual(expect.objectContaining({
+      outcome: 'done',
+      summary: 'Root synthesized the delegated inspection.',
+      delegation: expect.objectContaining({
+        policy: expect.objectContaining({ enabled: true }),
+        records: [expect.objectContaining({
+          task: 'Inspect the conversation engine boundary.',
+          status: 'finished',
+          outcome: 'done',
+          summary: 'The conversation engine owns the persisted turn boundary.',
+        })],
+      }),
+    }));
+    expect(turnResult.delegation?.records[0]?.rootRunId).toBe(turnResult.delegation?.rootRunId);
+  });
+
+  it('propagates parent cancellation into an active delegated child', async () => {
+    const storage = await createConversationTurnStorage();
+    const controller = new AbortController();
+    let markChildStarted!: () => void;
+    const childStarted = new Promise<void>((resolveStarted) => {
+      markChildStarted = resolveStarted;
+    });
+    let rootRequest = 0;
+    const rootAdapter = testAdapter(async () => {
+      rootRequest += 1;
+      return rootRequest === 1
+        ? {
+            content: 'Delegating a cancellable inspection.',
+            toolCalls: [{
+              id: 'delegate-cancellable',
+              tool: 'delegate_task',
+              input: { task: 'Wait for the parent cancellation.' },
+            }],
+          }
+        : { content: 'This response should not be needed after cancellation.' };
+    });
+    const childAdapter = testAdapter(async (_messages, _tools, signal) => {
+      markChildStarted();
+      return await rejectAdapterWhenAborted(signal);
+    });
+    vi.spyOn(LlmAdapterService, 'create')
+      .mockReturnValueOnce(rootAdapter)
+      .mockReturnValueOnce(childAdapter);
+
+    const turn = EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Delegate this, then stop when I cancel.',
+      apiKey: 'explicit-key',
+      abortSignal: controller.signal,
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+    await childStarted;
+    controller.abort(Object.assign(new Error('cancel parent turn'), { name: 'AbortError' }));
+
+    await expect(turn).resolves.toEqual(expect.objectContaining({
+      outcome: 'interrupted',
+      delegation: expect.objectContaining({
+        records: [expect.objectContaining({
+          status: 'cancelled',
+          outcome: 'interrupted',
+        })],
+      }),
+    }));
+  });
+
+  it('removes delegation entirely for an off turn', async () => {
+    const storage = await createConversationTurnStorage();
+    await expect(EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Reject an invalid delegation mode.',
+      apiKey: 'explicit-key',
+      delegation: 'invalid' as never,
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    })).rejects.toThrow('conversation delegation mode must be auto or off');
+
+    const loopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Run without delegation.',
+      summary: 'Handled directly.',
+    }) as never);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Run without delegation.',
+      apiKey: 'explicit-key',
+      delegation: 'off',
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(loopSpy.mock.calls[0]?.[0].tools?.map((tool) => tool.name)).not.toContain('delegate_task');
+    expect(loopSpy.mock.calls[0]?.[0].runId).toBeUndefined();
+    expect(turnResult.delegation).toBeUndefined();
+  });
+
   it('returns persisted trace, session artifacts, completed tool results, and memory changes to hosts', async () => {
     const storage = await createConversationTurnStorage();
     const artifact = new ArtifactService({ artifactRoot: storage.artifactRoot }).saveText({
@@ -782,4 +968,51 @@ function createLoopResult(args: {
       trace,
     },
   };
+}
+
+function testAdapter(chat: LlmAdapter['chat']): LlmAdapter {
+  return {
+    info: {
+      provider: 'openai',
+      model: 'gpt-5.4',
+      capabilities: {
+        toolCalls: true,
+        systemMessages: true,
+        reasoningSummaries: false,
+        parallelToolCalls: true,
+      },
+    },
+    chat,
+  };
+}
+
+function rootAgentSnapshot(): CustomAgentExecutionSnapshot {
+  return {
+    agentProfileId: 'project:root-reviewer',
+    agentName: 'Root reviewer',
+    source: 'project',
+    definitionHash: 'root-reviewer-definition',
+    runtime: { maxSteps: 4 },
+    toolProfile: {
+      preset: 'inspect',
+      memoryMode: 'none',
+    },
+    approvalProfile: { preset: 'read_only' },
+    systemContextAppendix: 'ROOT_PROFILE_SENTINEL',
+  };
+}
+
+async function rejectAdapterWhenAborted(signal: AbortSignal | undefined): Promise<LlmResponse> {
+  if (!signal) {
+    throw new Error('Expected delegated child abort signal');
+  }
+  if (signal.aborted) {
+    throw Object.assign(new Error('cancelled'), { name: 'AbortError' });
+  }
+
+  return await new Promise<LlmResponse>((_resolve, reject) => {
+    signal.addEventListener('abort', () => {
+      reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
+    }, { once: true });
+  });
 }

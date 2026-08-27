@@ -598,7 +598,7 @@ export class ControlPlaneChatSessionsController {
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
               // Engine config already owns the composed permission chain.
-              ...omit(args, ['approvalPolicies', 'permissionGrant']),
+              ...omit(args, ['approvalPolicies', 'delegation', 'permissionGrant']),
               agentProfileId: args.agentProfileId,
               agentSnapshot: args.agentSnapshot,
               host,

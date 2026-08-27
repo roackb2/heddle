@@ -16,6 +16,7 @@ const ReasoningEffortSchema = z.enum(REASONING_EFFORTS);
 const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
 const ChatSessionLeaseOwnerSchema = z.enum(['tui', 'daemon', 'ask']);
 const CompactionStatusSchema = z.enum(['idle', 'running', 'failed']);
+const ConversationDelegationModeSchema = z.enum(['auto', 'off']);
 
 const ToolCallSchema = z.object({
   id: z.string().describe('Provider-assigned tool call identifier used to pair tool results with assistant requests.'),
@@ -204,12 +205,16 @@ const QueuedConversationPromptSchema = z.object({
   systemContext: z.string()
     .describe('Optional runtime context that should be applied when this queued prompt runs.')
     .optional(),
+  delegation: ConversationDelegationModeSchema
+    .describe('Delegation availability captured when this prompt entered the queue.')
+    .optional(),
   createdAt: z.string().describe('Timestamp when this prompt entered the session queue.'),
   updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
 });
 
 const QueuedConversationPromptReadSchema = QueuedConversationPromptSchema.extend({
   agentSnapshot: CustomAgentExecutionSnapshotSchema.optional().catch(undefined),
+  delegation: ConversationDelegationModeSchema.optional().catch(undefined),
 });
 
 const QueuedConversationPromptsSchema = z.array(z.unknown())

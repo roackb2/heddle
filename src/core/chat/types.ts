@@ -144,12 +144,16 @@ export type ChatSessionLease = {
 
 export type ChatSessionRetention = 'reusable' | 'one_off';
 
+/** Root-agent delegation availability for one conversation turn. */
+export type ConversationDelegationMode = 'auto' | 'off';
+
 export type QueuedConversationPrompt = {
   id: string;
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   systemContext?: string;
+  delegation?: ConversationDelegationMode;
   createdAt: string;
   updatedAt: string;
 };

@@ -12,6 +12,8 @@ import type { ToolToolkit } from '@/core/tools/index.js';
 import { ConversationEngineHostExtensionService } from './host-extension.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
+import type { DelegationPolicy } from '@/core/delegation/index.js';
+import { ConversationDelegationPolicyService } from './delegation-policy.js';
 import {
   ConversationPersistenceService,
 } from './persistence/conversation-persistence.js';
@@ -31,6 +33,7 @@ export type NormalizedConversationEngineConfig = {
   systemContext?: string;
   memoryMaintenanceMode: 'none' | 'background' | 'inline';
   toolProfile?: RuntimeToolSelectionProfile;
+  delegationPolicy: DelegationPolicy;
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
@@ -79,6 +82,9 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     config.systemContext,
     hostExtensions?.systemContext,
   ].filter((value): value is string => Boolean(value)).join('\n\n') || undefined;
+  const delegationPolicy = ConversationDelegationPolicyService.resolveEnginePolicy(
+    config.delegation,
+  );
 
   return {
     workspaceRoot,
@@ -92,6 +98,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     systemContext,
     memoryMaintenanceMode: config.memoryMaintenanceMode ?? 'background',
     toolProfile: config.toolProfile,
+    delegationPolicy,
     traceSummarizerRegistry: config.traceSummarizerRegistry,
     approvalPolicies: config.approvalPolicies,
     tools: tools.length ? tools : undefined,

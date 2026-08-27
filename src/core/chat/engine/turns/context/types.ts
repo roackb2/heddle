@@ -57,6 +57,8 @@ export type ConversationTurnToolRuntimeArgs = Pick<
 
 export type ConversationTurnContext = {
   session: ChatSession;
+  /** Turn context before the selected root custom-agent appendix is applied. */
+  baseSystemContext?: string;
   runtime: ChatTurnRuntime;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   tools: ToolDefinition[];
