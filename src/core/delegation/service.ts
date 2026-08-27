@@ -80,6 +80,7 @@ export class DelegationRootScope {
   private readonly childRuntime: DelegationChildRuntimeService;
   private readonly defaultAgentProfileId: DelegationAgentProfileId;
   private readonly onActivity: CreateDelegationRootScopeOptions['onActivity'];
+  private readonly actionSemaphore = new Semaphore(1);
   private readonly semaphore: Semaphore;
   private readonly scopeController = new AbortController();
 
@@ -92,9 +93,6 @@ export class DelegationRootScope {
     this.workspaceRoot = resolve(options.workspaceRoot);
     this.onActivity = options.onActivity;
     this.semaphore = new Semaphore(this.policy.maxConcurrentChildren);
-    this.defaultAgentProfileId = this.policy.allowedAgentProfileIds.includes('builtin:ask')
-      ? 'builtin:ask'
-      : this.policy.allowedAgentProfileIds[0]!;
     this.childRuntime = new DelegationChildRuntimeService({
       rootRunId: this.rootRunId,
       workspaceRoot: this.workspaceRoot,
@@ -110,17 +108,26 @@ export class DelegationRootScope {
     this.agentSnapshots = this.policy.enabled
       ? this.resolveAgentSnapshots(resolver)
       : new Map();
+    const availableAgentProfileIds = [...this.agentSnapshots.keys()];
+    if (this.policy.enabled && availableAgentProfileIds.length === 0) {
+      throw new Error('Delegation has no child agent profile within the root authority ceiling');
+    }
+    this.defaultAgentProfileId = this.agentSnapshots.has('builtin:ask')
+      ? 'builtin:ask'
+      : availableAgentProfileIds[0] ?? 'builtin:ask';
   }
 
   /**
    * Creates the only model-visible delegation entry point for this scope.
    */
   createTool(): ToolDefinition {
+    const availableAgentProfileIds = [...this.agentSnapshots.keys()];
     return {
       name: 'delegate_task',
       description: [
-        'Run one bounded, read-only child agent on an independent inspection task.',
-        'The child receives the same workspace but no parent transcript and cannot delegate or mutate state.',
+        'Run one bounded child agent on an independent task.',
+        'Ask and Review children are read-only. Explicitly selecting builtin:code grants the child a bounded coding catalog within the root agent tool and permission ceilings.',
+        'The child receives the same workspace but no parent transcript and cannot delegate further.',
         `task is required and limited to ${MAX_DELEGATED_TASK_LENGTH} characters.`,
         `agentProfileId may be omitted to use ${this.defaultAgentProfileId}.`,
       ].join(' '),
@@ -135,12 +142,12 @@ export class DelegationRootScope {
             type: 'string',
             minLength: 1,
             maxLength: MAX_DELEGATED_TASK_LENGTH,
-            description: 'Self-contained inspection or review task for the child agent.',
+            description: 'Self-contained task for the child agent.',
           },
           agentProfileId: {
             type: 'string',
-            enum: [...this.policy.allowedAgentProfileIds],
-            description: `Read-only child profile. Omit to use ${this.defaultAgentProfileId}.`,
+            enum: availableAgentProfileIds,
+            description: `Child authority profile. Omit for read-only ${this.defaultAgentProfileId}; select builtin:code only when the task requires actions.`,
           },
         },
         required: ['task'],
@@ -249,13 +256,14 @@ export class DelegationRootScope {
   private resolveAgentSnapshots(
     resolver: DelegationAgentSnapshotResolver,
   ): ReadonlyMap<DelegationAgentProfileId, CustomAgentExecutionSnapshot> {
-    return new Map(this.policy.allowedAgentProfileIds.map((agentProfileId) => {
+    return new Map(this.policy.allowedAgentProfileIds.flatMap((agentProfileId) => {
       const snapshot = resolver.resolveExecutionSnapshot(agentProfileId);
       if (!snapshot) {
         throw new Error(`Delegation agent profile could not be resolved: ${agentProfileId}`);
       }
-      this.childRuntime.preflightSnapshot(agentProfileId, snapshot);
-      return [agentProfileId, cloneDeep(snapshot)];
+      return this.childRuntime.preflightSnapshot(agentProfileId, snapshot)
+        ? [[agentProfileId, cloneDeep(snapshot)] as const]
+        : [];
     }));
   }
 
@@ -317,47 +325,59 @@ export class DelegationRootScope {
     ]);
 
     try {
-      return await this.semaphore.runExclusive(async () => {
-        if (ownershipSignal.aborted) {
-          return this.settleWithoutResult(reserved.record, 'cancelled');
-        }
-
-        const deadlineController = new AbortController();
-        const deadline = setTimeout(() => {
-          const error = new Error(DelegationPolicyService.message('child_timeout'));
-          error.name = 'TimeoutError';
-          deadlineController.abort(error);
-        }, this.policy.maxChildDurationMs);
-        const signal = AbortSignal.any([
-          ownershipSignal,
-          deadlineController.signal,
-        ]);
-
-        try {
-          const result = await this.childRuntime.run({
-            record: reserved.record,
-            snapshot: reserved.snapshot,
-            signal,
-            onActivity: (activity) => this.publishChildActivity(reserved.record, activity),
-          });
-          return this.settleResult(
-            reserved.record,
-            result,
-            deadlineController.signal.aborted && !ownershipSignal.aborted,
-          );
-        } catch {
-          return this.settleWithoutResult(
-            reserved.record,
-            ownershipSignal.aborted
-              ? 'cancelled'
-              : deadlineController.signal.aborted ? 'child_timeout' : 'child_failed',
-          );
-        } finally {
-          clearTimeout(deadline);
-        }
-      });
+      const runWithinGlobalLimit = async () => await this.semaphore.runExclusive(
+        async () => await this.runReservedChild(reserved, ownershipSignal),
+      );
+      return DelegationChildRuntimeService.isActionProfile(
+        reserved.snapshot.agentProfileId as DelegationAgentProfileId,
+      )
+        ? await this.actionSemaphore.runExclusive(runWithinGlobalLimit)
+        : await runWithinGlobalLimit();
     } finally {
       this.childControllers.delete(reserved.record.childRunId);
+    }
+  }
+
+  private async runReservedChild(
+    reserved: ReservedChild,
+    ownershipSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    if (ownershipSignal.aborted) {
+      return this.settleWithoutResult(reserved.record, 'cancelled');
+    }
+
+    const deadlineController = new AbortController();
+    const deadline = setTimeout(() => {
+      const error = new Error(DelegationPolicyService.message('child_timeout'));
+      error.name = 'TimeoutError';
+      deadlineController.abort(error);
+    }, this.policy.maxChildDurationMs);
+    const signal = AbortSignal.any([
+      ownershipSignal,
+      deadlineController.signal,
+    ]);
+
+    try {
+      const result = await this.childRuntime.run({
+        record: reserved.record,
+        snapshot: reserved.snapshot,
+        signal,
+        onActivity: (activity) => this.publishChildActivity(reserved.record, activity),
+      });
+      return this.settleResult(
+        reserved.record,
+        result,
+        deadlineController.signal.aborted && !ownershipSignal.aborted,
+      );
+    } catch {
+      return this.settleWithoutResult(
+        reserved.record,
+        ownershipSignal.aborted
+          ? 'cancelled'
+          : deadlineController.signal.aborted ? 'child_timeout' : 'child_failed',
+      );
+    } finally {
+      clearTimeout(deadline);
     }
   }
 

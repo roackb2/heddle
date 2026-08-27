@@ -22,7 +22,6 @@ import type {
   ToolCapability,
 } from '@/core/runtime/tools/index.js';
 import type { ToolDefinition } from '@/core/types.js';
-import { DelegationPolicyService } from './policy.js';
 import type {
   DelegatedRunRecord,
   DelegationAgentProfileId,
@@ -30,7 +29,7 @@ import type {
   DelegationPolicy,
 } from './types.js';
 
-const MANDATORY_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
+const READ_ONLY_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
   preset: 'custom',
   allowedCapabilities: ['workspace.read'],
   deniedCapabilities: [
@@ -51,16 +50,66 @@ const MANDATORY_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
   memoryMode: 'none',
 };
 
-const SAFE_CHILD_CAPABILITIES = new Set<ToolCapability>([
+const ACTION_CHILD_TOOL_PROFILE: RuntimeToolSelectionProfile = {
+  preset: 'custom',
+  allowedCapabilities: [
+    'workspace.read',
+    'workspace.write',
+    'shell.inspect',
+    'shell.mutate',
+  ],
+  deniedCapabilities: [
+    'agent.delegate',
+    'memory.read',
+    'memory.write',
+    'artifact.read',
+    'artifact.write',
+    'external.read',
+    'browser.read',
+    'browser.action',
+    'mcp.unknown',
+    'internal.state',
+  ],
+  memoryMode: 'none',
+};
+
+const READ_ONLY_CHILD_CAPABILITIES = new Set<ToolCapability>([
   'workspace.read',
 ]);
 
-const SAFE_CHILD_TOOL_NAMES = new Set([
+const ACTION_CHILD_CAPABILITIES = new Set<ToolCapability>([
+  'workspace.read',
+  'workspace.write',
+  'shell.inspect',
+  'shell.mutate',
+]);
+
+const READ_ONLY_CHILD_TOOL_NAMES = new Set([
   'project_dashboard',
   'list_files',
   'read_file',
   'search_files',
 ]);
+
+const ACTION_CHILD_TOOL_NAMES = new Set([
+  ...READ_ONLY_CHILD_TOOL_NAMES,
+  'edit_file',
+  'delete_file',
+  'move_file',
+  'run_shell_inspect',
+  'run_shell_mutate',
+]);
+
+const MUTATING_CHILD_CAPABILITIES = new Set<ToolCapability>([
+  'workspace.write',
+  'shell.mutate',
+]);
+
+const ACTION_CHILD_SYSTEM_CONTEXT = [
+  'You are a bounded action-capable child agent working for a main agent.',
+  'Complete only the delegated task in the shared workspace, use the granted tools when needed, and do not delegate further.',
+  'Keep changes focused, verify them proportionately, and return a concise summary of actions, files, and validation.',
+].join('\n');
 
 const CHILD_RUNTIME_OPTION_KEYS = [
   'model',
@@ -76,11 +125,14 @@ const CHILD_RUNTIME_OPTION_KEYS = [
   'baseSystemContext',
   'logger',
   'createChildLlm',
+  'parentTools',
+  'approvalPolicies',
+  'approveToolCall',
 ] as const satisfies readonly (keyof DelegationChildRuntimeOptions)[];
 
 /**
  * Builds and executes one child through the existing single-run runtime while
- * enforcing the non-widenable v1 context, tool, approval, and adapter rules.
+ * enforcing the non-widenable context, tool, approval, and adapter rules.
  */
 export class DelegationChildRuntimeService {
   private readonly runtime: Readonly<DelegationChildRuntimeOptions>;
@@ -104,6 +156,12 @@ export class DelegationChildRuntimeService {
       searchIgnoreDirs: runtime.searchIgnoreDirs
         ? Object.freeze([...runtime.searchIgnoreDirs]) as string[]
         : undefined,
+      parentTools: runtime.parentTools
+        ? Object.freeze([...runtime.parentTools]) as ToolDefinition[]
+        : undefined,
+      approvalPolicies: runtime.approvalPolicies
+        ? Object.freeze([...runtime.approvalPolicies]) as ToolApprovalPolicy[]
+        : undefined,
     });
     if (!this.runtime.model.trim() || this.runtime.model !== this.runtime.model.trim()) {
       throw new Error('Delegation child runtime model must be a non-empty trimmed string');
@@ -117,9 +175,11 @@ export class DelegationChildRuntimeService {
   preflightSnapshot(
     agentProfileId: DelegationAgentProfileId,
     snapshot: CustomAgentExecutionSnapshot,
-  ): void {
-    DelegationChildRuntimeService.assertReadOnlySnapshot(agentProfileId, snapshot);
-    this.buildChildTools(snapshot);
+  ): boolean {
+    DelegationChildRuntimeService.assertSupportedSnapshot(agentProfileId, snapshot);
+    const tools = this.buildChildTools(snapshot);
+    return !DelegationChildRuntimeService.isActionProfile(agentProfileId)
+      || tools.some((tool) => DelegationChildRuntimeService.isMutatingTool(tool));
   }
 
   async run(input: {
@@ -151,16 +211,24 @@ export class DelegationChildRuntimeService {
   }): Promise<AgentLoopResult> {
     input.signal.throwIfAborted();
     const tools = this.buildChildTools(input.snapshot);
-    const systemContext = CustomAgentRuntimeContextService.appendAgentInstructions({
+    const profileSystemContext = CustomAgentRuntimeContextService.appendAgentInstructions({
       systemContext: this.runtime.baseSystemContext,
       snapshot: input.snapshot,
     });
+    const systemContext = DelegationChildRuntimeService.isActionProfile(
+      input.snapshot.agentProfileId as DelegationAgentProfileId,
+    )
+      ? [profileSystemContext, ACTION_CHILD_SYSTEM_CONTEXT].filter(Boolean).join('\n\n')
+      : profileSystemContext;
     const llm = await this.createChildLlm(input);
     input.signal.throwIfAborted();
 
     const {
       baseSystemContext: _baseSystemContext,
       createChildLlm: _createChildLlm,
+      parentTools: _parentTools,
+      approvalPolicies: _approvalPolicies,
+      approveToolCall,
       ...runtime
     } = this.runtime;
     const effectiveMaxSteps = Math.min(
@@ -180,6 +248,7 @@ export class DelegationChildRuntimeService {
       systemContext,
       maxSteps: effectiveMaxSteps,
       approvalPolicies: this.createChildApprovalPolicies(input.snapshot),
+      approveToolCall,
       abortSignal: input.signal,
       onEvent: (event) => {
         if (
@@ -194,6 +263,15 @@ export class DelegationChildRuntimeService {
   }
 
   private buildChildTools(snapshot: CustomAgentExecutionSnapshot): ToolDefinition[] {
+    const agentProfileId = snapshot.agentProfileId as DelegationAgentProfileId;
+    const actionCapable = DelegationChildRuntimeService.isActionProfile(agentProfileId);
+    const toolProfile = actionCapable
+      ? ACTION_CHILD_TOOL_PROFILE
+      : READ_ONLY_CHILD_TOOL_PROFILE;
+    const allowedToolNames = actionCapable
+      ? ACTION_CHILD_TOOL_NAMES
+      : READ_ONLY_CHILD_TOOL_NAMES;
+    const parentToolNames = new Set(this.runtime.parentTools?.map((tool) => tool.name) ?? []);
     const snapshotTools = RuntimeToolService.createDefaultAgentTools({
       model: this.runtime.model,
       workspaceRoot: this.workspaceRoot,
@@ -206,13 +284,16 @@ export class DelegationChildRuntimeService {
     });
     const tools = RuntimeToolProfileService.apply({
       tools: snapshotTools,
-      profile: MANDATORY_CHILD_TOOL_PROFILE,
-    }).filter((tool) => SAFE_CHILD_TOOL_NAMES.has(tool.name));
+      profile: toolProfile,
+    }).filter((tool) => (
+      allowedToolNames.has(tool.name)
+      && (!actionCapable || parentToolNames.has(tool.name))
+    ));
 
     tools.forEach((tool) => {
-      if (!DelegationChildRuntimeService.isSafeChildTool(tool)) {
+      if (!DelegationChildRuntimeService.isAllowedChildTool(agentProfileId, tool)) {
         throw new Error(
-          `${DelegationPolicyService.message('agent_not_read_only')} Tool: ${tool.name}`,
+          `Delegated child tool is outside the ${actionCapable ? 'action' : 'read-only'} allowlist: ${tool.name}`,
         );
       }
     });
@@ -226,27 +307,42 @@ export class DelegationChildRuntimeService {
       profile: snapshot.approvalProfile,
     });
     return [
-      DelegationChildRuntimeService.enforceSafeChildToolAllowlist(),
+      DelegationChildRuntimeService.enforceChildToolAllowlist(
+        snapshot.agentProfileId as DelegationAgentProfileId,
+      ),
       ...snapshotPolicies,
+      ...(this.runtime.approvalPolicies ?? []),
     ];
   }
 
-  private static enforceSafeChildToolAllowlist(): ToolApprovalPolicy {
+  private static enforceChildToolAllowlist(
+    agentProfileId: DelegationAgentProfileId,
+  ): ToolApprovalPolicy {
     return ({ tool }) => {
-      return DelegationChildRuntimeService.isSafeChildTool(tool)
+      return DelegationChildRuntimeService.isAllowedChildTool(agentProfileId, tool)
         ? undefined
         : {
           type: 'deny',
-          reason: `${tool.name} is outside the delegated read-only tool allowlist`,
+          reason: `${tool.name} is outside the delegated ${DelegationChildRuntimeService.isActionProfile(agentProfileId) ? 'action' : 'read-only'} tool allowlist`,
         };
     };
   }
 
-  private static isSafeChildTool(tool: ToolDefinition): boolean {
+  private static isAllowedChildTool(
+    agentProfileId: DelegationAgentProfileId,
+    tool: ToolDefinition,
+  ): boolean {
+    const actionCapable = DelegationChildRuntimeService.isActionProfile(agentProfileId);
+    const allowedToolNames = actionCapable
+      ? ACTION_CHILD_TOOL_NAMES
+      : READ_ONLY_CHILD_TOOL_NAMES;
+    const allowedCapabilities = actionCapable
+      ? ACTION_CHILD_CAPABILITIES
+      : READ_ONLY_CHILD_CAPABILITIES;
     const capabilities = RuntimeToolProfileService.capabilitiesFor(tool);
-    return SAFE_CHILD_TOOL_NAMES.has(tool.name)
+    return allowedToolNames.has(tool.name)
       && capabilities.length > 0
-      && capabilities.every((capability) => SAFE_CHILD_CAPABILITIES.has(capability));
+      && capabilities.every((capability) => allowedCapabilities.has(capability));
   }
 
   private async createChildLlm(input: {
@@ -281,23 +377,35 @@ export class DelegationChildRuntimeService {
     return adapter;
   }
 
-  private static assertReadOnlySnapshot(
+  private static assertSupportedSnapshot(
     agentProfileId: DelegationAgentProfileId,
     snapshot: CustomAgentExecutionSnapshot,
   ): void {
     const maxSteps = snapshot.runtime.maxSteps;
     const validStepDefault = maxSteps === undefined
       || (Number.isInteger(maxSteps) && maxSteps > 0);
-    const safelyReadOnly = snapshot.agentProfileId === agentProfileId
+    const sharedInvariant = snapshot.agentProfileId === agentProfileId
       && snapshot.source === 'built-in'
-      && snapshot.toolProfile.preset === 'inspect'
-      && snapshot.toolProfile.memoryMode === 'none'
-      && snapshot.approvalProfile.preset === 'read_only'
       && validStepDefault;
-    if (!safelyReadOnly) {
+    const validProfile = DelegationChildRuntimeService.isActionProfile(agentProfileId)
+      ? snapshot.toolProfile.preset === 'default'
+        && snapshot.approvalProfile.preset === 'interactive'
+      : snapshot.toolProfile.preset === 'inspect'
+        && snapshot.toolProfile.memoryMode === 'none'
+        && snapshot.approvalProfile.preset === 'read_only';
+    if (!sharedInvariant || !validProfile) {
       throw new Error(
-        `${DelegationPolicyService.message('agent_not_read_only')} Profile: ${agentProfileId}`,
+        `The requested child agent profile does not satisfy its delegated authority envelope. Profile: ${agentProfileId}`,
       );
     }
+  }
+
+  static isActionProfile(agentProfileId: DelegationAgentProfileId): boolean {
+    return agentProfileId === 'builtin:code';
+  }
+
+  private static isMutatingTool(tool: ToolDefinition): boolean {
+    return RuntimeToolProfileService.capabilitiesFor(tool)
+      .some((capability) => MUTATING_CHILD_CAPABILITIES.has(capability));
   }
 }

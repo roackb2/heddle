@@ -47,13 +47,21 @@ Creation fields never overwrite an existing session with that ID. A hosted
 service must derive the ID and repository scope from trusted server-side
 identity; Heddle does not provide authentication or tenant mapping.
 
-### Read-only subagents
+### Subagents
 
-Conversation turns make bounded read-only subagents available by default. The
-root model decides when independent repository inspection or review is useful
-and may call `delegate_task`; callers do not need to enable it per prompt.
-Children receive no parent transcript, cannot mutate the workspace, and cannot
-delegate again. The turn result exposes completed in-memory evidence through
+Conversation turns make bounded subagents available by default. The root model
+decides when an independent task is useful and may call `delegate_task`; callers
+do not need to enable it per prompt. Ask and Review children are read-only. When
+an implementation task needs actions, the root must explicitly select
+`builtin:code`; omitting the profile still chooses read-only Ask. Code receives
+only the root's existing workspace read/write and shell tools from a small exact
+catalog, and every action follows the root session's existing permission mode
+and approval callback. There is no separate subagent permission setting.
+
+Children share the root workspace, receive no parent transcript, and cannot
+delegate again. Action-capable children run one at a time, while read-only
+children may run in parallel within the configured global limit. The turn
+result exposes completed in-memory evidence through
 `result.delegation`. Its ordered activity stream reports correlated
 `delegation.started`, `delegation.finished`, `delegation.cancelled`, and
 `delegation.rejected` records. Child loop progress is wrapped in
@@ -86,8 +94,9 @@ const agent = new ConversationAgentService({
 ```
 
 An engine-level `off` cannot be widened by a turn-level `auto`. Child evidence
-and correlated live activity are currently in-process only; durable child
-records and purpose-built UI rendering are separate lifecycle features.
+is also stored as settled metadata on the owning parent turn, within that
+conversation's recent-turn retention window. Raw child transcripts and traces
+are not persisted or exposed through the client projection.
 
 If the host already acquired an OpenAI account access token, it can keep the
 token request-scoped instead of writing it to Heddle's credential store:

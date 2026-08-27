@@ -51,7 +51,7 @@ These flags show up across multiple commands:
 - `--model <name>`: choose the active model
 - `--max-steps <n>`: limit the agent loop length
 - `--prefer-api-key`: prefer an available provider API key over a stored OAuth credential for that run
-- `heddle ask --delegation <auto|off>`: keep automatic read-only subagents available, or remove delegation for this one turn
+- `heddle ask --delegation <auto|off>`: keep bounded subagents available, or remove delegation for this one turn
 
 ## Common Usage Examples
 
@@ -68,7 +68,10 @@ heddle ask "Summarize the test strategy in this repository"
 ```
 
 Delegation is available by default and the root agent decides when it is
-useful. Remove the capability for one request when needed:
+useful. Ask and Review children are read-only. The root must explicitly choose
+the Code child for a task that needs actions; those actions use the same
+permission mode and approval surface as root-agent actions. Remove the entire
+capability for one request when needed:
 
 ```bash
 heddle ask --delegation off "Summarize this repository directly"
@@ -127,9 +130,10 @@ selected reusable session is already running or queued, it fails admission so
 the supervisor never loses the exact run identity it must observe.
 
 Approval policy is unchanged. `run.activity` records can show an approval wait,
-but JSONL mode does not silently auto-approve it. Configure a suitable host
-permission policy before launching, or let another attached TUI/web/API client
-resolve the approval for that session.
+including when a Code child requests an action, but JSONL mode does not silently
+auto-approve it. Configure a suitable host permission policy before launching,
+or let another attached TUI/web/API client resolve the approval for that
+session.
 
 Choose the smallest integration surface that fits the host:
 
@@ -230,6 +234,9 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/browser channel <chromium|chrome|msedge>`: select the Playwright browser channel future browser runs and manual profile windows should use
 - `/browser open-profile [url]`: open the selected Heddle-owned browser profile in a visible window for manual login or session management
 - `/browser close-profile`: close the selected manual browser profile window and release its profile lock
+- `/subagents`: show whether subagents are available for upcoming messages
+- `/subagents on`: allow bounded subagents for upcoming messages
+- `/subagents off`: remove subagents from upcoming messages
 
 Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
 

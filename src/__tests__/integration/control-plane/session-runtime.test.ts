@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -553,6 +553,109 @@ describe('conversation turn lifecycle', () => {
     ]));
   });
 
+  it('lets an explicitly granted code child edit the shared workspace through root approvals', async () => {
+    const storage = await createConversationTurnStorage();
+    const approvalRequests: ToolCall[] = [];
+    let rootRequest = 0;
+    let childRequest = 0;
+    let childToolNames: string[] = [];
+    const rootAdapter = testAdapter(async () => {
+      rootRequest += 1;
+      return rootRequest === 1
+        ? {
+            content: 'I will grant a code child the focused workspace action.',
+            toolCalls: [{
+              id: 'delegate-code-child',
+              tool: 'delegate_task',
+              input: {
+                task: 'Create child-action.txt containing ACTION_CHILD_OK.',
+                agentProfileId: 'builtin:code',
+              },
+            }],
+          }
+        : { content: 'The delegated action completed.' };
+    });
+    const childAdapter = testAdapter(async (_messages, tools) => {
+      childToolNames = (tools ?? []).map((tool) => tool.name);
+      childRequest += 1;
+      return childRequest === 1
+        ? {
+            content: 'I will create the requested file.',
+            toolCalls: [{
+              id: 'child-edit-file',
+              tool: 'edit_file',
+              input: {
+                path: 'child-action.txt',
+                content: 'ACTION_CHILD_OK\n',
+                createIfMissing: true,
+              },
+            }],
+          }
+        : { content: 'Created child-action.txt and verified the edit succeeded.' };
+    });
+    vi.spyOn(LlmAdapterService, 'create')
+      .mockReturnValueOnce(rootAdapter)
+      .mockReturnValueOnce(childAdapter);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Delegate this focused file creation to a code child.',
+      apiKey: 'explicit-key',
+      systemContext: 'BASE_SYSTEM_CONTEXT',
+      agentSnapshot: rootCodeAgentSnapshot(),
+      host: {
+        approveToolCall: async (call) => {
+          approvalRequests.push(structuredClone(call));
+          return { approved: true, reason: 'Approved by the root session test host' };
+        },
+      },
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(readFileSync(join(storage.workspaceRoot, 'child-action.txt'), 'utf8')).toBe(
+      'ACTION_CHILD_OK\n',
+    );
+    expect(approvalRequests).toEqual([
+      expect.objectContaining({ id: 'child-edit-file', tool: 'edit_file' }),
+    ]);
+    expect(childToolNames.sort()).toEqual([
+      'delete_file',
+      'edit_file',
+      'list_files',
+      'move_file',
+      'project_dashboard',
+      'read_file',
+      'run_shell_inspect',
+      'run_shell_mutate',
+      'search_files',
+    ]);
+    expect(turnResult.delegation?.records).toEqual([
+      expect.objectContaining({
+        task: 'Create child-action.txt containing ACTION_CHILD_OK.',
+        status: 'finished',
+        outcome: 'done',
+        summary: 'Created child-action.txt and verified the edit succeeded.',
+        agentSnapshot: expect.objectContaining({ agentProfileId: 'builtin:code' }),
+      }),
+    ]);
+    const persisted = await readStoredChatSession(
+      new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+      storage.sessionId,
+    );
+    expect(persisted?.turns.at(-1)?.delegations).toEqual([
+      expect.objectContaining({
+        agentSnapshot: expect.objectContaining({ agentProfileId: 'builtin:code' }),
+        outcome: 'done',
+      }),
+    ]);
+  });
+
   it('propagates parent cancellation into an active delegated child', async () => {
     const storage = await createConversationTurnStorage();
     const controller = new AbortController();
@@ -1071,6 +1174,22 @@ function rootAgentSnapshot(): CustomAgentExecutionSnapshot {
     },
     approvalProfile: { preset: 'read_only' },
     systemContextAppendix: 'ROOT_PROFILE_SENTINEL',
+  };
+}
+
+function rootCodeAgentSnapshot(): CustomAgentExecutionSnapshot {
+  return {
+    agentProfileId: 'project:root-coder',
+    agentName: 'Root coder',
+    source: 'project',
+    definitionHash: 'root-coder-definition',
+    runtime: { maxSteps: 6 },
+    toolProfile: {
+      preset: 'default',
+      memoryMode: 'none',
+    },
+    approvalProfile: { preset: 'interactive' },
+    systemContextAppendix: 'ROOT_CODE_PROFILE_SENTINEL',
   };
 }
 

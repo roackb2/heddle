@@ -12,6 +12,12 @@ import type {
  * authority ceiling; a turn may remove delegation but never widen it.
  */
 export class ConversationDelegationPolicyService {
+  private static readonly DEFAULT_AGENT_PROFILE_IDS = [
+    'builtin:ask',
+    'builtin:review',
+    'builtin:code',
+  ] as const;
+
   static resolveEnginePolicy(
     config: ConversationDelegationConfig | undefined,
   ): DelegationPolicy {
@@ -20,6 +26,8 @@ export class ConversationDelegationPolicyService {
     return DelegationPolicyService.resolve({
       ...policyInput,
       enabled: mode === 'auto',
+      allowedAgentProfileIds: policyInput.allowedAgentProfileIds
+        ?? ConversationDelegationPolicyService.DEFAULT_AGENT_PROFILE_IDS,
     });
   }
 

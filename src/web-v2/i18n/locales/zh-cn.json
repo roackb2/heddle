@@ -27,7 +27,7 @@
     },
     "subagents": {
       "ariaLabel": "子代理",
-      "description": "当并行研究有帮助时，允许 Heddle 启动只读助手。",
+      "description": "允许 Heddle 启动受限助手，进行并行研究或经批准的聚焦代码操作。",
       "disabled": "后续消息关闭",
       "enabled": "后续消息开启",
       "title": "子代理"

@@ -108,7 +108,21 @@ export class EngineConversationTurnService implements ConversationTurnService {
       agentSnapshot,
     } = context;
     const host = EngineConversationTurnService.turnHost(args);
-    const delegationScope = EngineConversationTurnService.createDelegationScope(args, context, host);
+    const approvalPolicies = ToolApprovalProfileService.compile({
+      profile: agentSnapshot?.approvalProfile,
+      autoProfile: agentSnapshot?.approvalProfile.preset === 'auto'
+        ? AutonomyPermissionModeService.buildAutoProfile({
+          trustedRoots: ProjectConfigService.read(args.workspaceRoot).autoTrustedRoots,
+        })
+        : undefined,
+      basePolicies: args.approvalPolicies,
+    });
+    const delegationScope = EngineConversationTurnService.createDelegationScope(
+      args,
+      context,
+      host,
+      approvalPolicies,
+    );
     const rootTools = delegationScope
       ? [...tools, delegationScope.createTool()]
       : tools;
@@ -170,15 +184,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         shouldStop: () => leaseHeartbeat.signal.aborted || args.shouldStop?.() === true,
         onEvent: host.onEvent,
         approveToolCall: host.approveToolCall,
-        approvalPolicies: ToolApprovalProfileService.compile({
-          profile: agentSnapshot?.approvalProfile,
-          autoProfile: agentSnapshot?.approvalProfile.preset === 'auto'
-            ? AutonomyPermissionModeService.buildAutoProfile({
-              trustedRoots: ProjectConfigService.read(args.workspaceRoot).autoTrustedRoots,
-            })
-            : undefined,
-          basePolicies: args.approvalPolicies,
-        }),
+        approvalPolicies,
         recoverModelContext: async (input) => {
           leaseHeartbeat.throwIfFailed();
           const recovered = await ConversationTurnContextRecoveryService.recover({
@@ -319,6 +325,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
     args: RunConversationTurnArgs,
     context: ConversationTurnContext,
     host: ChatTurnHostPort,
+    approvalPolicies: ReturnType<typeof ToolApprovalProfileService.compile>,
   ): DelegationRootScope | undefined {
     const policy = args.delegationPolicy
       ?? ConversationDelegationPolicyService.resolveEnginePolicy(undefined);
@@ -349,6 +356,9 @@ export class EngineConversationTurnService implements ConversationTurnService {
         searchIgnoreDirs: args.searchIgnoreDirs,
         baseSystemContext: context.baseSystemContext,
         createChildLlm: () => context.runtime.createLlm(),
+        parentTools: context.tools,
+        approvalPolicies,
+        approveToolCall: host.approveToolCall,
       },
     });
   }
