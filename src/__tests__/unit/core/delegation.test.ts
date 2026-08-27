@@ -243,6 +243,44 @@ describe('delegation policy and scope', () => {
     expect(active).toBe(0);
   });
 
+  it('only exposes a durable snapshot after every reserved child settles', async () => {
+    let markStarted!: () => void;
+    let finishChild!: () => void;
+    const started = new Promise<void>((resolveStarted) => {
+      markStarted = resolveStarted;
+    });
+    const canFinish = new Promise<void>((resolveFinished) => {
+      finishChild = resolveFinished;
+    });
+    const { scope } = activeScope({
+      createChildLlm: () => finalAdapter(async () => {
+        markStarted();
+        await canFinish;
+        return { content: 'Settled child result.' };
+      }),
+    });
+
+    const running = scope.delegateTask({ task: 'Inspect before persistence.' });
+    await started;
+
+    expect(() => scope.settledSnapshot()).toThrow(
+      'Cannot persist delegation while child run is still running',
+    );
+
+    finishChild();
+    await running;
+
+    expect(scope.settledSnapshot()).toEqual(expect.objectContaining({
+      rootRunId: scope.rootRunId,
+      records: [expect.objectContaining({
+        status: 'finished',
+        outcome: 'done',
+        summary: 'Settled child result.',
+        finishedAt: expect.any(String),
+      })],
+    }));
+  });
+
   it('rejects a child adapter instance reused by a custom host factory', async () => {
     const sharedAdapter = finalAdapter(async () => ({ content: 'Shared result.' }));
     const { scope } = activeScope({

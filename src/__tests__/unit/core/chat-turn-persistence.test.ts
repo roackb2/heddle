@@ -52,10 +52,25 @@ describe('chat turn persistence', () => {
       traceSummarizerRegistry: new TraceSummaryService({
         'tool.calling': (event) => `custom summary for ${event.call.tool}`,
       }),
+      delegation: {
+        schemaVersion: 1,
+        rootRunId: 'run-without-children',
+        policy: {
+          enabled: true,
+          maxDepth: 1,
+          maxChildren: 4,
+          maxConcurrentChildren: 3,
+          maxStepsPerChild: 24,
+          maxChildDurationMs: 300_000,
+          allowedAgentProfileIds: ['builtin:ask', 'builtin:review'],
+        },
+        records: [],
+      },
       createTurnId: () => 'turn-1',
     });
 
     expect(artifacts.turn.events).toEqual(['custom summary for read_file']);
+    expect(artifacts.turn).not.toHaveProperty('delegations');
   });
 
   it('forces final compaction after context-window overload failures', async () => {

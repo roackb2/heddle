@@ -89,16 +89,19 @@ export type ToolResult = {
 export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
 
 /** Safe host-facing classification for a failed run. Never contains provider messages or credentials. */
-export type ModelRunFailureCode =
-  | 'authentication'
-  | 'permission'
-  | 'quota'
-  | 'rate_limit'
-  | 'context_window'
-  | 'request'
-  | 'transport'
-  | 'empty_response'
-  | 'unknown';
+export const MODEL_RUN_FAILURE_CODES = [
+  'authentication',
+  'permission',
+  'quota',
+  'rate_limit',
+  'context_window',
+  'request',
+  'transport',
+  'empty_response',
+  'unknown',
+] as const;
+
+export type ModelRunFailureCode = typeof MODEL_RUN_FAILURE_CODES[number];
 
 export type RunFailure = {
   source: 'model';

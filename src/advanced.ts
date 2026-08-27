@@ -312,6 +312,8 @@ export type {
   DelegationRejectionCode,
   DelegationRootScopeSnapshot,
   DelegationServiceOptions,
+  SettledDelegatedRunRecord,
+  SettledDelegationRootScopeSnapshot,
 } from './core/delegation/index.js';
 
 // --- Specialized runtimes: heartbeat ---------------------------------------

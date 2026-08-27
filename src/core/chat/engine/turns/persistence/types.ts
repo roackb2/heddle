@@ -8,6 +8,7 @@ import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ChatSessionLeaseClaim } from '@/core/chat/engine/sessions/leases/index.js';
+import type { SettledDelegationRootScopeSnapshot } from '@/core/delegation/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
   ConversationCompactionResult,
@@ -35,6 +36,7 @@ export type PersistChatTurnResultArgs = {
     sourceHistory: ChatMessage[],
   ) => void | Promise<void>;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  delegation?: SettledDelegationRootScopeSnapshot;
 };
 
 export type PersistTurnCompactionRuntime = Pick<
@@ -72,6 +74,7 @@ export type PersistCompletedChatTurnBase = {
   historyForTokenEstimate: ChatMessage[];
   traceSummarizerRegistry?: TraceSummaryService;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  delegation?: SettledDelegationRootScopeSnapshot;
 };
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {

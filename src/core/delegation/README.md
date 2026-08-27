@@ -17,7 +17,8 @@ This domain owns:
 - fresh child context, adapter creation, cancellation, step clamping, and a
   validated per-child execution deadline;
 - correlated delegation lifecycle and wrapped child conversation activity;
-- bounded model-facing results and richer in-memory host records.
+- bounded model-facing results, richer in-memory host records, and a
+  terminal-only snapshot for the owning conversation turn.
 
 `DelegationRootScope` owns the mutable per-root graph, reservation semaphore,
 and cancellation lifecycle. `DelegationChildRuntimeService` owns concrete
@@ -25,10 +26,11 @@ child prompt/tool/approval composition and fresh adapter execution. Keep that
 split intact: graph state must not leak into the single-run runtime, and child
 authority must not be reconstructed by host callers.
 
-It does not own chat sessions, turn activation, durable records, live UI
+It does not own chat sessions, turn activation, durable storage, live UI
 rendering, provider-native delegation, child worktrees, write authority, or
-recursive delegation. Those concerns must stay in their existing host/domain
-owners or later feature slices.
+recursive delegation. Those concerns stay in their existing host/domain
+owners or later feature slices. The delegation scope only proves that its
+records are settled before the conversation domain persists a projection.
 
 ## Headless Composition
 
@@ -90,8 +92,11 @@ turn and exposes `delegate_task` unless the engine or turn selects `off`.
 
 The root model decides whether a task benefits from delegation; there is no
 per-turn enable gate. An engine-level `off` is an authority ceiling, so a turn
-cannot re-enable it. The conversation turn result includes the scope snapshot
-in memory and omits it when delegation is off.
+cannot re-enable it. The conversation turn result includes a settled scope
+snapshot in memory and omits it when delegation is off. Completed child
+records are also projected into optional `TurnSummary.delegations` on the
+parent turn, so they follow the existing conversation repository and its
+eight-turn summary retention.
 
 Conversation hosts receive `delegation.started`, `delegation.finished`,
 `delegation.cancelled`, and `delegation.rejected` lifecycle activities with the
@@ -101,8 +106,8 @@ must stay wrapped: publishing a child `loop.finished` as an ordinary root
 activity would let existing clients mistake child settlement for root-turn
 settlement. Redundant child `assistant.stream` draft snapshots are omitted;
 `delegation.finished.summary` carries the completed child answer while tool,
-reasoning, warning, cancellation, and loop progress remain visible. Durable
-child records and purpose-built UI rendering remain later slices.
+reasoning, warning, cancellation, and loop progress remain visible.
+Purpose-built UI rendering remains a later slice.
 
 ## V1 Safety Invariants
 
@@ -131,5 +136,9 @@ child records and purpose-built UI rendering remain later slices.
 - No child is retried automatically or detached from the owning root scope.
 
 `records()` returns defensive copies of the current in-memory records,
-including trace and usage. Durable trace sidecars and conversation-turn
-summaries are intentionally deferred; do not add persistence to this domain.
+including trace and usage. `settledSnapshot()` fails closed if any reserved
+child is still running. The conversation turn owner removes raw trace and
+top-level model/provider fields before persistence while retaining correlation,
+the exact agent snapshot, outcome, safe failure, usage, and timestamps. Raw
+child trace sidecars and in-flight recovery remain deferred; do not add those
+persistence concerns to this domain.

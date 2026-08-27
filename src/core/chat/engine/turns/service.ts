@@ -212,6 +212,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
             })
           : result;
       leaseHeartbeat.throwIfFailed();
+      const delegation = delegationScope?.settledSnapshot();
 
       const persisted = await ConversationTurnPersistenceService.persistCompleted({
         ...persistenceInput,
@@ -225,6 +226,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         summarizer: runtime.summarizer,
         host,
         agentSnapshot,
+        delegation,
         leaseClaim: preflight.leaseClaim,
       });
       await leaseHeartbeat.stop();
@@ -254,7 +256,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
           sessionId: session.id,
         }),
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
-        ...(delegationScope ? { delegation: delegationScope.snapshot() } : {}),
+        ...(delegation ? { delegation } : {}),
         memory: {
           // Background maintenance runs after the primary turn is persisted,
           // but the result does not resolve until that working copy is stable.

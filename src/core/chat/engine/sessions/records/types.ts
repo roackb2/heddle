@@ -4,6 +4,7 @@ import type { ConversationCompactionResult } from '@/core/chat/engine/compaction
 import type { RunResult } from '@/core/types.js';
 import type { ChatSession, ChatSessionRetention, ConversationLine, TurnSummary } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import type { SettledDelegationRootScopeSnapshot } from '@/core/delegation/index.js';
 
 export type CreateChatSessionRecordOptions = {
   id: string;
@@ -26,6 +27,7 @@ export type BuildChatTurnSummaryInput = {
   traceFile: string;
   traceSummarizerRegistry?: TraceSummaryService;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  delegation?: SettledDelegationRootScopeSnapshot;
 };
 
 export type ApplyCompactedChatSessionHistoryInput = {
