@@ -158,11 +158,13 @@ describe('delegation policy and scope', () => {
   });
 
   it('consumes the total slot after success, provider failure, and cancellation', async () => {
+    const activities: ConversationActivity[] = [];
     let cancelStarted!: () => void;
     const started = new Promise<void>((resolveStarted) => {
       cancelStarted = resolveStarted;
     });
     const { scope } = activeScope({
+      onActivity: (activity) => activities.push(activity),
       createChildLlm: ({ task }) => taskAdapter(task, cancelStarted),
     });
 
@@ -197,6 +199,23 @@ describe('delegation policy and scope', () => {
       'interrupted',
       'done',
     ]);
+    expect(activities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'delegation.finished',
+        outcome: 'error',
+        failure: expect.any(Object),
+      }),
+      expect.objectContaining({
+        type: 'delegation.cancelled',
+        outcome: 'interrupted',
+        error: expect.objectContaining({ code: 'cancelled' }),
+      }),
+      expect.objectContaining({
+        type: 'delegation.rejected',
+        error: expect.objectContaining({ code: 'child_limit' }),
+      }),
+    ]));
+    expect(JSON.stringify(activities)).not.toContain('raw-provider-secret');
   });
 
   it('never executes more than three reserved children concurrently', async () => {
