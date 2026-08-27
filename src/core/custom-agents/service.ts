@@ -12,6 +12,7 @@ import type {
   CustomAgentDefinition,
   CustomAgentExecutionSnapshot,
   CustomAgentOption,
+  ResolveCustomAgentTurnSnapshotInput,
 } from './types.js';
 
 export type CustomAgentServiceOptions = {
@@ -51,6 +52,25 @@ export class CustomAgentService {
     }
 
     return CustomAgentService.toExecutionSnapshot(agent);
+  }
+
+  /**
+   * Resolves the immutable profile used by one accepted turn and rejects an
+   * identity/snapshot pair that could apply a different authority envelope
+   * than the selected profile advertises.
+   */
+  resolveTurnSnapshot(input: ResolveCustomAgentTurnSnapshotInput): CustomAgentExecutionSnapshot | undefined {
+    if (
+      input.agentProfileId
+      && input.agentSnapshot
+      && input.agentProfileId !== input.agentSnapshot.agentProfileId
+    ) {
+      throw new Error(
+        `Custom agent snapshot ${input.agentSnapshot.agentProfileId} does not match selected profile ${input.agentProfileId}`,
+      );
+    }
+
+    return input.agentSnapshot ?? this.resolveExecutionSnapshot(input.agentProfileId);
   }
 
   /**

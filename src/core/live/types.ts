@@ -172,6 +172,77 @@ export type ConversationAgentLoopActivity =
   | ConversationPlanUpdatedActivity
   | ConversationLoopFinishedActivity;
 
+export type ConversationDelegationErrorCode =
+  | 'delegation_disabled'
+  | 'depth_limit'
+  | 'child_limit'
+  | 'agent_not_allowed'
+  | 'agent_not_read_only'
+  | 'invalid_task'
+  | 'cancelled'
+  | 'child_timeout'
+  | 'child_failed';
+
+export type ConversationDelegationCorrelation = {
+  rootRunId: string;
+  parentRunId: string;
+  delegationId: string;
+  childRunId: string;
+  depth: 1;
+};
+
+type ConversationDelegationChildBase = ConversationDelegationCorrelation & {
+  source: 'delegation';
+  task: string;
+  agentProfileId: string;
+  timestamp: string;
+};
+
+export type ConversationDelegationStartedActivity = ConversationDelegationChildBase & {
+  type: typeof HeddleEventType.delegationStarted;
+};
+
+export type ConversationDelegationChildActivity = ConversationDelegationChildBase & {
+  type: typeof HeddleEventType.delegationChildActivity;
+  activity: ConversationAgentLoopActivity;
+};
+
+export type ConversationDelegationFinishedActivity = ConversationDelegationChildBase & {
+  type: typeof HeddleEventType.delegationFinished;
+  outcome: StopReason;
+  summary?: string;
+  failure?: RunFailure;
+  usage?: LlmUsage;
+};
+
+export type ConversationDelegationCancelledActivity = ConversationDelegationChildBase & {
+  type: typeof HeddleEventType.delegationCancelled;
+  outcome: 'interrupted';
+  summary?: string;
+  error: {
+    code: 'cancelled' | 'child_timeout';
+    message: string;
+  };
+};
+
+export type ConversationDelegationRejectedActivity = {
+  source: 'delegation';
+  type: typeof HeddleEventType.delegationRejected;
+  rootRunId: string;
+  error: {
+    code: ConversationDelegationErrorCode;
+    message: string;
+  };
+  timestamp: string;
+};
+
+export type ConversationDelegationActivity =
+  | ConversationDelegationStartedActivity
+  | ConversationDelegationChildActivity
+  | ConversationDelegationFinishedActivity
+  | ConversationDelegationCancelledActivity
+  | ConversationDelegationRejectedActivity;
+
 export type ConversationCompactionRunningActivity = {
   source: 'compaction';
   type: typeof HeddleEventType.compactionRunning;
@@ -227,7 +298,11 @@ export type ConversationDirectShellActivity =
   | ConversationDirectShellStartedActivity
   | ConversationDirectShellCompletedActivity;
 
-export type ConversationActivity = ConversationAgentLoopActivity | ConversationCompactionActivity | ConversationDirectShellActivity;
+export type ConversationActivity =
+  | ConversationAgentLoopActivity
+  | ConversationCompactionActivity
+  | ConversationDirectShellActivity
+  | ConversationDelegationActivity;
 
 export type ConversationActivityOf<Type extends ConversationActivity['type']> = Extract<
   ConversationActivity,

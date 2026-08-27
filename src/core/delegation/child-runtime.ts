@@ -6,7 +6,9 @@ import {
   CustomAgentRuntimeContextService,
 } from '@/core/custom-agents/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { LlmAdapter } from '@/core/llm/types.js';
+import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
 import {
   AgentLoopRuntimeService,
 } from '@/core/runtime/loop/index.js';
@@ -124,6 +126,7 @@ export class DelegationChildRuntimeService {
     record: DelegatedRunRecord;
     snapshot: CustomAgentExecutionSnapshot;
     signal: AbortSignal;
+    onActivity?: (activity: ConversationAgentLoopActivity) => void;
   }): Promise<AgentLoopResult> {
     try {
       return await this.execute(input);
@@ -144,6 +147,7 @@ export class DelegationChildRuntimeService {
     record: DelegatedRunRecord;
     snapshot: CustomAgentExecutionSnapshot;
     signal: AbortSignal;
+    onActivity?: (activity: ConversationAgentLoopActivity) => void;
   }): Promise<AgentLoopResult> {
     input.signal.throwIfAborted();
     const tools = this.buildChildTools(input.snapshot);
@@ -177,6 +181,14 @@ export class DelegationChildRuntimeService {
       maxSteps: effectiveMaxSteps,
       approvalPolicies: this.createChildApprovalPolicies(input.snapshot),
       abortSignal: input.signal,
+      onEvent: (event) => {
+        if (
+          AgentLoopRuntimeService.isConversationActivity(event)
+          && event.type !== HeddleEventType.assistantStream
+        ) {
+          input.onActivity?.(event);
+        }
+      },
       ...(llm ? { llm } : {}),
     });
   }

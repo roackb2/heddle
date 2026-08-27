@@ -6,6 +6,7 @@ import compact from 'lodash/compact.js';
 import { EventSource } from 'eventsource';
 import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
 import type { ResolvedRuntimeHost } from '@heddleagent/runtime/cli';
+import type { ConversationDelegationMode } from '@/core/chat/types.js';
 import { ControlPlaneSessionApiService } from '@/cli-v2/services/sessions/control-plane-session-api-service.js';
 import {
   AskJsonlProtocolWriter,
@@ -31,6 +32,7 @@ export type AskCliV2CommandOptions = {
   latestSession?: boolean;
   createSessionName?: string;
   agentProfileId?: string;
+  delegation?: ConversationDelegationMode;
   promptFile?: string;
   output?: AskCliV2OutputFormat | string;
   stdin?: AsyncIterable<string | Uint8Array>;
@@ -126,6 +128,7 @@ export class AskCliV2CommandEdgeService {
           sessionId,
           prompt,
           agentProfileId: options.agentProfileId ?? 'builtin:ask',
+          delegation: options.delegation,
         });
         return { exitCode };
       }
@@ -135,6 +138,7 @@ export class AskCliV2CommandEdgeService {
         sessionId,
         prompt,
         agentProfileId: options.agentProfileId ?? 'builtin:ask',
+        delegation: options.delegation,
         includePlanTool: false,
         memoryMaintenanceMode: 'inline',
       });

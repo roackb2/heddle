@@ -824,10 +824,11 @@ async function recordPrivilegedControlPlaneOperation(
 
 function buildSubmitPromptArgs(ctx: ControlPlaneWorkspaceContext, input: SessionMessageInput) {
   const { logger, sessionEngineArgs } = ctx.requestWorkspace;
-  const { browserIntent, ...messageInput } = input;
+  const { browserIntent, delegation, ...messageInput } = input;
   return {
     ...messageInput,
     ...sessionEngineArgs,
+    delegationMode: delegation,
     preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
     systemContext: BrowserAutomationIntentContextService.append({
       intent: browserIntent,

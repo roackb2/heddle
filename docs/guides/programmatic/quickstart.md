@@ -54,7 +54,13 @@ root model decides when independent repository inspection or review is useful
 and may call `delegate_task`; callers do not need to enable it per prompt.
 Children receive no parent transcript, cannot mutate the workspace, and cannot
 delegate again. The turn result exposes completed in-memory evidence through
-`result.delegation`.
+`result.delegation`. Its ordered activity stream reports correlated
+`delegation.started`, `delegation.finished`, `delegation.cancelled`, and
+`delegation.rejected` records. Child loop progress is wrapped in
+`delegation.child.activity` so hosts can render it without confusing child and
+root lifecycle events. Child draft `assistant.stream` snapshots are omitted to
+avoid multiplying cumulative token-stream traffic; the completed child answer
+is available on `delegation.finished.summary` and in `result.delegation`.
 
 Turn delegation off for a single request when needed:
 
@@ -80,8 +86,8 @@ const agent = new ConversationAgentService({
 ```
 
 An engine-level `off` cannot be widened by a turn-level `auto`. Child evidence
-is currently in-process only; durable records and child-specific live activity
-are separate lifecycle features.
+and correlated live activity are currently in-process only; durable child
+records and purpose-built UI rendering are separate lifecycle features.
 
 If the host already acquired an OpenAI account access token, it can keep the
 token request-scoped instead of writing it to Heddle's credential store:

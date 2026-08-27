@@ -24,4 +24,5 @@ export type {
   CustomAgentOption,
   CustomAgentRuntimeDefaults,
   CustomAgentSourceKind,
+  ResolveCustomAgentTurnSnapshotInput,
 } from './types.js';

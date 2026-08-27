@@ -1,7 +1,5 @@
 import type { ConversationEngineHost } from '@/core/chat/engine/types.js';
-import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import { HeddleEventType } from '@/core/event-types.js';
+import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './types.js';
 
 /**
@@ -15,9 +13,10 @@ export class ConversationEngineHostNormalizer {
     const requestToolApproval = host?.approvals?.requestToolApproval;
 
     const turnHost: ChatTurnHostPort = {
+      onActivity,
       onEvent: (event) => {
         onEvent?.(event);
-        if (ConversationEngineHostNormalizer.isConversationActivity(event)) {
+        if (AgentLoopRuntimeService.isConversationActivity(event)) {
           onActivity?.(event);
         }
       },
@@ -54,11 +53,5 @@ export class ConversationEngineHostNormalizer {
         onTraceEvent?.(event);
       },
     };
-  }
-
-  private static isConversationActivity(event: AgentLoopEvent): event is Extract<AgentLoopEvent, ConversationAgentLoopActivity> {
-    return event.type !== HeddleEventType.trace
-      && event.type !== HeddleEventType.loopResumed
-      && event.type !== HeddleEventType.checkpointSaved;
   }
 }

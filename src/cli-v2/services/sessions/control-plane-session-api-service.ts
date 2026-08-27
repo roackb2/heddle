@@ -110,7 +110,7 @@ export class ControlPlaneSessionApiService {
 
   async sendPrompt(input: Pick<
     SessionSendPromptInput,
-    'workspaceId' | 'sessionId' | 'prompt' | 'agentProfileId' | 'includePlanTool' | 'memoryMaintenanceMode'
+    'workspaceId' | 'sessionId' | 'prompt' | 'agentProfileId' | 'delegation' | 'includePlanTool' | 'memoryMaintenanceMode'
   >) {
     return this.client.controlPlane.sessionSendPrompt.mutate({
       ...input,
@@ -128,6 +128,7 @@ export class ControlPlaneSessionApiService {
     | 'sessionId'
     | 'prompt'
     | 'agentProfileId'
+    | 'delegation'
     | 'includePlanTool'
     | 'memoryMaintenanceMode'
     | 'queueIfBusy'

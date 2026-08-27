@@ -276,6 +276,32 @@ describe('control-plane session lifecycle API', () => {
     expect((await engine.sessions.require(session.id)).messages.map((message) => message.text)).not.toContain('should not be accepted');
   });
 
+  it('removes delegation when the control-plane API receives an off turn', async () => {
+    const { caller, activeWorkspace } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({
+      name: 'Delegation off API session',
+      apiKeyPresent: true,
+    });
+    const loopSpy = vi.spyOn(AgentLoopRuntimeService, 'run').mockResolvedValue(
+      createAgentLoopResult({
+        workspaceRoot: activeWorkspace.workspaceRoot,
+        prompt: 'Handle this directly.',
+        summary: 'Handled directly.',
+      }) as never,
+    );
+
+    await caller.sessionSendPrompt({
+      sessionId: session.id,
+      prompt: 'Handle this directly.',
+      delegation: 'off',
+      apiKey: 'test-api-key',
+      memoryMaintenanceMode: 'none',
+    });
+
+    expect(loopSpy.mock.calls[0]?.[0].tools?.map((tool) => tool.name)).not.toContain('delegate_task');
+    expect(loopSpy.mock.calls[0]?.[0].runId).toBeUndefined();
+  });
+
   it('compacts a session through the API without requiring clients to call compaction services', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
     const session = await engine.sessions.create({
@@ -894,6 +920,48 @@ function createWorkspaceEngine(workspace: WorkspaceDescriptor) {
     model: 'gpt-5.4',
     apiKeyPresent: true,
   });
+}
+
+function createAgentLoopResult(args: {
+  workspaceRoot: string;
+  prompt: string;
+  summary: string;
+}) {
+  const transcript = [
+    { role: 'user' as const, content: args.prompt },
+    { role: 'assistant' as const, content: args.summary },
+  ];
+  const trace = [{
+    type: 'run.finished' as const,
+    outcome: 'done' as const,
+    summary: args.summary,
+    step: 1,
+    timestamp: '2026-08-27T00:00:01.000Z',
+  }];
+
+  return {
+    outcome: 'done' as const,
+    summary: args.summary,
+    trace,
+    transcript,
+    model: 'gpt-5.6-luna',
+    provider: 'openai' as const,
+    workspaceRoot: args.workspaceRoot,
+    state: {
+      status: 'finished' as const,
+      runId: 'run-delegation-off-api',
+      goal: args.prompt,
+      model: 'gpt-5.6-luna',
+      provider: 'openai' as const,
+      workspaceRoot: args.workspaceRoot,
+      startedAt: '2026-08-27T00:00:00.000Z',
+      finishedAt: '2026-08-27T00:00:01.000Z',
+      outcome: 'done' as const,
+      summary: args.summary,
+      transcript,
+      trace,
+    },
+  };
 }
 
 function writeSkillSync(workspaceRoot: string, name: string, content: string): void {

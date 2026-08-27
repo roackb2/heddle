@@ -7,6 +7,11 @@ import {
   CustomAgentService,
 } from '@/core/custom-agents/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
+import type {
+  ConversationAgentLoopActivity,
+  ConversationDelegationCorrelation,
+} from '@/core/live/index.js';
 import {
   AgentLoopCheckpointService,
 } from '@/core/runtime/loop/index.js';
@@ -72,6 +77,7 @@ export class DelegationRootScope {
   private readonly childSettlements = new Set<Promise<ToolResult>>();
   private readonly childRuntime: DelegationChildRuntimeService;
   private readonly defaultAgentProfileId: DelegationAgentProfileId;
+  private readonly onActivity: CreateDelegationRootScopeOptions['onActivity'];
   private readonly semaphore: Semaphore;
   private readonly scopeController = new AbortController();
 
@@ -82,6 +88,7 @@ export class DelegationRootScope {
     this.policy = DelegationPolicyService.resolve(policy);
     this.rootRunId = AgentLoopCheckpointService.resolveRunId(options.rootRunId);
     this.workspaceRoot = resolve(options.workspaceRoot);
+    this.onActivity = options.onActivity;
     this.semaphore = new Semaphore(this.policy.maxConcurrentChildren);
     this.defaultAgentProfileId = this.policy.allowedAgentProfileIds.includes('builtin:ask')
       ? 'builtin:ask'
@@ -252,6 +259,14 @@ export class DelegationRootScope {
 
     this.childRecords.push(record);
     this.childControllers.set(childRunId, controller);
+    this.onActivity?.({
+      source: 'delegation',
+      type: HeddleEventType.delegationStarted,
+      ...this.correlation(record),
+      task: record.task,
+      agentProfileId: record.agentSnapshot.agentProfileId,
+      timestamp: record.startedAt,
+    });
     return { record, controller, snapshot: cloneDeep(input.snapshot) };
   }
 
@@ -299,6 +314,7 @@ export class DelegationRootScope {
             record: reserved.record,
             snapshot: reserved.snapshot,
             signal,
+            onActivity: (activity) => this.publishChildActivity(reserved.record, activity),
           });
           return this.settleResult(
             reserved.record,
@@ -343,6 +359,7 @@ export class DelegationRootScope {
       trace: cloneDeep(result.trace),
       finishedAt: new Date().toISOString(),
     });
+    this.publishSettlement(record, code);
 
     return this.resultForRecord(record, code);
   }
@@ -358,6 +375,7 @@ export class DelegationRootScope {
       summary: DelegationPolicyService.message(code),
       finishedAt: new Date().toISOString(),
     });
+    this.publishSettlement(record, code);
     return this.resultForRecord(record, code);
   }
 
@@ -395,11 +413,78 @@ export class DelegationRootScope {
 
   private rejection(code: DelegationRejectionCode): ToolResult {
     const message = DelegationPolicyService.message(code);
+    this.onActivity?.({
+      source: 'delegation',
+      type: HeddleEventType.delegationRejected,
+      rootRunId: this.rootRunId,
+      error: { code, message },
+      timestamp: new Date().toISOString(),
+    });
     const output: DelegateTaskOutput = {
       schemaVersion: 1,
       status: code === 'cancelled' ? 'cancelled' : 'rejected',
       error: { code, message },
     };
     return { ok: false, error: message, output };
+  }
+
+  private publishChildActivity(
+    record: DelegatedRunRecord,
+    activity: ConversationAgentLoopActivity,
+  ): void {
+    this.onActivity?.({
+      source: 'delegation',
+      type: HeddleEventType.delegationChildActivity,
+      ...this.correlation(record),
+      task: record.task,
+      agentProfileId: record.agentSnapshot.agentProfileId,
+      activity: cloneDeep(activity),
+      timestamp: activity.timestamp,
+    });
+  }
+
+  private publishSettlement(
+    record: DelegatedRunRecord,
+    code: 'cancelled' | 'child_timeout' | 'child_failed' | undefined,
+  ): void {
+    const base = {
+      source: 'delegation' as const,
+      ...this.correlation(record),
+      task: record.task,
+      agentProfileId: record.agentSnapshot.agentProfileId,
+      timestamp: record.finishedAt ?? new Date().toISOString(),
+    };
+    if (code === 'cancelled' || code === 'child_timeout') {
+      this.onActivity?.({
+        ...base,
+        type: HeddleEventType.delegationCancelled,
+        outcome: 'interrupted',
+        ...(record.summary ? { summary: record.summary } : {}),
+        error: {
+          code,
+          message: DelegationPolicyService.message(code),
+        },
+      });
+      return;
+    }
+
+    this.onActivity?.({
+      ...base,
+      type: HeddleEventType.delegationFinished,
+      outcome: record.outcome ?? 'error',
+      ...(record.summary ? { summary: record.summary } : {}),
+      ...(record.failure ? { failure: record.failure } : {}),
+      ...(record.usage ? { usage: record.usage } : {}),
+    });
+  }
+
+  private correlation(record: DelegatedRunRecord): ConversationDelegationCorrelation {
+    return {
+      rootRunId: record.rootRunId,
+      parentRunId: record.parentRunId,
+      delegationId: record.delegationId,
+      childRunId: record.childRunId,
+      depth: record.depth,
+    };
   }
 }

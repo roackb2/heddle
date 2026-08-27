@@ -7,6 +7,7 @@ import { ArtifactService } from '@/core/artifacts/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '@/core/llm/types.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
 import { ConversationTurnMemoryMaintenance } from '@/core/chat/engine/turns/memory/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
@@ -406,6 +407,7 @@ describe('conversation turn lifecycle', () => {
     const childToolNames: string[][] = [];
     let rootToolNames: string[] = [];
     let rootToolOutput: unknown;
+    const activities: ConversationActivity[] = [];
     let rootRequest = 0;
     const rootAdapter = testAdapter(async (messages, tools) => {
       rootToolNames = (tools ?? []).map((tool) => tool.name);
@@ -449,6 +451,9 @@ describe('conversation turn lifecycle', () => {
       apiKey: 'explicit-key',
       systemContext: 'BASE_SYSTEM_CONTEXT',
       agentSnapshot: rootAgentSnapshot(),
+      host: {
+        onActivity: (activity) => activities.push(structuredClone(activity)),
+      },
       memoryMaintenanceMode: 'none',
       artifactRoot: storage.artifactRoot,
       artifactsEnabled: true,
@@ -484,6 +489,26 @@ describe('conversation turn lifecycle', () => {
       }),
     }));
     expect(turnResult.delegation?.records[0]?.rootRunId).toBe(turnResult.delegation?.rootRunId);
+    expect(activities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: 'delegation',
+        type: 'delegation.started',
+        rootRunId: turnResult.delegation?.rootRunId,
+        depth: 1,
+      }),
+      expect.objectContaining({
+        source: 'delegation',
+        type: 'delegation.child.activity',
+        rootRunId: turnResult.delegation?.rootRunId,
+        activity: expect.objectContaining({ type: 'loop.started' }),
+      }),
+      expect.objectContaining({
+        source: 'delegation',
+        type: 'delegation.finished',
+        rootRunId: turnResult.delegation?.rootRunId,
+        outcome: 'done',
+      }),
+    ]));
   });
 
   it('propagates parent cancellation into an active delegated child', async () => {

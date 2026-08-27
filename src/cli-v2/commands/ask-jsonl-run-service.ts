@@ -3,6 +3,7 @@ import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import type { ControlPlaneSessionRunEventEnvelope } from '@/client-shared/api/types.js';
 import { ControlPlaneSessionApiService } from '@/cli-v2/services/sessions/control-plane-session-api-service.js';
 import { ControlPlaneSessionSubscriptionService } from '@/cli-v2/services/sessions/control-plane-session-subscription-service.js';
+import type { ConversationDelegationMode } from '@/core/chat/types.js';
 
 const ASK_JSONL_SCHEMA_VERSION = 1 as const;
 
@@ -82,6 +83,7 @@ export type AskJsonlRunInput = {
   sessionId: string;
   prompt: string;
   agentProfileId: string;
+  delegation?: ConversationDelegationMode;
 };
 
 /**

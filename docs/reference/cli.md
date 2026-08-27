@@ -51,6 +51,7 @@ These flags show up across multiple commands:
 - `--model <name>`: choose the active model
 - `--max-steps <n>`: limit the agent loop length
 - `--prefer-api-key`: prefer an available provider API key over a stored OAuth credential for that run
+- `heddle ask --delegation <auto|off>`: keep automatic read-only subagents available, or remove delegation for this one turn
 
 ## Common Usage Examples
 
@@ -64,6 +65,13 @@ Run a one-shot question:
 
 ```bash
 heddle ask "Summarize the test strategy in this repository"
+```
+
+Delegation is available by default and the root agent decides when it is
+useful. Remove the capability for one request when needed:
+
+```bash
+heddle ask --delegation off "Summarize this repository directly"
 ```
 
 `ask` still behaves like a one-shot command from the terminal, but Heddle stores the run as a one-off session under `.heddle/` so traces, memory maintenance, and later review use the same persisted conversation path as other session-backed runs.
@@ -96,6 +104,13 @@ runtime attachment notices go to stderr. Every record includes
 - `run.stream.reconnecting`, reporting bounded transport recovery;
 - exactly one terminal `run.result`, `run.cancelled`, `run.error`,
   `run.stream.error`, or `command.error` record.
+
+Delegated work appears in `run.activity` records as correlated
+`delegation.started`, `delegation.child.activity`, and terminal delegation
+activities. Child loop events stay inside the `delegation.child.activity`
+wrapper so consumers do not mistake child settlement for the root run's
+terminal lifecycle. Heddle omits redundant child `assistant.stream` drafts;
+consume the child terminal summary from `delegation.finished` instead.
 
 `run.result` includes the final outcome and summary, the persisted trace path,
 and changed-file paths when the run trace contains edit or Git-diff evidence.

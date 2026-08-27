@@ -50,7 +50,10 @@ describe('AskCliV2CommandEdgeService', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     try {
-      await AskCliV2CommandEdgeService.run('what is this project', defaultOptions());
+      await AskCliV2CommandEdgeService.run('what is this project', {
+        ...defaultOptions(),
+        delegation: 'off',
+      });
 
       expect(resolve).toHaveBeenCalledWith(expect.objectContaining({
         workspaceRoot: '/repo',
@@ -74,6 +77,7 @@ describe('AskCliV2CommandEdgeService', () => {
         preferApiKey: true,
         includePlanTool: false,
         memoryMaintenanceMode: 'inline',
+        delegation: 'off',
       }));
       expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Session: session-ask'));
       expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Trace: /repo/.heddle/traces/turn-1.json'));
@@ -271,6 +275,7 @@ describe('AskCliV2CommandEdgeService', () => {
     try {
       const result = await AskCliV2CommandEdgeService.run('', {
         ...defaultOptions(),
+        delegation: 'off',
         output: 'jsonl',
         promptFile: '-',
         stdin: Readable.from(['Inspect these files:\n\n', '- src/a.ts\n', '- src/b.ts\n']),
@@ -280,6 +285,7 @@ describe('AskCliV2CommandEdgeService', () => {
       expect(fixture.client.controlPlane.sessionSendPromptAsync.mutate).toHaveBeenCalledWith(expect.objectContaining({
         prompt,
         queueIfBusy: false,
+        delegation: 'off',
       }));
       expect(fixture.client.controlPlane.sessionSendPrompt.mutate).not.toHaveBeenCalled();
       const records = stdoutLines.map((line) => JSON.parse(line));

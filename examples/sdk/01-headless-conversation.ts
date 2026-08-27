@@ -16,6 +16,14 @@ try {
 
   console.log({
     activityTypes: result.activities.map((activity) => activity.type),
+    delegation: result.delegation?.records.map((record) => ({
+      agentProfileId: record.agentSnapshot.agentProfileId,
+      childRunId: record.childRunId,
+      delegationId: record.delegationId,
+      outcome: record.outcome,
+      status: record.status,
+      summary: record.summary,
+    })),
     outcome: result.outcome,
     sessionId: result.session.id,
     summary: result.summary,
