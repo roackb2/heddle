@@ -4,6 +4,11 @@ import { ArtifactService } from '@/core/artifacts/index.js';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
+import {
+  DelegationService,
+  type DelegationRootScope,
+} from '@/core/delegation/index.js';
+import { ConversationDelegationPolicyService } from '@/core/chat/engine/delegation-policy.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import type { NormalizedConversationEngineConfig } from '@/core/chat/engine/config.js';
 import type {
@@ -24,7 +29,10 @@ import { ConversationTurnLeaseHeartbeatService } from './lease/index.js';
 import { ConversationTurnPersistenceService } from './persistence/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
-import type { PrepareConversationTurnContextArgs } from './context/index.js';
+import type {
+  ConversationTurnContext,
+  PrepareConversationTurnContextArgs,
+} from './context/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type {
   RunConversationTurnArgs,
@@ -92,7 +100,18 @@ export class EngineConversationTurnService implements ConversationTurnService {
     });
     const contextInput: PrepareConversationTurnContextArgs = { ...args, sessionService };
     const context = await ConversationTurnContextBuilder.build(contextInput);
-    const { session, runtime, tools, toolNames, leaseOwner, agentSnapshot } = context;
+    const {
+      session,
+      runtime,
+      tools,
+      leaseOwner,
+      agentSnapshot,
+    } = context;
+    const delegationScope = EngineConversationTurnService.createDelegationScope(args, context);
+    const rootTools = delegationScope
+      ? [...tools, delegationScope.createTool()]
+      : tools;
+    const toolNames = rootTools.map((tool) => tool.name);
     const host = EngineConversationTurnService.turnHost(args);
     const source = `chat session ${session.id}`;
     const preflightInput: TurnPreflightInput = args;
@@ -133,6 +152,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
       const result = await AgentLoopRuntimeService.run({
         ...agentLoopInput,
+        runId: delegationScope?.rootRunId,
         goal: args.prompt,
         model: runtime.model,
         apiKey: runtime.apiKey,
@@ -140,7 +160,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         stateDir: args.stateRoot,
         memoryDir: runtime.memoryDir,
         llm: runtime.llm,
-        tools,
+        tools: rootTools,
         includeDefaultTools: false,
         maxSteps: args.maxSteps ?? agentSnapshot?.runtime.maxSteps,
         maxToolConcurrency: args.maxToolConcurrency,
@@ -234,6 +254,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
           sessionId: session.id,
         }),
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
+        ...(delegationScope ? { delegation: delegationScope.snapshot() } : {}),
         memory: {
           // Background maintenance runs after the primary turn is persisted,
           // but the result does not resolve until that working copy is stable.
@@ -243,6 +264,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         },
       };
     } finally {
+      await delegationScope?.cancelAndWait();
       await leaseHeartbeat.stop();
       await EngineConversationTurnService.clearLeaseFromStorage(sessionService, session.id, leaseOwner);
     }
@@ -284,6 +306,47 @@ export class EngineConversationTurnService implements ConversationTurnService {
         args.host?.onCompactionStatus?.(event, phase);
       },
     };
+  }
+
+  /**
+   * Composes the conversation-owned activation rule with the lower-level
+   * delegation runtime. Engine policy is the authority ceiling; a turn may
+   * turn delegation off but cannot re-enable a host-disabled engine.
+   */
+  private static createDelegationScope(
+    args: RunConversationTurnArgs,
+    context: ConversationTurnContext,
+  ): DelegationRootScope | undefined {
+    const policy = args.delegationPolicy
+      ?? ConversationDelegationPolicyService.resolveEnginePolicy(undefined);
+    if (!ConversationDelegationPolicyService.isEnabled({
+      enginePolicy: policy,
+      turnMode: args.delegation,
+    })) {
+      return undefined;
+    }
+    if (context.tools.some((tool) => tool.name === 'delegate_task')) {
+      throw new Error('delegate_task is reserved by the conversation delegation runtime');
+    }
+
+    return new DelegationService({ policy }).createRootScope({
+      workspaceRoot: args.workspaceRoot,
+      runtime: {
+        model: context.runtime.model,
+        reasoningEffort: context.runtime.reasoningEffort,
+        apiKey: context.runtime.apiKey,
+        credential: context.runtime.credential?.type === 'oauth-access-token'
+          ? context.runtime.credential
+          : undefined,
+        preferApiKey: args.preferApiKey,
+        maxToolConcurrency: args.maxToolConcurrency,
+        stateDir: args.stateRoot,
+        memoryDir: context.runtime.memoryDir,
+        searchIgnoreDirs: args.searchIgnoreDirs,
+        baseSystemContext: context.baseSystemContext,
+        createChildLlm: () => context.runtime.createLlm(),
+      },
+    });
   }
 
   private static listTurnArtifacts(args: {

@@ -47,6 +47,42 @@ Creation fields never overwrite an existing session with that ID. A hosted
 service must derive the ID and repository scope from trusted server-side
 identity; Heddle does not provide authentication or tenant mapping.
 
+### Read-only subagents
+
+Conversation turns make bounded read-only subagents available by default. The
+root model decides when independent repository inspection or review is useful
+and may call `delegate_task`; callers do not need to enable it per prompt.
+Children receive no parent transcript, cannot mutate the workspace, and cannot
+delegate again. The turn result exposes completed in-memory evidence through
+`result.delegation`.
+
+Turn delegation off for a single request when needed:
+
+```ts
+await agent.send({
+  prompt: 'Handle this without subagents.',
+  delegation: 'off',
+})
+```
+
+Set a hard host-wide ceiling, or tune the execution bounds, at construction:
+
+```ts
+const agent = new ConversationAgentService({
+  delegation: {
+    // mode: 'off',
+    maxChildren: 4,
+    maxConcurrentChildren: 3,
+    maxStepsPerChild: 24,
+    maxChildDurationMs: 5 * 60_000,
+  },
+})
+```
+
+An engine-level `off` cannot be widened by a turn-level `auto`. Child evidence
+is currently in-process only; durable records and child-specific live activity
+are separate lifecycle features.
+
 If the host already acquired an OpenAI account access token, it can keep the
 token request-scoped instead of writing it to Heddle's credential store:
 

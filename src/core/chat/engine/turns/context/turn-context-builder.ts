@@ -44,6 +44,7 @@ export class ConversationTurnContextBuilder {
 
     return {
       session,
+      baseSystemContext: baseRuntime.systemContext,
       runtime,
       agentSnapshot: args.agentSnapshot,
       tools,

@@ -53,7 +53,7 @@ describe('ConversationAgentService', () => {
     });
 
     const first = await agent.send({ prompt: '  Summarize this project.  ' });
-    const second = await agent.send({ prompt: 'Continue.' });
+    const second = await agent.send({ prompt: 'Continue.', delegation: 'off' });
 
     expect(agent.runtime).toEqual(expect.objectContaining({
       maxSteps: 7,
@@ -86,6 +86,13 @@ describe('ConversationAgentService', () => {
         memoryMaintenanceMode: 'none',
         prompt: 'Summarize this project.',
         sessionId: 'project-assistant',
+      }),
+    );
+    expect(EngineConversationTurnService.run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        delegation: 'off',
+        prompt: 'Continue.',
       }),
     );
   });

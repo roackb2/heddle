@@ -93,6 +93,80 @@ describe('createConversationEngine', () => {
     }));
   });
 
+  it('defaults delegation to auto, preserves bounded host policy, and passes turn off overrides', async () => {
+    const invalidRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-delegation-invalid-'));
+    expect(() => createConversationEngine({
+      workspaceRoot: invalidRoot,
+      stateRoot: join(invalidRoot, '.heddle'),
+      model: 'gpt-5.4',
+      delegation: { mode: 'invalid' as never },
+    })).toThrow('conversation delegation mode must be auto or off');
+
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-delegation-'));
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot: join(workspaceRoot, '.heddle'),
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      delegation: {
+        maxChildren: 2,
+        maxConcurrentChildren: 2,
+        maxChildDurationMs: 90_000,
+      },
+    });
+    const session = await engine.sessions.create({ id: 'session-auto', name: 'Auto delegation' });
+
+    await engine.turns.submit({
+      sessionId: session.id,
+      prompt: 'Handle this directly or delegate when useful.',
+      delegation: 'off',
+    });
+
+    expect(EngineConversationTurnService.run).toHaveBeenLastCalledWith(expect.objectContaining({
+      delegation: 'off',
+      delegationPolicy: expect.objectContaining({
+        enabled: true,
+        maxChildren: 2,
+        maxConcurrentChildren: 2,
+        maxChildDurationMs: 90_000,
+      }),
+    }));
+
+    await engine.turns.continue({
+      sessionId: session.id,
+      prompt: 'Continue without delegation.',
+      delegation: 'off',
+    });
+    expect(EngineConversationTurnService.run).toHaveBeenLastCalledWith(expect.objectContaining({
+      delegation: 'off',
+      prompt: 'Continue without delegation.',
+    }));
+
+    const disabledRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-delegation-off-'));
+    const disabledEngine = createConversationEngine({
+      workspaceRoot: disabledRoot,
+      stateRoot: join(disabledRoot, '.heddle'),
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      delegation: { mode: 'off' },
+    });
+    const disabledSession = await disabledEngine.sessions.create({
+      id: 'session-off',
+      name: 'Disabled delegation',
+    });
+
+    await disabledEngine.turns.submit({
+      sessionId: disabledSession.id,
+      prompt: 'Do not delegate.',
+      delegation: 'auto',
+    });
+
+    expect(EngineConversationTurnService.run).toHaveBeenLastCalledWith(expect.objectContaining({
+      delegation: 'auto',
+      delegationPolicy: expect.objectContaining({ enabled: false }),
+    }));
+  });
+
   it('exposes an artifacts reader rooted at the resolved artifact root', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-'));
     const stateRoot = join(workspaceRoot, '.heddle');

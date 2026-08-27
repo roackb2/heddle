@@ -18,6 +18,8 @@ export type ChatTurnRuntime = {
   memoryDir: string;
   systemContext: string | undefined;
   llm: LlmAdapter;
+  /** Creates a fresh adapter with the exact credentials and endpoint resolved for this turn. */
+  createLlm: () => LlmAdapter;
 };
 
 export type ConversationTurnRuntimeConfig = ApiKeyRuntime & {

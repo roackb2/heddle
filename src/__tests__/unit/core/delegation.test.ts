@@ -88,6 +88,8 @@ describe('delegation policy and scope', () => {
       { enabled: true, maxConcurrentChildren: 4 },
       { enabled: true, maxChildren: 2, maxConcurrentChildren: 3 },
       { enabled: true, maxStepsPerChild: 33 },
+      { enabled: true, maxChildDurationMs: 999 },
+      { enabled: true, maxChildDurationMs: 15 * 60_000 + 1 },
       { enabled: true, allowedAgentProfileIds: [] },
       { enabled: true, allowedAgentProfileIds: ['builtin:code'] },
     ];
@@ -405,6 +407,46 @@ describe('delegation policy and scope', () => {
     expect(adaptersCreated).toBe(1);
     expect(active).toBe(0);
     expect(scope.records().every((record) => record.status === 'cancelled')).toBe(true);
+  });
+
+  it('settles a child with a distinct timeout after its execution deadline', async () => {
+    vi.useFakeTimers();
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolveStarted) => {
+      markStarted = resolveStarted;
+    });
+    const { scope } = activeScope({
+      policy: { maxChildDurationMs: 1_000 },
+      createChildLlm: () => finalAdapter(async (_messages, _tools, signal) => {
+        markStarted();
+        return await rejectWhenAborted(signal);
+      }),
+    });
+
+    try {
+      const pending = scope.delegateTask({ task: 'Wait past the child deadline.' });
+      await started;
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        output: {
+          status: 'cancelled',
+          outcome: 'interrupted',
+          error: { code: 'child_timeout' },
+        },
+      });
+      expect(scope.records()).toEqual([
+        expect.objectContaining({
+          status: 'cancelled',
+          outcome: 'interrupted',
+          summary: 'The delegated child exceeded its wall-clock limit.',
+        }),
+      ]);
+    } finally {
+      await scope.cancelAndWait();
+      vi.useRealTimers();
+    }
   });
 });
 

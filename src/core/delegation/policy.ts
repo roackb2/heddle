@@ -9,9 +9,12 @@ import type {
 export const DEFAULT_DELEGATION_MAX_CHILDREN = 4;
 export const DEFAULT_DELEGATION_MAX_CONCURRENT_CHILDREN = 3;
 export const DEFAULT_DELEGATION_MAX_STEPS_PER_CHILD = 24;
+export const DEFAULT_DELEGATION_MAX_CHILD_DURATION_MS = 5 * 60_000;
 export const MAX_DELEGATION_CHILDREN = 4;
 export const MAX_DELEGATION_CONCURRENT_CHILDREN = 3;
 export const MAX_DELEGATION_STEPS_PER_CHILD = 32;
+export const MIN_DELEGATION_CHILD_DURATION_MS = 1_000;
+export const MAX_DELEGATION_CHILD_DURATION_MS = 15 * 60_000;
 export const MAX_DELEGATED_TASK_LENGTH = 8_000;
 export const MAX_DELEGATED_SUMMARY_LENGTH = 8_000;
 
@@ -45,6 +48,8 @@ export class DelegationPolicyService {
         input.maxConcurrentChildren ?? DEFAULT_DELEGATION_MAX_CONCURRENT_CHILDREN,
       maxStepsPerChild:
         input.maxStepsPerChild ?? DEFAULT_DELEGATION_MAX_STEPS_PER_CHILD,
+      maxChildDurationMs:
+        input.maxChildDurationMs ?? DEFAULT_DELEGATION_MAX_CHILD_DURATION_MS,
       allowedAgentProfileIds,
     };
 
@@ -74,6 +79,12 @@ export class DelegationPolicyService {
       policy.maxStepsPerChild,
       1,
       MAX_DELEGATION_STEPS_PER_CHILD,
+    );
+    DelegationPolicyService.assertIntegerRange(
+      'maxChildDurationMs',
+      policy.maxChildDurationMs,
+      MIN_DELEGATION_CHILD_DURATION_MS,
+      MAX_DELEGATION_CHILD_DURATION_MS,
     );
     if (allowedAgentProfileIds.length === 0) {
       throw new RangeError('delegation allowedAgentProfileIds must not be empty');
@@ -140,6 +151,7 @@ export class DelegationPolicyService {
       agent_not_read_only: 'The requested child agent profile is not safely read-only.',
       invalid_task: `delegate_task requires a non-empty task up to ${MAX_DELEGATED_TASK_LENGTH} characters and an optional supported agentProfileId.`,
       cancelled: 'Delegated work was cancelled by the host.',
+      child_timeout: 'The delegated child exceeded its wall-clock limit.',
       child_failed: 'The delegated child did not complete successfully.',
     };
     return messages[code];
