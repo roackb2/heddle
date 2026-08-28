@@ -9,6 +9,7 @@ import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index
 describe('RuntimeCredentialService', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
 
   it('does not fall back to OpenAI keys for Anthropic models', () => {
@@ -270,6 +271,146 @@ describe('RuntimeCredentialService', () => {
         expiresAt: credential.expiresAt,
       },
     });
+  });
+
+  it('projects a fresh stored OAuth credential without exposing refresh material', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T08:00:00.000Z'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-request-credential-'));
+    const storePath = ProviderCredentialRepository.resolveStorePath(stateRoot);
+    new ProviderCredentialRepository({ storePath }).set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'stored-access-token',
+      refreshToken: 'stored-refresh-token',
+      expiresAt: Date.parse('2026-08-28T09:00:00.000Z'),
+      accountId: 'account-123',
+      createdAt: '2026-08-28T07:00:00.000Z',
+      updatedAt: '2026-08-28T07:00:00.000Z',
+    });
+    const fetchImpl = vi.fn<typeof fetch>();
+
+    const credential = await RuntimeCredentialService
+      .acquireRequestScopedCredentialForModel('gpt-5.4', {
+        stateRoot,
+        fetchImpl,
+      });
+
+    expect(credential).toEqual({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'stored-access-token',
+      expiresAt: Date.parse('2026-08-28T09:00:00.000Z'),
+      accountId: 'account-123',
+    });
+    expect(Object.keys(credential ?? {}).sort()).toEqual([
+      'accessToken',
+      'accountId',
+      'expiresAt',
+      'provider',
+      'type',
+    ]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refreshes and persists a near-expiry credential before projecting it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T08:00:00.000Z'));
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-refresh-credential-')), 'auth.json');
+    const repository = new ProviderCredentialRepository({ storePath });
+    repository.set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'old-access-token',
+      refreshToken: 'old-refresh-token',
+      expiresAt: Date.parse('2026-08-28T08:00:30.000Z'),
+      accountId: 'account-123',
+      createdAt: '2026-08-27T08:00:00.000Z',
+      updatedAt: '2026-08-27T08:00:00.000Z',
+    });
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 3_600,
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    const credential = await RuntimeCredentialService
+      .acquireRequestScopedCredentialForModel('gpt-5.4', {
+        storePath,
+        fetchImpl,
+      });
+
+    expect(credential).toMatchObject({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'new-access-token',
+      expiresAt: Date.parse('2026-08-28T09:00:00.000Z'),
+      accountId: 'account-123',
+    });
+    expect(repository.get('openai')).toMatchObject({
+      type: 'oauth',
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+      accountId: 'account-123',
+      createdAt: '2026-08-27T08:00:00.000Z',
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('coalesces concurrent refreshes for the same credential store', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T08:00:00.000Z'));
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-concurrent-refresh-')), 'auth.json');
+    new ProviderCredentialRepository({ storePath }).set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'old-access-token',
+      refreshToken: 'old-refresh-token',
+      expiresAt: Date.parse('2026-08-28T08:00:30.000Z'),
+      createdAt: '2026-08-27T08:00:00.000Z',
+      updatedAt: '2026-08-27T08:00:00.000Z',
+    });
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 3_600,
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    const credentials = await Promise.all([
+      RuntimeCredentialService.acquireRequestScopedCredentialForModel(
+        'gpt-5.4',
+        { storePath, fetchImpl },
+      ),
+      RuntimeCredentialService.acquireRequestScopedCredentialForModel(
+        'gpt-5.4',
+        { storePath, fetchImpl },
+      ),
+    ]);
+
+    expect(credentials).toEqual([
+      expect.objectContaining({ accessToken: 'new-access-token' }),
+      expect.objectContaining({ accessToken: 'new-access-token' }),
+    ]);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('returns no request-scoped credential when the model has no stored OAuth login', async () => {
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-missing-credential-')), 'auth.json');
+
+    await expect(RuntimeCredentialService.acquireRequestScopedCredentialForModel(
+      'gpt-5.4',
+      { storePath },
+    )).resolves.toBeUndefined();
+    await expect(RuntimeCredentialService.acquireRequestScopedCredentialForModel(
+      'claude-sonnet-4-6',
+      { storePath },
+    )).resolves.toBeUndefined();
   });
 
   it('rejects ambiguous or provider-mismatched runtime credentials', () => {

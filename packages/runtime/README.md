@@ -56,6 +56,12 @@ reimplementing callback buffering or terminal sequencing. Scheduling, task
 persistence, and deployment-specific model/tool/MCP preparation stay outside
 the service.
 
+`RuntimeCredentialService.acquireRequestScopedCredentialForModel` lets a Node
+host reuse its Heddle OpenAI account login safely across an isolation boundary.
+Heddle refreshes and persists the stored credential at the host boundary, then
+returns only an access token, expiry, and optional account identifier. The
+refresh token must never be passed to an Execution Host.
+
 ## Does not own
 
 - the finished `heddle` command, TUI, daemon lifecycle, or built browser UI;

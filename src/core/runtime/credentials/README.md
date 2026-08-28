@@ -23,6 +23,15 @@ Hosts must acquire request-scoped tokens outside Heddle and send them only over
 an authenticated transport. They remain responsible for tenant authorization,
 redaction, and re-authentication after expiry or process/browser refresh.
 
+Node hosts that use Heddle's credential store should call
+`RuntimeCredentialService.acquireRequestScopedCredentialForModel`. The service
+refreshes a near-expiry stored OpenAI credential at the host boundary, persists
+the refreshed credential, and returns only the access-token runtime shape. A
+refresh token must never cross into an isolated Execution Host.
+Pass the Heddle `stateRoot` when the host should use that root's canonical
+`auth.json`; `storePath` remains available for custom credential repositories
+and tests, and the two options are mutually exclusive.
+
 Do not combine `apiKey` and `credential` for one runtime. The ambiguity is
 rejected during resolution instead of relying on an implicit precedence rule.
 
