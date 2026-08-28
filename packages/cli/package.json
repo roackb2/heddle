@@ -23,7 +23,7 @@
     "node": ">=20"
   },
   "bin": {
-    "heddle": "./dist/src/cli-v2/main.js"
+    "heddle": "dist/src/cli-v2/main.js"
   },
   "files": [
     "dist",
