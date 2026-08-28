@@ -8,11 +8,13 @@ public `@heddleagent/execution-host-client@6.6.1` and
 `@heddleagent/postgres@6.1.2` packages are maintained and released from the
 separate permissioned Execution Host repository. `@heddleagent/run-client@6.0.0`
 ships the existing browser-safe run client under its final coordinate.
-`@heddleagent/runtime@6.5.0` ships the existing embeddable SDK, prompt-free
-permission modes, read-only delegation, and the stable memory checkpoint
-boundary and memory-change result used by compatible Execution Hosts.
-`@heddleagent/cli@6.0.0` ships the existing `heddle`
-command, TUI, daemon, and browser control plane. The former `@roackb2/*`
+`@heddleagent/runtime@6.6.0` ships the embeddable SDK, default-auto bounded
+subagents, explicit approval-gated Code children, correlated child activity,
+settled child records, prompt-free permission modes, and the stable memory
+checkpoint boundary used by compatible Execution Hosts.
+`@heddleagent/cli@6.1.0` ships the `heddle` command, TUI, daemon, and browser
+control plane with default-on subagent controls and live/settled child views.
+The former `@roackb2/*`
 coordinates are deprecated and remain installable only so existing applications
 keep running; new integrations should use the `@heddleagent/*` packages.
 
@@ -20,8 +22,8 @@ keep running; new integrations should use the `@heddleagent/*` packages.
 
 | Package | Responsibility | Migration status |
 | --- | --- | --- |
-| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.5.0`; `/runs` replaces the former `/hosted` package-path name, `/cli` is the official CLI bridge, and `/advanced` includes read-only delegation and portable memory checkpoints |
-| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Existing CLI, TUI, daemon, and browser control plane activated at stable `6.0.0` |
+| `@heddleagent/runtime` | Embeddable TypeScript/Node agent runtime and SDK | Stable `6.6.0`; `/runs` is the process-local run boundary, `/cli` is the official CLI bridge, and the curated conversation SDK includes bounded default-auto subagents and explicit approval-gated Code children |
+| `@heddleagent/cli` | Installable Heddle coding-agent product and `heddle` executable | Stable `6.1.0`; terminal and browser hosts expose default-on/off subagent controls plus correlated live and settled child activity |
 | `@heddleagent/run-client` | Browser-safe JavaScript run protocol consumer | Existing implementation activated at stable `6.0.0` |
 | `@heddleagent/execution-host-client` | Backend contracts and direct/AgentCore clients for invoking a separate compatible Execution Host | Stable `6.6.1`; canonical source and release lane are in the permissioned Execution Host repository |
 | `@heddleagent/postgres` | Official PostgreSQL implementations for supported Heddle-owned durable ports | Stable `6.1.2`; canonical source and release lane are in the permissioned Execution Host repository |

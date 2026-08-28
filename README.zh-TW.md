@@ -38,7 +38,7 @@ conversation 與 run 基礎之上。
 `@heddleagent/execution-host-client@6.6.1`。舊的
 `@roackb2/heddle-adopter@5.13.0` coordinate 已 deprecated，只為既有使用者保留安裝能力。
 
-穩定的 coding-agent 套件是 `@heddleagent/cli@6.0.0`，安裝後提供
+穩定的 coding-agent 套件是 `@heddleagent/cli@6.1.0`，安裝後提供
 `heddle` command。舊的 `@roackb2/heddle@5.13.0` coordinate 已 deprecated，只為既有使用者保留安裝能力。
 
 **Runtime** 是 library code。**Hosted run layer** 在你營運的 infrastructure

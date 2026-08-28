@@ -1,6 +1,6 @@
 {
   "name": "@heddleagent/cli",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Heddle coding-agent CLI, daemon, and local browser control-plane product",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
@@ -39,7 +39,7 @@
   ],
   "dependencies": {
     "@heddleagent/run-client": "^6.0.0",
-    "@heddleagent/runtime": "^6.1.0",
+    "@heddleagent/runtime": "^6.6.0",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",
     "chalk": "^5.6.2",

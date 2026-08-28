@@ -41,7 +41,7 @@ The stable separate-host package is
 `@roackb2/heddle-adopter@5.13.0` coordinate is deprecated and remains
 installable only for existing consumers.
 
-The stable coding-agent package is `@heddleagent/cli@6.0.0`; it installs the
+The stable coding-agent package is `@heddleagent/cli@6.1.0`; it installs the
 `heddle` command. The former `@roackb2/heddle@5.13.0` coordinate remains
 installable only for existing consumers and is deprecated for new installs.
 
