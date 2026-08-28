@@ -1,4 +1,7 @@
+import dayjs from 'dayjs';
+import { Mutex } from 'async-mutex';
 import {
+  OpenAiOAuthService,
   ProviderCredentialRepository,
   type StoredProviderCredential,
 } from '@/core/auth/index.js';
@@ -22,6 +25,7 @@ import type {
 export class RuntimeCredentialService {
   static readonly DEFAULT_OLLAMA_OPENAI_BASE_URL = 'http://127.0.0.1:11434/v1';
   static readonly DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
+  private static readonly requestCredentialMutexes = new Map<string, Mutex>();
 
   static resolveProviderApiKey(provider: LlmProvider): string | undefined {
     const compatibleProfile = OpenAiCompatibleProviderProfileService.maybeGet(provider);
@@ -59,6 +63,93 @@ export class RuntimeCredentialService {
     const provider = LlmAdapterService.inferProvider(model);
     const credential = new ProviderCredentialRepository({ storePath: options.storePath }).get(provider);
     return credential?.type === 'oauth' ? credential : undefined;
+  }
+
+  /**
+   * Acquires an access-token-only credential for an isolated runtime request.
+   *
+   * The host-side credential store retains refresh material. When the stored
+   * OpenAI credential is near expiry, Heddle refreshes and persists it before
+   * returning the non-persistable runtime shape. Callers must send only the
+   * returned value across their authenticated execution boundary.
+   */
+  static async acquireRequestScopedCredentialForModel(
+    model: string,
+    options: {
+      stateRoot?: string;
+      storePath?: string;
+      fetchImpl?: typeof fetch;
+      refreshBeforeMs?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<RuntimeProviderCredential | undefined> {
+    const provider = LlmAdapterService.inferProvider(model);
+    if (provider !== 'openai') {
+      return undefined;
+    }
+    if (options.stateRoot && options.storePath) {
+      throw new Error('Provide either stateRoot or storePath for runtime credential acquisition, not both.');
+    }
+
+    const refreshBeforeMs = options.refreshBeforeMs ?? 60_000;
+    if (!Number.isFinite(refreshBeforeMs) || refreshBeforeMs < 0) {
+      throw new Error('Runtime credential refresh window must be a non-negative finite number of milliseconds.');
+    }
+    const storePath = options.storePath ?? ProviderCredentialRepository.resolveStorePath(
+      options.stateRoot,
+    );
+    const mutex = RuntimeCredentialService.resolveRequestCredentialMutex(storePath);
+
+    try {
+      return await mutex.runExclusive(async () => {
+        options.signal?.throwIfAborted();
+        const repository = new ProviderCredentialRepository({ storePath });
+        const stored = repository.get(provider);
+        if (stored?.type !== 'oauth') {
+          return undefined;
+        }
+
+        const credential = dayjs(stored.expiresAt).isAfter(
+          dayjs().add(refreshBeforeMs, 'millisecond'),
+        )
+          ? stored
+          : await OpenAiOAuthService.refreshCredential(stored, {
+              fetchImpl: options.fetchImpl,
+              signal: options.signal,
+            });
+        if (credential !== stored) {
+          repository.set(credential);
+        }
+        options.signal?.throwIfAborted();
+
+        return {
+          type: 'oauth-access-token',
+          provider: 'openai',
+          accessToken: credential.accessToken,
+          expiresAt: credential.expiresAt,
+          ...(credential.accountId ? { accountId: credential.accountId } : {}),
+        };
+      });
+    } finally {
+      if (
+        !mutex.isLocked()
+        && RuntimeCredentialService.requestCredentialMutexes.get(storePath)
+          === mutex
+      ) {
+        RuntimeCredentialService.requestCredentialMutexes.delete(storePath);
+      }
+    }
+  }
+
+  private static resolveRequestCredentialMutex(storePath: string): Mutex {
+    const existing = RuntimeCredentialService.requestCredentialMutexes.get(storePath);
+    if (existing) {
+      return existing;
+    }
+
+    const mutex = new Mutex();
+    RuntimeCredentialService.requestCredentialMutexes.set(storePath, mutex);
+    return mutex;
   }
 
   static hasCredentialForModel(

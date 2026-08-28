@@ -88,11 +88,12 @@ export class OpenAiOAuthService {
 
   static async refreshCredential(
     credential: OpenAiOAuthCredential,
-    options: { fetchImpl?: typeof fetch } = {},
+    options: { fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
   ): Promise<OpenAiOAuthCredential> {
     const tokens = await OpenAiOAuthService.refreshToken({
       refreshToken: credential.refreshToken,
       fetchImpl: options.fetchImpl,
+      signal: options.signal,
     });
     return {
       ...OpenAiOAuthService.createCredential(tokens),
