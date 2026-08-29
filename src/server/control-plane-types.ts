@@ -29,6 +29,7 @@ export type ChatSessionView = {
   archivedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  lastUserActivityAt?: string;
   model?: string;
   reasoningEffort?: ReasoningEffort;
   driftEnabled?: boolean;

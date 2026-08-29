@@ -10,6 +10,8 @@ or future hosts, it belongs here rather than in host-side code.
 
 - Persisted session state shape and lifecycle.
 - Session preference semantics such as stored model and reasoning effort.
+- Resume-session selection based on accepted user conversation activity,
+  independently from pinned-first presentation ordering.
 - The persisted FIFO prompt queue used when a user submits follow-up work while
   a session already has earlier work to finish.
 - New-session inheritance rules.
@@ -129,6 +131,22 @@ Session semantics should be dead simple:
 - defaults are resolved once at the owning boundary;
 - derived effective state is derived once;
 - hosts consume concrete values instead of re-resolving policy.
+
+## Resume Selection Invariants
+
+`lastUserActivityAt` advances when Heddle accepts user conversation work,
+including queued prompts and direct-shell messages. Pinning, renaming, settings,
+lease heartbeats, compaction, and assistant completion do not advance it.
+
+Session catalogs remain pinned-first for interface presentation. Hosts must use
+the control plane's `resumeSessionId` (or the session service's `latest` method)
+for implicit startup selection instead of treating the first displayed row as
+the latest conversation. Explicit session IDs always take precedence.
+
+Legacy records have no `lastUserActivityAt`. Until the first new user activity
+is recorded, the service falls back to `updatedAt`, then `createdAt`, while
+still ignoring pin state. This is migration-free and becomes exact as soon as
+the user chats after upgrading.
 
 ## Queued Prompt Invariants
 

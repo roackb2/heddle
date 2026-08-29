@@ -1,4 +1,8 @@
 export { ConversationLines } from './conversation-lines.js';
 export { ChatSessionRecords } from './records.js';
 export { ChatSessionTitles } from './titles.js';
-export type { CreateChatSessionRecordOptions, GenerateChatSessionTitleInput } from './types.js';
+export type {
+  ChatSessionResumeCandidate,
+  CreateChatSessionRecordOptions,
+  GenerateChatSessionTitleInput,
+} from './types.js';

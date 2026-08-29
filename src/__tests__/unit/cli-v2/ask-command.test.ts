@@ -93,14 +93,25 @@ describe('AskCliV2CommandEdgeService', () => {
     const runtime = createRuntime();
     const resolve = vi.spyOn(ControlPlaneCommandRuntimeService, 'resolve').mockResolvedValue(runtime);
     const fixture = createClientFixture({
-      sessions: [{
-        id: 'session-latest',
-        name: 'Latest',
-        pinned: false,
-        messageCount: 1,
-        turnCount: 1,
-        queuedPromptCount: 0,
-      }],
+      sessions: [
+        {
+          id: 'session-pinned',
+          name: 'Pinned shortcut',
+          pinned: true,
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+        {
+          id: 'session-latest',
+          name: 'Latest conversation',
+          pinned: false,
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+      ],
+      resumeSessionId: 'session-latest',
       sendPromptResult: {
         outcome: 'done',
         summary: 'Continued answer.',
@@ -382,6 +393,7 @@ function createRuntime(): ControlPlaneCommandRuntime {
 
 function createClientFixture(input: {
   sessions?: unknown[];
+  resumeSessionId?: string;
   createSessionResult?: unknown;
   sendPromptResult: unknown;
   sendPromptAsyncResult?: unknown;
@@ -396,6 +408,7 @@ function createClientFixture(input: {
         query: vi.fn(async () => ({
           workspaceId: 'workspace-1',
           sessions: input.sessions ?? [],
+          resumeSessionId: input.resumeSessionId,
         })),
       },
       sessionCreate: {

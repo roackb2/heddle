@@ -1,5 +1,6 @@
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
 import type {
+  ControlPlaneSessions,
   ControlPlaneSessionView,
 } from '@/client-shared/api/types.js';
 import type {
@@ -30,11 +31,15 @@ type ControlPlaneSessionLoaderOptions = {
 export class ControlPlaneSessionLoader {
   constructor(private readonly options: ControlPlaneSessionLoaderOptions) {}
 
-  async refreshSessions(): Promise<ControlPlaneSessionView[]> {
+  async refreshSessionCatalog(): Promise<ControlPlaneSessions> {
     const workspaceId = this.options.state.requireWorkspaceId();
-    const sessions = await this.options.api.listSessions(workspaceId);
-    this.options.state.patch({ sessions });
-    return sessions;
+    const catalog = await this.options.api.readSessions(workspaceId);
+    this.options.state.patch({ sessions: catalog.sessions });
+    return catalog;
+  }
+
+  async refreshSessions(): Promise<ControlPlaneSessionView[]> {
+    return (await this.refreshSessionCatalog()).sessions;
   }
 
   async createSession(input: ControlPlaneSessionCreateInput = {}): Promise<ControlPlaneSessionView> {

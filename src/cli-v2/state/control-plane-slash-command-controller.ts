@@ -78,11 +78,13 @@ export class ControlPlaneSlashCommandController {
       await this.options.loader.refreshSessions();
       await this.options.loader.selectSession(resultSessionId);
     } else if (activeSessionId) {
-      const sessions = await this.options.loader.refreshSessions();
-      if (sessions.some((session) => session.id === activeSessionId)) {
+      const catalog = await this.options.loader.refreshSessionCatalog();
+      if (catalog.sessions.some((session) => session.id === activeSessionId)) {
         await this.options.loader.refreshSession(activeSessionId, { silent: true });
       } else {
-        await this.options.loader.selectSession(sessions[0]?.id ?? (await this.options.loader.createSession()).id);
+        await this.options.loader.selectSession(
+          catalog.resumeSessionId ?? (await this.options.loader.createSession()).id,
+        );
       }
     }
 

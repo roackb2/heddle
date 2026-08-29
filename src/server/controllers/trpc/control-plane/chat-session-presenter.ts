@@ -119,6 +119,7 @@ export class ControlPlaneChatSessionPresenter {
       archivedAt: readString(candidate.archivedAt),
       createdAt: readString(candidate.createdAt),
       updatedAt: readString(candidate.updatedAt),
+      lastUserActivityAt: readString(candidate.lastUserActivityAt),
       model: readString(candidate.model),
       reasoningEffort: ControlPlaneChatSessionPresenter.readReasoningEffort(candidate.reasoningEffort),
       driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : undefined,

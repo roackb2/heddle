@@ -1,16 +1,9 @@
 /**
  * Control-plane chat session application service.
  *
- * Boundary rule:
- * ordinary create/read/update/submit/continue flows go through
- * createConversationEngine(...). The controller owns daemon/control-plane
- * orchestration only: event fanout, pending approval state, cancellation, and
- * DTO projection.
- *
- * Current compromise:
- * the fake browser-integration shortcut still bypasses the engine turn
- * boundary, but it mutates state through the session service so persistence
- * concurrency semantics stay consistent with real runs.
+ * Ordinary flows go through createConversationEngine(...); this controller
+ * owns daemon orchestration and DTO projection. The browser-integration fake
+ * still bypasses the turn boundary but persists through the session service.
  */
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
@@ -117,6 +110,7 @@ type CompactControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlP
 type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   sessionId: string;
   prompt: string;
+  userActivityAt?: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   delegationMode?: ConversationDelegationMode;
@@ -343,7 +337,7 @@ export class ControlPlaneChatSessionsController {
   }
 
   async continuePrompt(args: ContinueChatPromptArgs) {
-    return await this.runService.startAndWait(this.buildContinuePromptRun(args));
+    return await this.runService.startAndWait(this.buildContinuePromptRun({ ...args, userActivityAt: args.userActivityAt ?? new Date().toISOString() }));
   }
 
   subscribeToEvents(
@@ -502,6 +496,7 @@ export class ControlPlaneChatSessionsController {
       agentSnapshot: args.agentSnapshot,
       systemContext: args.systemContext,
       delegation: args.delegationMode,
+      userActivityAt: args.userActivityAt,
     });
     this.publishQueueUpdated(args, queued.session);
 
@@ -539,6 +534,7 @@ export class ControlPlaneChatSessionsController {
         agentSnapshot: dequeued.item.agentSnapshot,
         systemContext: dequeued.item.systemContext,
         delegationMode: dequeued.item.delegation,
+        userActivityAt: dequeued.item.userActivityAt ?? dequeued.item.updatedAt,
       }));
     } catch (error) {
       const restored = await sessions.enqueuePrompt(args.sessionId, {
@@ -547,6 +543,7 @@ export class ControlPlaneChatSessionsController {
         agentSnapshot: dequeued.item.agentSnapshot,
         systemContext: dequeued.item.systemContext,
         delegation: dequeued.item.delegation,
+        userActivityAt: dequeued.item.userActivityAt ?? dequeued.item.updatedAt,
       });
       this.publishQueueUpdated(args, restored.session);
       args.logger?.debug(
@@ -587,6 +584,7 @@ export class ControlPlaneChatSessionsController {
           await this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
             runId: run.runId,
             prompt: args.prompt,
+            userActivityAt: args.userActivityAt,
             leaseOwner: args.leaseOwner,
           });
         },
@@ -628,6 +626,9 @@ export class ControlPlaneChatSessionsController {
     return {
       address: this.runStreams.resolveAddress(args),
       ...this.runStreams.createLifecycle(args, {
+        onAccepted: async () => {
+          await this.createEngine(args).sessions.markUserActivity(args.sessionId, args.userActivityAt);
+        },
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
       execute: async (run: ConversationRunContext) => {
@@ -648,6 +649,7 @@ export class ControlPlaneChatSessionsController {
         return await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
           return await engine.turns.continue({
             sessionId: args.sessionId,
+            userActivityAt: args.userActivityAt,
             host,
             abortSignal,
             shouldStop,
@@ -763,10 +765,8 @@ export class ControlPlaneChatSessionsController {
   }
 
   private prepareSubmitPromptArgs(args: SubmitChatPromptArgs): SubmitChatPromptArgs {
-    return {
-      ...args,
-      agentSnapshot: new CustomAgentService({ workspaceRoot: args.workspaceRoot }).resolveTurnSnapshot(args),
-    };
+    const agentSnapshot = new CustomAgentService({ workspaceRoot: args.workspaceRoot }).resolveTurnSnapshot(args);
+    return { ...args, userActivityAt: args.userActivityAt ?? new Date().toISOString(), agentSnapshot };
   }
 
   private async persistRunFailureMessage(

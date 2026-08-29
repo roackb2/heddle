@@ -83,7 +83,7 @@ async function main() {
     .command('ask [goal...]')
     .description('run a one-shot ask against the workspace')
     .option('--session <id>', 'continue a saved chat session by id')
-    .option('--latest', 'continue the most recently updated chat session')
+    .option('--latest', 'continue the chat session with the latest user conversation activity')
     .option('--new-session [name]', 'create a fresh chat session and run this ask inside it')
     .option('--agent <id>', 'custom agent id for this ask turn')
     .option('--mode <mode>', 'built-in custom agent mode: ask, code, or review')

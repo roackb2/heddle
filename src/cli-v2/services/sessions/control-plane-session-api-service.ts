@@ -3,6 +3,7 @@ import { createControlPlaneRequestContext } from '@/client-shared/api/links.js';
 import type {
   ControlPlaneApprovalDecision,
   ControlPlanePermissionModeUpdateInput,
+  ControlPlaneSessions,
   RouterInputs,
 } from '@/client-shared/api/types.js';
 
@@ -55,9 +56,15 @@ export class ControlPlaneSessionApiService {
     return resolvedWorkspaceId;
   }
 
-  async listSessions(workspaceId: string) {
+  async readSessions(workspaceId: string): Promise<ControlPlaneSessions> {
     const result = await this.client.controlPlane.sessions.query({ workspaceId });
-    return result.workspaceId === workspaceId ? result.sessions : [];
+    return result.workspaceId === workspaceId
+      ? result
+      : { workspaceId, sessions: [], resumeSessionId: undefined };
+  }
+
+  async listSessions(workspaceId: string) {
+    return (await this.readSessions(workspaceId)).sessions;
   }
 
   async getModelOptions() {

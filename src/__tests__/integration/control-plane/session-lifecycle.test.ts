@@ -48,9 +48,14 @@ describe('control-plane session lifecycle API', () => {
   });
 
   it('pins sessions through the workspace-scoped API and lists pinned sessions first', async () => {
-    const { caller } = createControlPlaneCaller();
+    const { caller, engine } = createControlPlaneCaller();
     const older = await caller.sessionCreate({ name: 'Older session' });
     const newer = await caller.sessionCreate({ name: 'Newer session' });
+    await engine.sessions.markAcceptedUserMessage(newer.id, {
+      runId: 'recent-user-run',
+      prompt: 'This is the work I used most recently.',
+      userActivityAt: '2026-08-29T10:00:00.000Z',
+    });
 
     const pinned = await caller.sessionPinnedUpdate({
       id: older.id,
@@ -66,6 +71,7 @@ describe('control-plane session lifecycle API', () => {
       pinned: true,
     });
     await expect(caller.sessions()).resolves.toMatchObject({
+      resumeSessionId: newer.id,
       sessions: [
         expect.objectContaining({ id: older.id, pinned: true }),
         expect.objectContaining({ id: newer.id, pinned: false }),

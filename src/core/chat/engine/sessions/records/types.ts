@@ -44,6 +44,16 @@ export type ApplyCompletedChatSessionTurnInput = ApplyCompactedChatSessionHistor
 export type MarkAcceptedConversationUserMessageInput = {
   runId: string;
   prompt: string;
+  /** Admission time supplied by a host when queued work must retain its original recency. */
+  userActivityAt?: string;
+};
+
+export type ChatSessionResumeCandidate = {
+  id: string;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastUserActivityAt?: string;
 };
 
 export type MarkAcceptedConversationUserMessageFailedInput = {

@@ -119,11 +119,11 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   async latest(): Promise<ChatSession | undefined> {
-    return (await this.list())[0];
+    return ChatSessionRecords.resolveResumeCandidate(await this.list());
   }
 
   async latestExisting(): Promise<ChatSession | undefined> {
-    return (await this.listExisting())[0];
+    return ChatSessionRecords.resolveResumeCandidate(await this.listExisting());
   }
 
   async create(input?: CreateConversationSessionInput): Promise<ChatSession> {
@@ -253,10 +253,19 @@ export class FileConversationSessionService implements ConversationSessionServic
       return await this.require(id);
     }
 
+    const userActivityAt = inputs.some((input) => input.role === 'user')
+      ? new Date().toISOString()
+      : undefined;
     return await this.updateRequiredSession(id, (session) => ({
-      ...session,
+      ...(userActivityAt ? ChatSessionRecords.markUserActivity(session, userActivityAt) : session),
       messages: [...session.messages, ...inputs],
     }));
+  }
+
+  async markUserActivity(id: string, userActivityAt?: string): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => (
+      ChatSessionRecords.markUserActivity(session, userActivityAt)
+    ));
   }
 
   async markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): Promise<ChatSession> {
@@ -293,6 +302,11 @@ export class FileConversationSessionService implements ConversationSessionServic
     ConversationDelegationPolicyService.assertTurnMode(input.delegation);
 
     const now = new Date().toISOString();
+    const parsedUserActivityAt = dayjs(input.userActivityAt ?? now);
+    if (!parsedUserActivityAt.isValid()) {
+      throw new Error('User activity timestamp must be a valid datetime.');
+    }
+    const userActivityAt = parsedUserActivityAt.toISOString();
     const item = {
       id: `queued-prompt-${randomUUID()}`,
       prompt,
@@ -300,11 +314,12 @@ export class FileConversationSessionService implements ConversationSessionServic
       agentSnapshot: input.agentSnapshot,
       systemContext: input.systemContext,
       delegation: input.delegation,
+      userActivityAt,
       createdAt: now,
       updatedAt: now,
     };
     const session = await this.updateRequiredSession(id, (current) => ({
-      ...current,
+      ...ChatSessionRecords.markUserActivity(current, userActivityAt),
       queuedPrompts: [...current.queuedPrompts, item],
     }));
 
@@ -321,16 +336,17 @@ export class FileConversationSessionService implements ConversationSessionServic
       throw new Error('Queued prompt cannot be empty.');
     }
 
+    const userActivityAt = new Date().toISOString();
     return await this.updateRequiredSession(id, (session) => {
       if (!session.queuedPrompts.some((item) => item.id === input.queueItemId)) {
         throw new Error(`Queued prompt not found: ${input.queueItemId}`);
       }
 
       return {
-        ...session,
+        ...ChatSessionRecords.markUserActivity(session, userActivityAt),
         queuedPrompts: session.queuedPrompts.map((item) => (
           item.id === input.queueItemId
-            ? { ...item, prompt, updatedAt: new Date().toISOString() }
+            ? { ...item, prompt, userActivityAt, updatedAt: userActivityAt }
             : item
         )),
       };

@@ -24,6 +24,7 @@ export function useControlPlaneSidebarData({
   const [loadedSessions, setLoadedSessions] = useState<{
     workspaceId?: string;
     sessions: SidebarSession[];
+    resumeSessionId?: string;
   }>({ sessions: [] });
   const sessionsQuery = trpcReact.controlPlane.sessions.useQuery(
     workspaceKnown && workspaceId ? { workspaceId } : undefined,
@@ -48,6 +49,7 @@ export function useControlPlaneSidebarData({
     setLoadedSessions({
       workspaceId,
       sessions: sessionsQuery.data.sessions,
+      resumeSessionId: sessionsQuery.data.resumeSessionId,
     });
   }, [sessionsQuery.data, workspaceId]);
 
@@ -55,6 +57,9 @@ export function useControlPlaneSidebarData({
     () => loadedSessions.workspaceId === workspaceId ? loadedSessions.sessions : [],
     [loadedSessions, workspaceId],
   );
+  const resumeSessionId = loadedSessions.workspaceId === workspaceId
+    ? loadedSessions.resumeSessionId
+    : undefined;
   const tasks = useMemo(
     () => {
       const taskData = tasksQuery.data;
@@ -68,12 +73,12 @@ export function useControlPlaneSidebarData({
   );
 
   useEffect(() => {
-    if (navigation.selectedSessionId || navigation.settingsOpen || navigation.activeSurfaceId !== 'sessions' || sessions.length === 0) {
+    if (navigation.selectedSessionId || navigation.settingsOpen || navigation.activeSurfaceId !== 'sessions' || !resumeSessionId) {
       return;
     }
 
-    navigation.selectSession(sessions[0]!.id, { workspaceId, replace: true });
-  }, [navigation, sessions, workspaceId]);
+    navigation.selectSession(resumeSessionId, { workspaceId, replace: true });
+  }, [navigation, resumeSessionId, workspaceId]);
 
   useEffect(() => {
     if (navigation.selectedTaskId || navigation.settingsOpen || navigation.activeSurfaceId !== 'tasks' || tasks.length === 0) {

@@ -26,6 +26,7 @@ describe('chat session queued prompts', () => {
       agentProfileId: 'builtin:review',
       agentSnapshot,
       delegation: 'off',
+      userActivityAt: '2026-08-29T10:00:00.000Z',
     });
     const dequeued = await sessions.dequeueQueuedPrompt(session.id);
 
@@ -36,7 +37,10 @@ describe('chat session queued prompts', () => {
       agentProfileId: 'builtin:review',
       agentSnapshot,
       delegation: 'off',
+      userActivityAt: '2026-08-29T10:00:00.000Z',
     }));
+    expect(queued.session.lastUserActivityAt).toBe('2026-08-29T10:00:00.000Z');
+    expect(dequeued.session.lastUserActivityAt).toBe('2026-08-29T10:00:00.000Z');
     expect(dequeued.session.queuedPrompts).toEqual([]);
   });
 });

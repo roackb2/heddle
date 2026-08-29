@@ -177,6 +177,7 @@ export type ConversationSessionService = {
   // Messages
   appendMessage(id: string, input: AppendConversationMessageInput): Promise<ChatSession>;
   appendMessages(id: string, inputs: AppendConversationMessageInput[]): Promise<ChatSession>;
+  markUserActivity(id: string, userActivityAt?: string): Promise<ChatSession>;
   acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): Promise<ChatSession>;
   markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): Promise<ChatSession>;
   markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): Promise<ChatSession>;
@@ -251,6 +252,8 @@ export type AppendConversationMessageInput = {
 export type MarkAcceptedConversationUserMessageInput = {
   runId: string;
   prompt: string;
+  /** Admission time supplied by a host when queued work must retain its original recency. */
+  userActivityAt?: string;
 };
 
 export type AcceptConversationUserMessageInput = MarkAcceptedConversationUserMessageInput & {
@@ -268,6 +271,8 @@ export type EnqueueConversationPromptInput = {
   agentSnapshot?: CustomAgentExecutionSnapshot;
   systemContext?: string;
   delegation?: ConversationDelegationMode;
+  /** Original user activity time when restoring an already accepted queue item. */
+  userActivityAt?: string;
 };
 
 export type UpdateQueuedConversationPromptInput = {
@@ -313,6 +318,8 @@ export type ConversationTurnService = {
 export type SubmitConversationTurnInput = {
   sessionId: string;
   prompt: string;
+  /** Original admission time when a host runs a prompt that was accepted earlier. */
+  userActivityAt?: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   /** `off` removes delegation for this turn; `auto` cannot widen an engine-level `off`. */
@@ -333,6 +340,8 @@ export type SubmitConversationTurnInput = {
 export type ContinueConversationTurnInput = {
   sessionId: string;
   prompt?: string;
+  /** Original admission time when a host resumes work accepted earlier. */
+  userActivityAt?: string;
   /** `off` removes delegation for this turn; `auto` cannot widen an engine-level `off`. */
   delegation?: ConversationDelegationMode;
   maxSteps?: number;

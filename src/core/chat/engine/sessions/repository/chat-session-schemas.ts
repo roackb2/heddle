@@ -248,6 +248,9 @@ const QueuedConversationPromptSchema = z.object({
   delegation: ConversationDelegationModeSchema
     .describe('Delegation availability captured when this prompt entered the queue.')
     .optional(),
+  userActivityAt: z.string()
+    .describe('Original user activity timestamp retained across delayed queue execution and retries.')
+    .optional(),
   createdAt: z.string().describe('Timestamp when this prompt entered the session queue.'),
   updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
 });
@@ -365,6 +368,9 @@ export const SessionBodyReadSchema = z.object({
   archivedAt: z.string()
     .describe('Timestamp when this session was archived and hidden from normal session lists.')
     .optional(),
+  lastUserActivityAt: z.string()
+    .describe('Most recent accepted user conversation activity; metadata changes do not advance it.')
+    .optional(),
   history: ChatMessagesSchema
     .describe('Model-facing transcript retained for future turns.')
     .optional()
@@ -411,6 +417,9 @@ export const SessionBodyWriteSchema = z.object({
   archivedAt: z.string()
     .describe('Timestamp when this session was archived and hidden from normal session lists.')
     .optional(),
+  lastUserActivityAt: z.string()
+    .describe('Most recent accepted user conversation activity; metadata changes do not advance it.')
+    .optional(),
   history: z.array(ChatMessageSchema).describe('Model-facing transcript retained for future turns.'),
   messages: z.array(ConversationLineSchema).describe('Host-facing visible conversation lines.'),
   turns: z.array(TurnSummarySchema).describe('Recent completed turn summaries shown in session detail surfaces.'),
@@ -448,6 +457,7 @@ export const ChatSessionRecordSchema = CatalogEntryWriteSchema
     archives: z.array(ChatArchiveRecordSchema).optional(),
     leaseEpoch: z.number().int().nonnegative().optional(),
     lease: ChatSessionLeaseSchema.optional(),
+    lastUserActivityAt: z.string().optional(),
     history: z.array(ChatMessageSchema),
     messages: z.array(ConversationLineSchema),
     turns: z.array(TurnSummarySchema),

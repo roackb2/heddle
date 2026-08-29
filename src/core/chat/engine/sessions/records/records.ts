@@ -6,6 +6,7 @@
  * session service can compose them without growing scattered helper functions.
  */
 import { truncate } from '@/core/utils/text.js';
+import dayjs from 'dayjs';
 import omit from 'lodash/omit.js';
 import type { ChatSession, ConversationLine } from '@/core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
@@ -15,6 +16,7 @@ import type {
   ApplyCompactedChatSessionHistoryInput,
   ApplyCompletedChatSessionTurnInput,
   BuildChatTurnSummaryInput,
+  ChatSessionResumeCandidate,
   CreateChatSessionRecordOptions,
   MarkAcceptedConversationUserMessageFailedInput,
   MarkAcceptedConversationUserMessageInput,
@@ -35,6 +37,7 @@ export class ChatSessionRecords {
       turns: [],
       createdAt: now,
       updatedAt: now,
+      lastUserActivityAt: undefined,
       model: options.model,
       reasoningEffort: options.reasoningEffort,
       driftEnabled: false,
@@ -49,6 +52,44 @@ export class ChatSessionRecords {
 
   static touch(session: ChatSession): ChatSession {
     return { ...session, updatedAt: new Date().toISOString() };
+  }
+
+  /**
+   * Advances conversation recency without letting metadata or delayed work
+   * rewrite the user's actual session order.
+   */
+  static markUserActivity(session: ChatSession, userActivityAt = new Date().toISOString()): ChatSession {
+    const normalized = ChatSessionRecords.normalizeUserActivityAt(userActivityAt);
+    const current = ChatSessionRecords.readTimestamp(session.lastUserActivityAt);
+    if (current !== undefined && current >= dayjs(normalized).valueOf()) {
+      return session;
+    }
+
+    return { ...session, lastUserActivityAt: normalized };
+  }
+
+  /** Pin state controls presentation only; resume selection follows user activity. */
+  static resolveResumeCandidate<T extends ChatSessionResumeCandidate>(sessions: readonly T[]): T | undefined {
+    const visible = sessions.filter((session) => !session.archivedAt);
+    const withUserActivity = visible.filter((session) => (
+      ChatSessionRecords.readTimestamp(session.lastUserActivityAt) !== undefined
+    ));
+    const candidates = withUserActivity.length > 0 ? withUserActivity : visible;
+    const useUserActivity = withUserActivity.length > 0;
+
+    return candidates.reduce<T | undefined>((latest, candidate) => {
+      if (!latest) {
+        return candidate;
+      }
+
+      const latestAt = ChatSessionRecords.readResumeTimestamp(latest, useUserActivity);
+      const candidateAt = ChatSessionRecords.readResumeTimestamp(candidate, useUserActivity);
+      if (candidateAt !== latestAt) {
+        return candidateAt > latestAt ? candidate : latest;
+      }
+
+      return candidate.id < latest.id ? candidate : latest;
+    }, undefined);
   }
 
   static summarize(session: ChatSession): string {
@@ -127,7 +168,7 @@ export class ChatSessionRecords {
     }
 
     return ChatSessionRecords.touch({
-      ...session,
+      ...ChatSessionRecords.markUserActivity(session, input.userActivityAt),
       messages: [
         ...session.messages.filter((candidate) => !ChatSessionRecords.isLiveMessage(candidate)),
         message,
@@ -181,6 +222,35 @@ export class ChatSessionRecords {
 
   private static acceptedUserMessageId(runId: string): string {
     return `accepted-user-${runId}`;
+  }
+
+  private static normalizeUserActivityAt(value: string): string {
+    const parsed = dayjs(value);
+    if (!parsed.isValid()) {
+      throw new Error('User activity timestamp must be a valid datetime.');
+    }
+    return parsed.toISOString();
+  }
+
+  private static readResumeTimestamp(
+    session: ChatSessionResumeCandidate,
+    useUserActivity: boolean,
+  ): number {
+    if (useUserActivity) {
+      return ChatSessionRecords.readTimestamp(session.lastUserActivityAt) ?? Number.NEGATIVE_INFINITY;
+    }
+
+    return ChatSessionRecords.readTimestamp(session.updatedAt)
+      ?? ChatSessionRecords.readTimestamp(session.createdAt)
+      ?? Number.NEGATIVE_INFINITY;
+  }
+
+  private static readTimestamp(value: string | undefined): number | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = dayjs(value);
+    return parsed.isValid() ? parsed.valueOf() : undefined;
   }
 
   private static isAcceptedUserMessage(message: ConversationLine): boolean {

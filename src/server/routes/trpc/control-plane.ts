@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { TRPCError } from '@trpc/server';
 import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { ModelOptionsService, ModelPolicyService } from '@/core/llm/models/index.js';
 import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
@@ -109,9 +110,11 @@ export const controlPlaneRouter = router({
   sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(async ({ ctx }) => {
     const requestWorkspace = ctx.requestWorkspace;
     const sessions = await controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs);
+    const permittedSessions = filterPermittedSessions(ctx, requestWorkspace.workspace.id, sessions);
     return {
       workspaceId: requestWorkspace.workspace.id,
-      sessions: filterPermittedSessions(ctx, requestWorkspace.workspace.id, sessions),
+      sessions: permittedSessions,
+      resumeSessionId: ChatSessionRecords.resolveResumeCandidate(permittedSessions)?.id,
     };
   }),
   sessionsEvents: controlPlaneWorkspaceProcedure.input(sessionsEventsInputSchema).subscription(({ ctx, signal }) => {

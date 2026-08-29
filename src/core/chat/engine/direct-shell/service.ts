@@ -9,6 +9,7 @@
  */
 import { HeddleEventType } from '@/core/event-types.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatMessage } from '@/core/llm/types.js';
 import type { ConversationDirectShellLineResult } from '@/core/chat/types.js';
 import {
@@ -89,8 +90,9 @@ export class ConversationDirectShellService {
 
     const session = await input.sessions.require(input.sessionId);
     const shellDisplay = `!${command}`;
+    const userActivityAt = new Date().toISOString();
     await input.sessions.updateWithLease(input.sessionId, input.leaseClaim, (current) => ({
-      ...current,
+      ...ChatSessionRecords.markUserActivity(current, userActivityAt),
       messages: [
         ...current.messages,
         {

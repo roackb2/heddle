@@ -219,11 +219,11 @@ export class AskCliV2CommandEdgeService {
     }
 
     if (selection.latestSession) {
-      const latest = (await sessionApi.listSessions(workspaceId))[0];
-      if (!latest) {
+      const resumeSessionId = (await sessionApi.readSessions(workspaceId)).resumeSessionId;
+      if (!resumeSessionId) {
         throw new Error('No saved chat sessions are available yet. Use --new-session to create one first.');
       }
-      return latest.id;
+      return resumeSessionId;
     }
 
     const created = await sessionApi.createSession(workspaceId, {

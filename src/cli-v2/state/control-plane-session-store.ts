@@ -200,8 +200,8 @@ export class ControlPlaneSessionStore {
         this.workspaceChanges.refresh(workspaceId),
       ]);
       this.subscriptions.subscribeToSessionList(workspaceId);
-      const sessions = await this.refreshSessions();
-      const sessionId = input.sessionId ?? sessions[0]?.id ?? (await this.createSession()).id;
+      const catalog = await this.loader.refreshSessionCatalog();
+      const sessionId = input.sessionId ?? catalog.resumeSessionId ?? (await this.createSession()).id;
       await this.selectSession(sessionId);
     } catch (error) {
       this.state.patch({ error: formatError(error), loading: false });

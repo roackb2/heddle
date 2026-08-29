@@ -54,6 +54,8 @@ export class EngineConversationTurnService implements ConversationTurnService {
   }
 
   async submit(input: SubmitConversationTurnInput): Promise<SubmitConversationTurnResult> {
+    const userActivityAt = input.userActivityAt ?? new Date().toISOString();
+    await this.sessions.markUserActivity(input.sessionId, userActivityAt);
     const normalizedHost = ConversationEngineHostNormalizer.normalize(input.host);
     const runtimeConfigInput: TurnRuntimeConfigInput = this.config;
     const turnInput: TurnSubmitInput = input;

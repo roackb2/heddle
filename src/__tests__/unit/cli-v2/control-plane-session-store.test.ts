@@ -52,6 +52,53 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('opens the server-selected recent conversation instead of the first pinned row', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionsQuery.mockResolvedValueOnce({
+      workspaceId: 'workspace-1',
+      resumeSessionId: 'session-recent',
+      sessions: [
+        {
+          id: 'session-pinned',
+          name: 'Pinned shortcut',
+          workspaceId: 'workspace-1',
+          pinned: true,
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+        {
+          id: 'session-recent',
+          name: 'Recent work',
+          workspaceId: 'workspace-1',
+          pinned: false,
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+      ],
+    });
+    fixture.calls.sessionQuery.mockResolvedValueOnce({
+      ...createSessionDetail(),
+      id: 'session-recent',
+      name: 'Recent work',
+    });
+    fixture.calls.sessionRuntimeContextQuery.mockResolvedValueOnce(createRuntimeContext({
+      sessionId: 'session-recent',
+      sessionName: 'Recent work',
+    }));
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+    await store.start();
+
+    expect(fixture.calls.sessionQuery).toHaveBeenCalledWith({
+      id: 'session-recent',
+      workspaceId: 'workspace-1',
+    });
+    expect(store.getSnapshot().activeSessionId).toBe('session-recent');
+    store.dispose();
+  });
+
   it('refreshes the canonical workspace change list after a live workspace-changing activity', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
@@ -1291,7 +1338,11 @@ function createClientFixture(options: {
   let runSequence = 0;
   const calls = {
     stateQuery: vi.fn(async () => ({ activeWorkspaceId: 'workspace-1', workspaces: [] })),
-    sessionsQuery: vi.fn(async () => ({ workspaceId: 'workspace-1', sessions: [sessionView] })),
+    sessionsQuery: vi.fn(async () => ({
+      workspaceId: 'workspace-1',
+      sessions: [sessionView],
+      resumeSessionId: sessionView.id,
+    })),
     sessionQuery: vi.fn(async () => sessionDetail),
     sessionRunningQuery: vi.fn(async () => ({ running: false })),
     sessionRunStateQuery: vi.fn(async () => ({ running: false, activeRun: null, pendingApproval })),

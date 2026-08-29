@@ -543,8 +543,10 @@ describe('createConversationEngine', () => {
     const first = await engine.sessions.create({ id: 'session-a', name: 'First' });
     const second = await engine.sessions.create({ id: 'session-b', name: 'Second' });
 
-    expect((await engine.sessions.list()).map((session) => session.id)).toEqual(['session-b', 'session-a']);
-    expect((await engine.sessions.latest())?.id).toBe((await engine.sessions.list())[0]?.id);
+    const listedSessionIds = (await engine.sessions.list()).map((session) => session.id);
+    expect(listedSessionIds).toHaveLength(2);
+    expect(listedSessionIds).toEqual(expect.arrayContaining(['session-a', 'session-b']));
+    expect((await engine.sessions.latest())?.id).toBe(listedSessionIds[0]);
     await expect(engine.sessions.read('missing')).resolves.toBeUndefined();
     expect((await engine.sessions.require(first.id)).id).toBe(first.id);
     await expect(engine.sessions.require('missing')).rejects.toThrow('Chat session not found: missing');
@@ -576,6 +578,36 @@ describe('createConversationEngine', () => {
     await expect(engine.sessions.delete('session-1')).resolves.toBe(true);
     await expect(engine.sessions.delete('missing')).resolves.toBe(false);
     expect((await listChatSessionCatalog(sessionRepository)).map((session) => session.id)).toEqual(['session-1']);
+  });
+
+  it('resumes the most recently used conversation without changing pinned-first list order', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-resume-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const pinned = await engine.sessions.create({ id: 'session-pinned', name: 'Pinned' });
+    const recent = await engine.sessions.create({ id: 'session-recent', name: 'Recent work' });
+
+    await engine.turns.submit({
+      sessionId: recent.id,
+      prompt: 'Continue this work next time.',
+      userActivityAt: '2026-08-29T10:00:00.000Z',
+    });
+    await engine.sessions.setPinned(pinned.id, true);
+    await engine.sessions.rename(pinned.id, 'Pinned shortcut');
+
+    expect((await engine.sessions.list()).map((session) => session.id)).toEqual([
+      pinned.id,
+      recent.id,
+    ]);
+    await expect(engine.sessions.latest()).resolves.toMatchObject({
+      id: recent.id,
+      lastUserActivityAt: '2026-08-29T10:00:00.000Z',
+    });
   });
 
   it('updates shared session settings for TUI and control-plane clients', async () => {

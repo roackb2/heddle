@@ -162,6 +162,8 @@ export type QueuedConversationPrompt = {
   agentSnapshot?: CustomAgentExecutionSnapshot;
   systemContext?: string;
   delegation?: ConversationDelegationMode;
+  /** User activity time retained when queued work is retried or drained later. */
+  userActivityAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -178,6 +180,8 @@ export type ChatSession = {
   turns: TurnSummary[];
   createdAt: string;
   updatedAt: string;
+  /** Most recent accepted user conversation activity; metadata changes do not advance it. */
+  lastUserActivityAt?: string;
   model?: string;
   reasoningEffort?: ReasoningEffort;
   driftEnabled?: boolean;
