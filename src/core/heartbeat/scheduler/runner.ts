@@ -70,6 +70,8 @@ export class HeartbeatTaskRunnerService {
       runAt: Date;
       /** `due` requires the durable store to re-check eligibility while claiming. */
       claimMode?: HeartbeatTaskClaimMode;
+      /** Exact interrupted execution consumed only by `claimMode: 'recovery'`. */
+      recoveryOfExecutionId?: string;
     },
   ): Promise<HeartbeatTaskExecutionResult> {
     HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
@@ -96,6 +98,7 @@ export class HeartbeatTaskRunnerService {
       loadedCheckpoint,
       claimedAt: runAt,
       claimMode: options.claimMode,
+      recoveryOfExecutionId: options.recoveryOfExecutionId,
     });
     if (claim.status !== 'claimed') {
       return HeartbeatTaskRunnerService.claimResult(task.id, claim);
@@ -611,6 +614,14 @@ export class HeartbeatTaskRunnerService {
         status: 'not-due',
         taskId,
         nextRunAt: claim.task.schedule.nextRunAt,
+        failed: false,
+      };
+    }
+    if (claim.status === 'admission-closed') {
+      return {
+        status: 'admission-closed',
+        taskId,
+        target: claim.target,
         failed: false,
       };
     }

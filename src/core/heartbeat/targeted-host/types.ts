@@ -74,7 +74,11 @@ export type HeartbeatTargetedTaskDispatcherOptions = {
   invocationTimeoutMs: number;
   /** Retry delay only for transient ownership contention. */
   contentionRetryMs?: number;
-  /** Durable product/operator gate. Errors fail closed. */
+  /**
+   * Best-effort dispatch precheck used to avoid unnecessary polling/invocation.
+   * Errors fail closed locally, but the store's atomic task claim remains the
+   * durable admission authority.
+   */
   isAdmissionEnabled?: () => boolean | Promise<boolean>;
   now?: () => Date;
   createInvocationId?: (

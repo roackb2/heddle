@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import {
+  type HeartbeatAdmissionDecision,
   MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
   MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
 } from './types.js';
@@ -16,6 +17,44 @@ export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', '
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
 export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
 export const HeartbeatTaskRecoveryReasonSchema = z.enum(['host-restart', 'operator']);
+export const HeartbeatAdmissionDecisionSchema = z.enum(['ready', 'closed']);
+export const HeartbeatAdmissionGroupIdSchema = z.string()
+  .refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.')
+  .refine(
+    (value) => value === value.trim(),
+    'Admission group id cannot contain leading or trailing whitespace.',
+  );
+
+function isAdmissionGroupRecord(value: unknown): value is Record<string, HeartbeatAdmissionDecision> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype !== null && prototype !== Object.prototype) {
+    return false;
+  }
+  return Object.entries(value).every(([groupId, decision]) =>
+    HeartbeatAdmissionGroupIdSchema.safeParse(groupId).success
+    && HeartbeatAdmissionDecisionSchema.safeParse(decision).success);
+}
+
+export const HeartbeatAdmissionTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('namespace') }),
+  z.object({
+    kind: z.literal('group'),
+    groupId: HeartbeatAdmissionGroupIdSchema,
+  }),
+]);
+const HeartbeatAdmissionGroupsSchema = z.custom<Record<string, HeartbeatAdmissionDecision>>(
+  isAdmissionGroupRecord,
+  { message: 'Admission groups must map valid opaque ids to ready or closed.' },
+).transform((groups) => Object.fromEntries(Object.entries(groups)));
+
+export const HeartbeatAdmissionStateSchema = z.object({
+  version: z.literal(1),
+  namespace: HeartbeatAdmissionDecisionSchema.optional(),
+  groups: HeartbeatAdmissionGroupsSchema,
+});
 
 const HeartbeatTaskExecutionSchema = z.object({
   executionId: z.string().describe('Fencing token for the currently owned execution attempt.'),
@@ -34,8 +73,16 @@ const HeartbeatTaskRunRequestSchema = z.object({
 const HeartbeatTaskRecoverySchema = z.object({
   interruptedExecutionId: z.string().describe('Fencing token of the interrupted execution.'),
   interruptedOwnerId: z.string().describe('Scheduler owner whose execution was interrupted.'),
+  interruptedRunRequestGeneration: z.number().int().nonnegative().optional()
+    .describe('Run-request generation already owned by the interrupted execution.'),
   recoveredAt: z.string().describe('Timestamp when the task became retryable again.'),
   reason: HeartbeatTaskRecoveryReasonSchema.describe('Host-owned reason for recovering the execution.'),
+  replacementStatus: z.enum(['pending', 'claimed']).optional()
+    .describe('Whether this current-format recovery still authorizes one exact replacement.'),
+  replacementExecutionId: z.string().optional()
+    .describe('Single replacement execution that atomically consumed this recovery.'),
+  replacementClaimedAt: z.string().optional()
+    .describe('Timestamp when the replacement execution consumed this recovery.'),
 });
 
 export const HeartbeatTaskExecutionOutcomeSchema = z.object({
@@ -52,6 +99,9 @@ export const HeartbeatTaskExecutionOutcomeSchema = z.object({
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),
   workspaceId: z.string().optional().describe('Workspace identifier this task belongs to.'),
+  admissionGroupId: HeartbeatAdmissionGroupIdSchema
+    .optional()
+    .describe('Opaque admission group checked in addition to namespace admission.'),
   task: z.string().describe('Durable task instruction the heartbeat should pursue.'),
   name: z.string().optional().describe('Human-facing task label.'),
   enabled: z.boolean().describe('Whether the scheduler may run this task.'),

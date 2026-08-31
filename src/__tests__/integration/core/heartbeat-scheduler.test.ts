@@ -470,6 +470,7 @@ describe('heartbeat scheduler', () => {
     const checkpoint = createHeartbeatResult('pause').checkpoint;
     const task: HeartbeatTask = {
       id: 'retry-me',
+      admissionGroupId: 'recovery-group',
       task: 'Retry after restart.',
       enabled: true,
       schedule: { intervalMs: 60_000 },
@@ -485,6 +486,8 @@ describe('heartbeat scheduler', () => {
     };
     await store.saveTask(task);
     await store.saveCheckpoint(task, checkpoint);
+    await store.setAdmissionDecision({ kind: 'group', groupId: 'recovery-group' }, 'closed');
+    await store.setAdmissionDecision({ kind: 'namespace' }, 'closed');
     const controller = new AbortController();
     const events: HeartbeatSchedulerEvent[] = [];
     let runnerCalls = 0;
@@ -519,6 +522,14 @@ describe('heartbeat scheduler', () => {
       type: 'heartbeat.task.recovered',
       interruptedExecutionId: 'interrupted-execution',
       interruptedOwnerId: 'interrupted-worker',
+    });
+    await expect(store.loadTask(task.id)).resolves.toMatchObject({
+      state: {
+        recovery: {
+          interruptedExecutionId: 'interrupted-execution',
+          replacementExecutionId: expect.any(String),
+        },
+      },
     });
     await expect(store.listRunRecords()).resolves.toHaveLength(1);
   });
@@ -594,8 +605,21 @@ describe('heartbeat scheduler', () => {
       execution: replacementExecution,
       loadedCheckpoint: false,
       claimedAt: NOW,
+      claimMode: 'recovery',
+      recoveryOfExecutionId: originalExecution.executionId,
     });
     expect(replacementClaim.status).toBe('claimed');
+    expect(replacementClaim).toMatchObject({
+      status: 'claimed',
+      task: {
+        state: {
+          recovery: {
+            replacementStatus: 'claimed',
+            replacementExecutionId: replacementExecution.executionId,
+          },
+        },
+      },
+    });
 
     const lateResult = createHeartbeatResult('continue');
     await expect(store.completeTaskExecution({

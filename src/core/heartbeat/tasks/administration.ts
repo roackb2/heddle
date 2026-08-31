@@ -5,6 +5,7 @@ export type CreateHeartbeatTaskInput = {
   workspaceId?: string;
   id?: string;
   name?: string;
+  admissionGroupId?: string;
   task: string;
   enabled?: boolean;
   continuationMode?: HeartbeatTask['continuationMode'];
@@ -20,6 +21,8 @@ export type CreateHeartbeatTaskInput = {
 
 export type UpdateHeartbeatTaskInput = {
   name?: string;
+  /** Set `null` to return this task to namespace-only admission. */
+  admissionGroupId?: string | null;
   task?: string;
   enabled?: boolean;
   continuationMode?: HeartbeatTask['continuationMode'];

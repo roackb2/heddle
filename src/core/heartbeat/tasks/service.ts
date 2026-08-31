@@ -12,7 +12,14 @@ import type {
   UpdateHeartbeatTaskInput,
 } from './administration.js';
 import { HeartbeatTaskControlPolicy } from './control-policy.js';
-import { FileHeartbeatTaskRepository } from './repository.js';
+import {
+  FileHeartbeatTaskRepository,
+  type FileHeartbeatAdmissionState,
+} from './repository.js';
+import {
+  HeartbeatAdmissionDecisionSchema,
+  HeartbeatAdmissionTargetSchema,
+} from './schemas.js';
 import { HeartbeatTaskExecutionEligibilityPolicy } from './execution-eligibility.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
 import {
@@ -21,7 +28,10 @@ import {
 } from './types.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
+  HeartbeatAdmissionDecision,
+  HeartbeatAdmissionTarget,
   HeartbeatTask,
+  HeartbeatTaskAdmissionControl,
   HeartbeatTaskExecution,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
@@ -51,7 +61,10 @@ export type {
  * run records, and operator-facing task/run projections. Hosts should call this
  * service, not the file repository.
  */
-export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, HeartbeatTaskAdministrationService {
+export class FileHeartbeatTaskService implements
+  HeartbeatTargetedTaskStore,
+  HeartbeatTaskAdministrationService,
+  HeartbeatTaskAdmissionControl {
   private static readonly mutationMutexes = new Map<string, Mutex>();
   private static readonly activeExecutions = new Set<string>();
   private static readonly runRequestEventBuses = new Map<string, EventEmitter>();
@@ -81,6 +94,41 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, Hea
 
   async saveTask(task: HeartbeatTask) {
     await this.mutationMutex.runExclusive(async () => await this.repository.saveTask(task));
+  }
+
+  async readAdmissionDecision(target: HeartbeatAdmissionTarget): Promise<HeartbeatAdmissionDecision> {
+    const parsedTarget = HeartbeatAdmissionTargetSchema.parse(target) as HeartbeatAdmissionTarget;
+    return await this.mutationMutex.runExclusive(async () => {
+      const state = await this.repository.loadAdmissionState();
+      return FileHeartbeatTaskService.resolveAdmissionDecision(state, parsedTarget);
+    });
+  }
+
+  /**
+   * Changes only future claim eligibility. Already claimed work keeps its
+   * fencing token and must be cancelled or drained through an explicit host
+   * operation.
+   */
+  async setAdmissionDecision(
+    target: HeartbeatAdmissionTarget,
+    decision: HeartbeatAdmissionDecision,
+  ): Promise<void> {
+    const parsedTarget = HeartbeatAdmissionTargetSchema.parse(target) as HeartbeatAdmissionTarget;
+    const parsedDecision = HeartbeatAdmissionDecisionSchema.parse(decision);
+    await this.mutationMutex.runExclusive(async () => {
+      const current = await this.repository.loadAdmissionState();
+      const next: FileHeartbeatAdmissionState = parsedTarget.kind === 'namespace' ? {
+        ...current,
+        namespace: parsedDecision,
+      } : {
+        ...current,
+        groups: Object.fromEntries([
+          ...Object.entries(current.groups),
+          [parsedTarget.groupId, parsedDecision],
+        ]),
+      };
+      await this.repository.saveAdmissionState(next);
+    });
   }
 
   async loadCheckpoint(task: HeartbeatTask) {
@@ -145,6 +193,7 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, Hea
    * implementation uses database compare-and-swap or leases.
    */
   async claimTaskExecution(input: Parameters<HeartbeatTargetedTaskStore['claimTaskExecution']>[0]) {
+    FileHeartbeatTaskService.assertRecoveryClaimInput(input);
     return await this.mutationMutex.runExclusive(async () => {
       const task = await this.findTask(input.taskId);
       if (!task) {
@@ -156,7 +205,8 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, Hea
       if (task.state?.status === 'running') {
         return { status: 'busy' } as const;
       }
-      if (input.claimMode === 'due') {
+      const claimMode = input.claimMode ?? 'any';
+      if (claimMode !== 'any') {
         const eligibility = HeartbeatTaskExecutionEligibilityPolicy.evaluate(task, input.claimedAt);
         if (!eligibility.eligible) {
           if (eligibility.reason === 'not-due') {
@@ -166,11 +216,27 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, Hea
         }
       }
 
+      const recoveryOfExecutionId = claimMode === 'recovery' ? input.recoveryOfExecutionId : undefined;
+      if (
+        recoveryOfExecutionId
+        && HeartbeatTaskStateProjector.pendingRecoveryExecutionId(task) !== recoveryOfExecutionId
+      ) {
+        return { status: 'not-due', task } as const;
+      }
+      if (!recoveryOfExecutionId) {
+        const admissionState = await this.repository.loadAdmissionState();
+        const closedTarget = FileHeartbeatTaskService.resolveClosedAdmissionTarget(task, admissionState);
+        if (closedTarget) {
+          return { status: 'admission-closed', target: closedTarget } as const;
+        }
+      }
+
       const runningTask = HeartbeatTaskStateProjector.markRunning({
         task,
         now: input.claimedAt,
         loadedCheckpoint: input.loadedCheckpoint,
         execution: input.execution,
+        recoveryOfExecutionId,
       });
       await this.repository.saveTask(runningTask);
       FileHeartbeatTaskService.activeExecutions.add(this.executionKey(input.execution));
@@ -609,6 +675,46 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, Hea
     const eventBus = new EventEmitter();
     FileHeartbeatTaskService.runRequestEventBuses.set(heartbeatRoot, eventBus);
     return eventBus;
+  }
+
+  private static resolveClosedAdmissionTarget(
+    task: HeartbeatTask,
+    state: FileHeartbeatAdmissionState,
+  ): HeartbeatAdmissionTarget | undefined {
+    const namespace = { kind: 'namespace' } as const;
+    if (FileHeartbeatTaskService.resolveAdmissionDecision(state, namespace) === 'closed') {
+      return namespace;
+    }
+    if (!task.admissionGroupId) {
+      return undefined;
+    }
+
+    const group = { kind: 'group', groupId: task.admissionGroupId } as const;
+    return FileHeartbeatTaskService.resolveAdmissionDecision(state, group) === 'closed' ? group : undefined;
+  }
+
+  private static assertRecoveryClaimInput(
+    input: Parameters<HeartbeatTargetedTaskStore['claimTaskExecution']>[0],
+  ): void {
+    if (input.claimMode === 'recovery' && !input.recoveryOfExecutionId) {
+      throw new Error('Heartbeat recovery claims require recoveryOfExecutionId.');
+    }
+    if (input.claimMode !== 'recovery' && input.recoveryOfExecutionId !== undefined) {
+      throw new Error('recoveryOfExecutionId is valid only for a heartbeat recovery claim.');
+    }
+  }
+
+  private static resolveAdmissionDecision(
+    state: FileHeartbeatAdmissionState,
+    target: HeartbeatAdmissionTarget,
+  ): HeartbeatAdmissionDecision {
+    if (target.kind === 'namespace') {
+      return state.namespace ?? 'ready';
+    }
+    if (!Object.hasOwn(state.groups, target.groupId)) {
+      return 'closed';
+    }
+    return state.groups[target.groupId] ?? 'closed';
   }
 
   private static withLegacyExecution(task: HeartbeatTask): HeartbeatTask {

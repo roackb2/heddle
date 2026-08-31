@@ -3,6 +3,7 @@ import {
   FileHeartbeatTaskService,
   HeartbeatTaskControlPolicy,
   type HeartbeatTask,
+  type HeartbeatTaskAdmissionControl,
   type HeartbeatTaskAdministrationService,
 } from '../../../advanced.js';
 
@@ -13,6 +14,7 @@ describe('HeartbeatTaskControlPolicy', () => {
     const task = HeartbeatTaskControlPolicy.createTask({
       input: {
         name: 'Weekly Digest',
+        admissionGroupId: 'publisher-a',
         task: '  Summarize the week.  ',
         intervalMs: 60_000,
         defer: false,
@@ -24,6 +26,7 @@ describe('HeartbeatTaskControlPolicy', () => {
     expect(task).toMatchObject({
       id: 'weekly-digest-2',
       name: 'Weekly Digest',
+      admissionGroupId: 'publisher-a',
       task: 'Summarize the week.',
       enabled: true,
       continuationMode: 'operator',
@@ -41,6 +44,16 @@ describe('HeartbeatTaskControlPolicy', () => {
       existingTasks: [createTask({ id: 'weekly-digest' })],
       now: NOW,
     })).toThrow(/already exists/i);
+    expect(() => HeartbeatTaskControlPolicy.createTask({
+      input: { task: 'Invalid group.', admissionGroupId: '   ' },
+      existingTasks: [],
+      now: NOW,
+    })).toThrow(/group id cannot be blank/i);
+    expect(() => HeartbeatTaskControlPolicy.createTask({
+      input: { task: 'Non-canonical group.', admissionGroupId: ' publisher-a ' },
+      existingTasks: [],
+      now: NOW,
+    })).toThrow(/leading or trailing whitespace/i);
   });
 
   it('updates the latest running task without erasing its claim or pending request', () => {
@@ -89,6 +102,18 @@ describe('HeartbeatTaskControlPolicy', () => {
     expect(disabled.schedule.nextRunAt).toBeUndefined();
     expect(disabled.state?.execution?.executionId).toBe('execution-live');
     expect(disabled.state?.runRequest).toMatchObject({ generation: 2, claimedGeneration: 2 });
+
+    const grouped = HeartbeatTaskControlPolicy.updateTask({
+      task: updated,
+      input: { admissionGroupId: 'publisher-b' },
+      now: NOW,
+    });
+    expect(grouped.admissionGroupId).toBe('publisher-b');
+    expect(HeartbeatTaskControlPolicy.updateTask({
+      task: grouped,
+      input: { admissionGroupId: null },
+      now: NOW,
+    }).admissionGroupId).toBeUndefined();
   });
 
   it('projects pause and resume semantics including blocked-task protection', () => {
@@ -192,7 +217,11 @@ describe('HeartbeatTaskControlPolicy', () => {
     const service: HeartbeatTaskAdministrationService = new FileHeartbeatTaskService({
       dir: '/tmp/heddle-heartbeat-administration-contract',
     });
+    const admission: HeartbeatTaskAdmissionControl = new FileHeartbeatTaskService({
+      dir: '/tmp/heddle-heartbeat-admission-contract',
+    });
     expect(service).toBeInstanceOf(FileHeartbeatTaskService);
+    expect(admission).toBeInstanceOf(FileHeartbeatTaskService);
   });
 });
 

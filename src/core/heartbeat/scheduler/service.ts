@@ -12,6 +12,7 @@ import pLimit from 'p-limit';
 import {
   FileHeartbeatTaskService,
   HeartbeatTaskExecutionEligibilityPolicy,
+  HeartbeatTaskStateProjector,
   type HeartbeatTask,
   type HeartbeatTaskRunRecord,
   type HeartbeatTaskRunRequestSignal,
@@ -176,7 +177,7 @@ export class HeartbeatSchedulerService {
       ...options,
       task,
       runAt: now,
-      claimMode: 'due',
+      ...HeartbeatSchedulerService.resolveDurableClaim(task),
     });
   }
 
@@ -214,7 +215,7 @@ export class HeartbeatSchedulerService {
             executionOwnerId,
             task,
             runAt: now,
-            claimMode: 'due',
+            ...HeartbeatSchedulerService.resolveDurableClaim(task),
             signal: HeartbeatSchedulerService.composeExecutionSignal(options.signal, taskSignal),
           });
         };
@@ -350,6 +351,17 @@ export class HeartbeatSchedulerService {
     }
 
     return dayjs(task.schedule.nextRunAt).valueOf();
+  }
+
+  private static resolveDurableClaim(task: HeartbeatTask): {
+    claimMode: 'due' | 'recovery';
+    recoveryOfExecutionId?: string;
+  } {
+    const recoveryOfExecutionId = HeartbeatTaskStateProjector.pendingRecoveryExecutionId(task);
+    return recoveryOfExecutionId ? {
+      claimMode: 'recovery',
+      recoveryOfExecutionId,
+    } : { claimMode: 'due' };
   }
 
   private static resolveMaxConcurrentTasks(value: number | undefined): number {

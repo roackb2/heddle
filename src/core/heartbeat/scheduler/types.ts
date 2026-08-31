@@ -12,6 +12,7 @@ export {
   MAX_HEARTBEAT_HANDLER_RETRY_MS,
 } from '../tasks/types.js';
 import type {
+  HeartbeatAdmissionTarget,
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
   HeartbeatTaskNonAgentRunRecord,
@@ -315,6 +316,7 @@ export type HeartbeatTaskExecutionResult = {
     }
   | { status: 'failed'; executionId: string; error: string; task: HeartbeatTask; failed: true }
   | { status: 'not-found' | 'disabled' | 'busy'; failed: false }
+  | { status: 'admission-closed'; target: HeartbeatAdmissionTarget; failed: false }
   | { status: 'not-due'; nextRunAt?: string; failed: false }
   | { status: 'claim-lost'; executionId: string; failed: false }
   | { status: 'cancelled'; executionId?: string; record?: HeartbeatTaskRunRecord; failed: false }

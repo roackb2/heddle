@@ -29,7 +29,11 @@ operator-facing heartbeat views.
   `FileHeartbeatTaskRepository`. It also owns process-local execution claims,
   recovery of interrupted single-host executions, fencing of late completion/
   failure/outcome writes, durable run-request generations, and the file
-  adapter's process-local scheduler wake signal. `HeartbeatTaskStateProjector`
+  adapter's process-local scheduler wake signal. The separate
+  `HeartbeatTaskAdmissionControl` port exposes only the durable binary
+  `ready | closed` projection for the namespace and one optional opaque task
+  group. The final claim checks that projection under the same mutation
+  boundary. `HeartbeatTaskStateProjector`
   owns task state transitions after agent success, no-work skip, cancellation,
   failure, request, claim, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
@@ -66,6 +70,10 @@ operator-facing heartbeat views.
   persistence. Those stay in `src/core/chat`.
 - CLI, server, web, or TUI presentation. Those surfaces should call this domain
   through typed heartbeat entry points.
+- Hosted admission orchestration such as desired state, preparing/blocked
+  phases, transition IDs, retries, restart reconciliation, or product-owned
+  resume preparation. A hosted adapter projects that richer lifecycle into
+  Heddle's binary claim decision.
 
 ## Boundary Notes
 
@@ -84,6 +92,25 @@ operator-facing heartbeat views.
 - Execution settlement must read and project from the latest stored task inside
   the same atomic store transition. Saving a projection derived from the
   pre-run snapshot can erase newer run requests or operator control changes.
+- A fresh final claim is eligible only when the task is enabled, its `due`
+  schedule is eligible (unless explicit `any` run-now mode is used), namespace
+  admission is `ready`, and its optional assigned group is `ready`. Missing
+  namespace state defaults to `ready` for legacy ungrouped tasks; a missing
+  assigned-group state defaults to `closed`. Namespace admission is the global
+  fresh-work circuit breaker. It is not a zero-execution stop because exact
+  recovery can continue already admitted work. Group admission is one flat
+  opaque scope, not a hierarchy, quota, or fairness mechanism.
+- `HeartbeatTaskAdmissionControl.setAdmissionDecision()` must serialize with
+  `claimTaskExecution()`. Closing admission prevents only fresh logical work.
+  `claimMode: 'recovery'` may bypass both closed scopes only when
+  `recoveryOfExecutionId` atomically matches the current unconsumed durable
+  recovery marker. The replacement consumes that marker once, inherits the
+  interrupted run-request correlation, and does not consume a newer request.
+  Caller-supplied, stale, legacy diagnostic, or already-consumed recovery IDs
+  cannot bypass admission. Closing admission otherwise does not disable tasks,
+  change due timestamps, consume run requests, alter
+  checkpoints, cancel active executions, or drain a worker. Use explicit host
+  pause, drain, or cancellation when no execution may proceed.
 - Custom adapters should use the public `HeartbeatTaskStateProjector` exported
   from `@heddleagent/runtime/advanced` for normalization, request, claim,
   settlement, and recovery transitions. The adapter still owns the backend
@@ -107,7 +134,8 @@ operator-facing heartbeat views.
   `loadTask(taskId)` resolves that task directly rather than scanning a global
   catalog. The method reads durable eligibility and makes the final due claim
   through the store; its typed result distinguishes settlement, normal failure,
-  missing/disabled/not-due/busy work, a lost claim, and cancellation.
+  missing/disabled/not-due/busy work, `admission-closed` with the blocking
+  target, a lost claim, and cancellation.
 - The one-shot `runTask()` method does not scan unrelated tasks, poll, subscribe,
   or recover interrupted executions. `HeartbeatTargetedTaskHost` is the
   low-volume in-process default around that primitive: it owns notification
@@ -117,7 +145,7 @@ operator-facing heartbeat views.
   host-domain idempotency remain host responsibilities. The store's atomic
   claim fences duplicate at-least-once worker deliveries; it does not make host
   tool side effects exactly once.
-- The file service serializes task/checkpoint/run mutations with a shared
+- The file service serializes task/checkpoint/run/admission mutations with a shared
   in-process mutex for one resolved heartbeat root. Task, checkpoint, and run
   JSON files are replaced atomically, so readers see a complete previous or next
   document rather than a partial write. Concurrent
@@ -130,11 +158,14 @@ operator-facing heartbeat views.
   latency; polling remains the restart fallback. This is reliable for one Node.js
   process owning a state root; it is not a distributed lease. Multiple processes
   or replicas must provide a remote
-  `HeartbeatTaskStore` that implements atomic claim, fencing, and recovery with
+  `HeartbeatTaskStore` plus `HeartbeatTaskAdmissionControl` implementations that
+  serialize admission changes with atomic claim, fencing, and recovery through
   database compare-and-swap, leases, or transactions.
 - Recovery preserves the latest checkpoint and run history, records the
-  interrupted execution identity under `task.state.recovery`, and makes an
-  enabled task immediately due. It does not record success or roll back host
+  interrupted execution identity plus a pending single-use replacement marker
+  under `task.state.recovery`, and makes an enabled task immediately due. A
+  missing marker on a legacy recovery record is diagnostic only and authorizes
+  no bypass. Recovery does not record success or roll back host
   domain side effects; host tools remain responsible for idempotent mutations.
 - Recovery is a lifecycle policy, not a consequence of receiving a different
   `ownerId`. The built-in file adapter can recover an execution only when its
@@ -144,10 +175,16 @@ operator-facing heartbeat views.
   final writes remain fenced after an explicit recovery.
 - Custom remote adapters should run the executable contract scenarios from
   `@heddleagent/runtime/heartbeat/testing` against two fresh store instances sharing
-  one backend namespace. Required scenarios cover exact lookup, atomic due
-  claims, coalesced requests, settlement, recovery, and stale-write fencing;
-  history and subscription checks are capability-gated. The harness owns a
-  fixture-only hook for expiring a lease or simulating a dead prior process.
+  one backend namespace. Baseline scenarios cover exact lookup, atomic due
+  claims, coalesced requests, settlement, recovery, and stale-write fencing.
+  Supplying the optional `createAdmissionControl` harness port additionally
+  certifies fail-closed group state, close-vs-claim linearization, active-claim
+  survival, exact crash replacement through closed admission, stale recovery
+  rejection, newer-request preservation, and unrelated-group progress. This
+  keeps existing namespace-only harnesses source-compatible without treating
+  them as scoped-admission proof; history and subscription checks are
+  capability-gated. The harness owns a fixture-only hook for expiring a lease
+  or simulating a dead prior process.
   Passing the suite does not certify host queue delivery or exactly-once domain
   effects.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
