@@ -708,8 +708,13 @@ export class FileHeartbeatTaskService implements
     state: FileHeartbeatAdmissionState,
     target: HeartbeatAdmissionTarget,
   ): HeartbeatAdmissionDecision {
-    return target.kind === 'namespace' ? state.namespace ?? 'ready'
-      : state.groups[target.groupId] ?? 'closed';
+    if (target.kind === 'namespace') {
+      return state.namespace ?? 'ready';
+    }
+    if (!Object.hasOwn(state.groups, target.groupId)) {
+      return 'closed';
+    }
+    return state.groups[target.groupId] ?? 'closed';
   }
 
   private static withLegacyExecution(task: HeartbeatTask): HeartbeatTask {

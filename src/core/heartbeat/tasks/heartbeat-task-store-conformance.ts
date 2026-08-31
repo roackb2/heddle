@@ -447,6 +447,56 @@ export class HeartbeatTaskStoreConformance {
       await admission.readAdmissionDecision(groupA) === 'closed',
       'an absent assigned group must fail closed',
     );
+    const prototypeNamedGroups = ['constructor', 'toString', '__proto__'] as const;
+    for (const [index, groupId] of prototypeNamedGroups.entries()) {
+      const target = { kind: 'group', groupId } as const;
+      assert(
+        await admission.readAdmissionDecision(target) === 'closed',
+        `an absent group named ${groupId} must not resolve through inherited object properties`,
+      );
+      const task = createGroupedTask(`admission-prototype-name-${groupId}`, target);
+      await first.saveTask(task);
+      const claim = await first.claimTaskExecution({
+        taskId: task.id,
+        execution: createExecution(`prototype-name-execution-${index}`, 'owner-a', harness),
+        loadedCheckpoint: false,
+        claimedAt: at(harness, 500),
+        claimMode: 'due',
+      });
+      assertAdmissionClosed(claim, target, `an absent group named ${groupId} must fail closed at claim time`);
+    }
+    const protoTarget = { kind: 'group', groupId: '__proto__' } as const;
+    await admission.setAdmissionDecision(protoTarget, 'ready');
+    assert(
+      await admission.readAdmissionDecision(protoTarget) === 'ready',
+      'an explicit __proto__ group decision must survive durable serialization as an own property',
+    );
+    assert(
+      await admission.readAdmissionDecision({ kind: 'group', groupId: 'constructor' }) === 'closed',
+      'writing __proto__ must not expose another inherited property as an admission decision',
+    );
+    const protoExecution = createExecution('prototype-name-ready-execution', 'owner-a', harness);
+    const protoClaim = await first.claimTaskExecution({
+      taskId: 'admission-prototype-name-__proto__',
+      execution: protoExecution,
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 750),
+      claimMode: 'due',
+    });
+    assert(protoClaim.status === 'claimed', 'an explicitly ready __proto__ group must claim normally');
+    const protoSettlement = await first.recordTaskExecutionOutcome({
+      taskId: 'admission-prototype-name-__proto__',
+      execution: protoExecution,
+      kind: 'skipped',
+      summary: 'Prototype-named group storage remained safe.',
+      finishedAt: at(harness, 800),
+    });
+    assert(protoSettlement.status === 'saved', 'an explicitly ready __proto__ group must settle normally');
+    await admission.setAdmissionDecision(protoTarget, 'closed');
+    assert(
+      await admission.readAdmissionDecision(protoTarget) === 'closed',
+      'an explicit __proto__ group close must survive durable serialization',
+    );
 
     const legacy = createTask('admission-legacy');
     const groupedWhileMissing = createGroupedTask('admission-missing', groupA);
