@@ -30,7 +30,9 @@ export type HeartbeatAdmissionDecision = 'ready' | 'closed';
  * Implementations must serialize decision changes with `claimTaskExecution`.
  * An absent namespace decision is `ready` for legacy ungrouped tasks, while an
  * absent assigned-group decision is `closed` so partially reconciled grouped
- * tasks fail closed.
+ * tasks fail closed. Admission governs fresh logical work. An exact durable
+ * recovery continuation may bypass closed admission; use explicit host pause,
+ * drain, or cancellation when no execution may proceed.
  */
 export interface HeartbeatTaskAdmissionControl {
   readAdmissionDecision(target: HeartbeatAdmissionTarget): Promise<HeartbeatAdmissionDecision>;
@@ -108,8 +110,14 @@ export type HeartbeatTaskRecoveryReason = 'host-restart' | 'operator';
 export type HeartbeatTaskRecovery = {
   interruptedExecutionId: string;
   interruptedOwnerId: string;
+  interruptedRunRequestGeneration?: number;
   recoveredAt: string;
   reason: HeartbeatTaskRecoveryReason;
+  /** Missing on legacy diagnostic records, which never authorize a replacement. */
+  replacementStatus?: 'pending' | 'claimed';
+  /** Set atomically when one exact replacement execution consumes this recovery. */
+  replacementExecutionId?: string;
+  replacementClaimedAt?: string;
 };
 
 type HeartbeatTaskExecutionOutcomeBase = {
@@ -207,9 +215,16 @@ export type HeartbeatTaskClaimResult =
 /**
  * `due` makes the durable store re-check scheduler eligibility atomically with
  * the claim. `any` is reserved for explicit operator-triggered "run now"
- * paths that intentionally ignore the stored schedule.
+ * paths that intentionally ignore the stored schedule. Both modes are fresh
+ * logical work and require ready admission.
+ *
+ * `recovery` is only for the exact unconsumed recovery identified by
+ * `recoveryOfExecutionId`. It still requires an enabled, due, non-running task,
+ * but may bypass closed namespace/group admission because it continues work
+ * admitted by the interrupted execution. The claim must consume that recovery
+ * marker atomically and must not consume a newer run-request generation.
  */
-export type HeartbeatTaskClaimMode = 'any' | 'due';
+export type HeartbeatTaskClaimMode = 'any' | 'due' | 'recovery';
 
 export type HeartbeatTaskExecutionWriteResult =
   | { status: 'saved'; task: HeartbeatTask; record?: HeartbeatTaskRunRecord }
@@ -234,7 +249,8 @@ export type HeartbeatTaskStore = {
   /**
    * Final durable admission authority. The claim must atomically recheck task
    * enablement, claim-mode schedule eligibility, active ownership, namespace
-   * admission, and the task's optional assigned-group admission.
+   * admission, and the task's optional assigned-group admission, or atomically
+   * match and consume the exact pending recovery allowed to bypass both scopes.
    */
   claimTaskExecution: (input: {
     taskId: string;
@@ -242,6 +258,8 @@ export type HeartbeatTaskStore = {
     loadedCheckpoint: boolean;
     claimedAt: Date;
     claimMode?: HeartbeatTaskClaimMode;
+    /** Required only for `claimMode: 'recovery'`; rejected on every other mode. */
+    recoveryOfExecutionId?: string;
   }) => Promise<HeartbeatTaskClaimResult>;
   completeTaskExecution: (input: {
     execution: HeartbeatTaskExecution;

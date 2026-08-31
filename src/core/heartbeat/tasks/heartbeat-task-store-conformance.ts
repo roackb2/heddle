@@ -28,8 +28,12 @@ export type HeartbeatTaskStoreConformanceCapabilities = {
 export type HeartbeatTaskStoreConformanceHarness = {
   /** Return a fresh store instance using exactly this opaque backend namespace. */
   createStore(namespace: string): MaybePromise<HeartbeatTargetedTaskStore>;
-  /** Return the binary admission control port for the same backend namespace. */
-  createAdmissionControl(namespace: string): MaybePromise<HeartbeatTaskAdmissionControl>;
+  /**
+   * Return the binary admission control port for the same backend namespace.
+   * Omit only when certifying a legacy namespace-only adapter; scoped-admission
+   * conformance runs whenever this port is supplied.
+   */
+  createAdmissionControl?(namespace: string): MaybePromise<HeartbeatTaskAdmissionControl>;
   /** Remove every resource created for an opaque backend namespace. */
   cleanupNamespace(namespace: string): MaybePromise<void>;
   /** Return a deterministic base time; the suite derives fixed offsets from it. */
@@ -76,7 +80,7 @@ const scenarioName = {
   requests: 'run requests coalesce atomically and settlement preserves newer host state',
   settlement: 'success, skip, cancellation, and failure settle atomically',
   recovery: 'competing claims are busy, live work is retained, and stale settlement is fenced after recovery',
-  admission: 'namespace and group admission changes linearize with claims while unrelated groups keep progressing',
+  admission: 'namespace and group admission changes linearize with claims, exact recovery continues, and unrelated groups keep progressing',
   subscription: 'optional run-request subscriptions receive cross-instance signals and unsubscribe',
   history: 'optional run history supports save, list, filter, limit, and load',
 } as const;
@@ -95,8 +99,14 @@ export class HeartbeatTaskStoreConformance {
       HeartbeatTaskStoreConformance.createScenario(scenarioName.requests, harness, HeartbeatTaskStoreConformance.verifyRunRequests),
       HeartbeatTaskStoreConformance.createScenario(scenarioName.settlement, harness, HeartbeatTaskStoreConformance.verifySettlements),
       HeartbeatTaskStoreConformance.createScenario(scenarioName.recovery, harness, HeartbeatTaskStoreConformance.verifyRecoveryAndFencing),
-      HeartbeatTaskStoreConformance.createScenario(scenarioName.admission, harness, HeartbeatTaskStoreConformance.verifyAdmission),
     ];
+    if (harness.createAdmissionControl) {
+      scenarios.push(HeartbeatTaskStoreConformance.createScenario(
+        scenarioName.admission,
+        harness,
+        HeartbeatTaskStoreConformance.verifyAdmission,
+      ));
+    }
     if (harness.capabilities?.runRequestSubscription) {
       scenarios.push(HeartbeatTaskStoreConformance.createScenario(
         scenarioName.subscription,
@@ -355,7 +365,40 @@ export class HeartbeatTaskStoreConformance {
     const repeatedRecovery = await first.recoverInterruptedTasks({ ownerId: 'replacement-owner', recoveredAt: at(harness, 5_000), reason: 'host-restart' });
     assert(repeatedRecovery.length === 0, 'recovery must be idempotent');
     const replacement = createExecution('replacement-execution', 'replacement-owner', harness);
-    await assertClaimed(second, task.id, replacement, harness, 6_000);
+    await assertRejected(
+      async () => await second.claimTaskExecution({
+        taskId: task.id,
+        execution: replacement,
+        loadedCheckpoint: false,
+        claimedAt: at(harness, 6_000),
+        claimMode: 'recovery',
+      }),
+      'a recovery claim without an interrupted execution id must be rejected',
+    );
+    await assertRejected(
+      async () => await second.claimTaskExecution({
+        taskId: task.id,
+        execution: replacement,
+        loadedCheckpoint: false,
+        claimedAt: at(harness, 6_000),
+        claimMode: 'any',
+        recoveryOfExecutionId: expired.executionId,
+      }),
+      'a recovery id on a fresh claim must be rejected',
+    );
+    const replacementClaim = await second.claimTaskExecution({
+      taskId: task.id,
+      execution: replacement,
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 6_000),
+      claimMode: 'recovery',
+      recoveryOfExecutionId: expired.executionId,
+    });
+    assert(replacementClaim.status === 'claimed', 'the exact pending recovery must claim once');
+    assert(
+      replacementClaim.task.state?.recovery?.replacementExecutionId === replacement.executionId,
+      'the replacement claim must consume the pending recovery marker',
+    );
     const staleResult = createResult('late-success');
     const staleWrites = await Promise.all([
       first.completeTaskExecution({
@@ -389,7 +432,9 @@ export class HeartbeatTaskStoreConformance {
   private static async verifyAdmission(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
     const first = await harness.createStore(namespace);
     const second = await harness.createStore(namespace);
-    const admission = await harness.createAdmissionControl(namespace);
+    const createAdmissionControl = harness.createAdmissionControl;
+    assert(createAdmissionControl, 'scoped-admission conformance requires createAdmissionControl');
+    const admission = await createAdmissionControl(namespace);
     const namespaceTarget = { kind: 'namespace' } as const;
     const groupA = { kind: 'group', groupId: 'publisher-a' } as const;
     const groupB = { kind: 'group', groupId: 'publisher-b' } as const;
@@ -427,6 +472,32 @@ export class HeartbeatTaskStoreConformance {
     assert(
       (await second.loadCheckpoint(preserved))?.runId === checkpoint.runId,
       'closing admission must preserve the checkpoint',
+    );
+
+    const legacyRecovery = {
+      ...createGroupedTask('admission-legacy-recovery', groupA),
+      state: {
+        status: 'waiting' as const,
+        recovery: {
+          interruptedExecutionId: 'legacy-interrupted-execution',
+          interruptedOwnerId: 'legacy-owner',
+          recoveredAt: at(harness, 1_000).toISOString(),
+          reason: 'host-restart' as const,
+        },
+      },
+    } satisfies HeartbeatTask;
+    await first.saveTask(legacyRecovery);
+    const legacyRecoveryClaim = await first.claimTaskExecution({
+      taskId: legacyRecovery.id,
+      execution: createExecution('legacy-replacement-attempt', 'owner-a', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 1_500),
+      claimMode: 'recovery',
+      recoveryOfExecutionId: 'legacy-interrupted-execution',
+    });
+    assert(
+      legacyRecoveryClaim.status === 'not-due',
+      'a legacy diagnostic recovery record must not authorize an admission bypass',
     );
 
     const legacyExecution = createExecution('legacy-execution', 'owner-a', harness);
@@ -504,18 +575,186 @@ export class HeartbeatTaskStoreConformance {
       assertDeepEqual(raceClaim.target, groupA, 'the racing claim must identify the blocking group');
     }
 
+    await admission.setAdmissionDecision(groupA, 'ready');
+    const recoveryTask = createGroupedTask('admission-recovery', groupA);
+    await first.saveTask(recoveryTask);
+    await first.requestTaskRun(recoveryTask.id, {
+      requestedAt: at(harness, 8_500),
+      reason: 'work-interrupted-after-claim',
+    });
+    const activeRecoveryExecution = createExecution('recovery-active-execution', 'owner-a', harness);
+    const activeRecoveryClaim = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: activeRecoveryExecution,
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 9_000),
+      claimMode: 'due',
+    });
+    assert(activeRecoveryClaim.status === 'claimed', 'the original requested work must claim before interruption');
+    assert(
+      activeRecoveryClaim.task.state?.execution?.runRequestGeneration === 1,
+      'the interrupted execution must own the first run-request generation',
+    );
+    await second.requestTaskRun(recoveryTask.id, {
+      requestedAt: at(harness, 10_000),
+      reason: 'fresh-work-after-recovery',
+    });
+    await admission.setAdmissionDecision(groupA, 'closed');
+    await admission.setAdmissionDecision(namespaceTarget, 'closed');
+
+    const crashedExecution = {
+      ...createExecution('recovery-crashed-execution', 'crashed-owner', harness),
+      runRequestGeneration: 1,
+    };
+    await harness.makeExecutionRecoverable({
+      namespace,
+      store: first,
+      task: await requireTask(first, recoveryTask.id),
+      execution: crashedExecution,
+      recoverAt: at(harness, 11_000),
+    });
+    const recoveries = await second.recoverInterruptedTasks({
+      ownerId: 'replacement-owner',
+      recoveredAt: at(harness, 11_000),
+      reason: 'host-restart',
+    });
+    assert(
+      recoveries.some(({ recovery }) => recovery.interruptedExecutionId === crashedExecution.executionId),
+      'expired ownership must create an exact durable recovery marker',
+    );
+
+    const staleRecovery = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: createExecution('stale-recovery-attempt', 'replacement-owner', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 12_000),
+      claimMode: 'recovery',
+      recoveryOfExecutionId: 'not-the-interrupted-execution',
+    });
+    assert(staleRecovery.status === 'not-due', 'a stale caller-supplied recovery id must not bypass closed admission');
+
+    const freshWhileClosed = await second.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: createExecution('fresh-while-closed', 'owner-b', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 13_000),
+      claimMode: 'due',
+    });
+    assertAdmissionClosed(freshWhileClosed, namespaceTarget, 'fresh due work must remain blocked by namespace admission');
+
+    const replacementExecution = createExecution('recovery-replacement-execution', 'replacement-owner', harness);
+    const replacementClaim = await second.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: replacementExecution,
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 14_000),
+      claimMode: 'recovery',
+      recoveryOfExecutionId: crashedExecution.executionId,
+    });
+    assert(replacementClaim.status === 'claimed', 'the exact unconsumed recovery must bypass closed namespace and group admission');
+    assert(
+      replacementClaim.task.state?.recovery?.replacementExecutionId === replacementExecution.executionId,
+      'the replacement claim must atomically consume the recovery marker',
+    );
+    assert(
+      replacementClaim.task.state?.runRequest?.generation === 2
+      && replacementClaim.task.state.runRequest.claimedGeneration === 1,
+      'recovery must not consume a newer pending run request',
+    );
+    assert(
+      replacementClaim.task.state?.execution?.runRequestGeneration === 1,
+      'recovery must retain the interrupted execution run-request generation',
+    );
+
+    const staleOriginalSettlement = await first.recordTaskExecutionOutcome({
+      taskId: recoveryTask.id,
+      execution: activeRecoveryExecution,
+      kind: 'skipped',
+      summary: 'The pre-crash execution cannot settle after replacement.',
+      finishedAt: at(harness, 15_000),
+    });
+    assert(staleOriginalSettlement.status === 'claim-lost', 'replacement recovery must fence the pre-crash execution');
+    const staleInterruptedSettlement = await first.recordTaskExecutionOutcome({
+      taskId: recoveryTask.id,
+      execution: crashedExecution,
+      kind: 'skipped',
+      summary: 'The interrupted execution cannot settle after replacement.',
+      finishedAt: at(harness, 15_000),
+    });
+    assert(staleInterruptedSettlement.status === 'claim-lost', 'replacement recovery must fence the interrupted execution');
+
+    const replacementSettlement = await second.recordTaskExecutionOutcome({
+      taskId: recoveryTask.id,
+      execution: replacementExecution,
+      kind: 'skipped',
+      summary: 'Recovered logical work settled.',
+      finishedAt: at(harness, 16_000),
+    });
+    assert(replacementSettlement.status === 'saved', 'the exact replacement must settle normally');
+
+    const repeatedRecovery = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: createExecution('repeated-recovery-attempt', 'replacement-owner', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 17_000),
+      claimMode: 'recovery',
+      recoveryOfExecutionId: crashedExecution.executionId,
+    });
+    assert(repeatedRecovery.status === 'not-due', 'a consumed recovery marker must not authorize another replacement');
+    const explicitWhileClosed = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: createExecution('explicit-while-closed', 'owner-a', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 18_000),
+      claimMode: 'any',
+    });
+    assertAdmissionClosed(explicitWhileClosed, namespaceTarget, 'explicit run-now work must not bypass namespace admission');
+
+    await admission.setAdmissionDecision(namespaceTarget, 'ready');
+    const groupClosedFresh = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: createExecution('group-closed-fresh', 'owner-a', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 19_000),
+      claimMode: 'due',
+    });
+    assertAdmissionClosed(groupClosedFresh, groupA, 'fresh requested work must remain blocked by group admission');
+
     const groupBTask = createGroupedTask('admission-unrelated', groupB);
     await first.saveTask(groupBTask);
     const groupBExecution = createExecution('group-b-execution', 'owner-b', harness);
-    await assertClaimed(second, groupBTask.id, groupBExecution, harness, 9_000);
+    await assertClaimed(second, groupBTask.id, groupBExecution, harness, 20_000);
     const groupBSettlement = await second.recordTaskExecutionOutcome({
       taskId: groupBTask.id,
       execution: groupBExecution,
       kind: 'skipped',
       summary: 'The unrelated group remained ready.',
-      finishedAt: at(harness, 10_000),
+      finishedAt: at(harness, 21_000),
     });
     assert(groupBSettlement.status === 'saved', 'closing one group must not block unrelated-group progress');
+
+    await admission.setAdmissionDecision(groupA, 'ready');
+    const freshExecution = createExecution('fresh-after-resume', 'owner-a', harness);
+    const freshClaim = await first.claimTaskExecution({
+      taskId: recoveryTask.id,
+      execution: freshExecution,
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 22_000),
+      claimMode: 'due',
+    });
+    assert(freshClaim.status === 'claimed', 'fresh pending work may claim only after admission resumes');
+    assert(
+      freshClaim.task.state?.execution?.runRequestGeneration === 2,
+      'the post-recovery claim must consume the newer pending run request',
+    );
+    const freshSettlement = await first.recordTaskExecutionOutcome({
+      taskId: recoveryTask.id,
+      execution: freshExecution,
+      kind: 'skipped',
+      summary: 'Fresh work settled after admission resumed.',
+      finishedAt: at(harness, 23_000),
+    });
+    assert(freshSettlement.status === 'saved', 'fresh work must settle after admission resumes');
   }
 
   private static async verifyRunRequestSubscription(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
@@ -596,6 +835,15 @@ function assert(condition: unknown, detail: string): asserts condition {
 
 function assertDeepEqual(actual: unknown, expected: unknown, detail: string): void {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(detail);
+}
+
+async function assertRejected(operation: () => Promise<unknown>, detail: string): Promise<void> {
+  try {
+    await operation();
+  } catch {
+    return;
+  }
+  throw new Error(detail);
 }
 
 function assertAdmissionClosed(

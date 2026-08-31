@@ -327,6 +327,9 @@ export class HeartbeatTaskControlPolicy {
     if (!value.trim()) {
       throw new Error('Heartbeat admission group id cannot be blank.');
     }
+    if (value !== value.trim()) {
+      throw new Error('Heartbeat admission group id cannot contain leading or trailing whitespace.');
+    }
     return value;
   }
 

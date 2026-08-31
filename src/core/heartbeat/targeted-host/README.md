@@ -29,8 +29,11 @@ the replaceable invocation-target port preserves that migration seam.
 `isAdmissionEnabled` is only a best-effort precheck that avoids unnecessary
 polling or invocation. It is not the durable authority because it can race with
 the final claim. Likewise, `host.pause()` is a process-local drain/cancellation
-operation. Closing durable namespace or group admission affects future claims
-only and does not cancel already claimed work.
+operation. Closing durable namespace or group admission blocks fresh logical
+work but does not cancel or strand already admitted work. An exact durable
+single-use recovery replacement may bypass both scopes; caller-selected stale
+IDs cannot. Use host pause, drain, or cancellation when no execution may
+proceed.
 
 `taskIdPrefix` is an optional defense-in-depth filter, not an authorization
 boundary. Prefer giving each host a store already scoped to its tenant or task

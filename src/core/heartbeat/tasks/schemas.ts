@@ -17,18 +17,24 @@ export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 
 export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
 export const HeartbeatTaskRecoveryReasonSchema = z.enum(['host-restart', 'operator']);
 export const HeartbeatAdmissionDecisionSchema = z.enum(['ready', 'closed']);
+export const HeartbeatAdmissionGroupIdSchema = z.string()
+  .refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.')
+  .refine(
+    (value) => value === value.trim(),
+    'Admission group id cannot contain leading or trailing whitespace.',
+  );
 export const HeartbeatAdmissionTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('namespace') }),
   z.object({
     kind: z.literal('group'),
-    groupId: z.string().refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.'),
+    groupId: HeartbeatAdmissionGroupIdSchema,
   }),
 ]);
 
 export const HeartbeatAdmissionStateSchema = z.object({
   version: z.literal(1),
   namespace: HeartbeatAdmissionDecisionSchema.optional(),
-  groups: z.record(z.string(), HeartbeatAdmissionDecisionSchema),
+  groups: z.record(HeartbeatAdmissionGroupIdSchema, HeartbeatAdmissionDecisionSchema),
 });
 
 const HeartbeatTaskExecutionSchema = z.object({
@@ -48,8 +54,16 @@ const HeartbeatTaskRunRequestSchema = z.object({
 const HeartbeatTaskRecoverySchema = z.object({
   interruptedExecutionId: z.string().describe('Fencing token of the interrupted execution.'),
   interruptedOwnerId: z.string().describe('Scheduler owner whose execution was interrupted.'),
+  interruptedRunRequestGeneration: z.number().int().nonnegative().optional()
+    .describe('Run-request generation already owned by the interrupted execution.'),
   recoveredAt: z.string().describe('Timestamp when the task became retryable again.'),
   reason: HeartbeatTaskRecoveryReasonSchema.describe('Host-owned reason for recovering the execution.'),
+  replacementStatus: z.enum(['pending', 'claimed']).optional()
+    .describe('Whether this current-format recovery still authorizes one exact replacement.'),
+  replacementExecutionId: z.string().optional()
+    .describe('Single replacement execution that atomically consumed this recovery.'),
+  replacementClaimedAt: z.string().optional()
+    .describe('Timestamp when the replacement execution consumed this recovery.'),
 });
 
 export const HeartbeatTaskExecutionOutcomeSchema = z.object({
@@ -66,8 +80,7 @@ export const HeartbeatTaskExecutionOutcomeSchema = z.object({
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),
   workspaceId: z.string().optional().describe('Workspace identifier this task belongs to.'),
-  admissionGroupId: z.string()
-    .refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.')
+  admissionGroupId: HeartbeatAdmissionGroupIdSchema
     .optional()
     .describe('Opaque admission group checked in addition to namespace admission.'),
   task: z.string().describe('Durable task instruction the heartbeat should pursue.'),

@@ -100,7 +100,8 @@ Custom stores implement this protocol through `HeartbeatTaskStore`:
 - `subscribeToRunRequests` optionally wakes a scheduler in the same process; polling remains the cross-process fallback
 - `claimTaskExecution` atomically rechecks task eligibility plus durable
   namespace/optional-group admission and establishes the current `executionId`
-  fencing token
+  fencing token; exact recovery mode also matches and consumes its durable
+  interrupted-execution marker
 - `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` project from the latest stored task and reject a stale token with `claim-lost`
 - `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
 
@@ -251,9 +252,10 @@ The method deliberately does **not** start a polling loop, subscribe to
 run-request notifications, perform a global task scan, or run interrupted-task
 recovery. Its final `due` claim rechecks durable enabled/running/schedule state,
 so a stale queue delivery cannot bypass an operator change between lookup and
-claim. That claim also rechecks durable namespace and optional group admission;
-a dispatcher precheck cannot replace it. A duplicate at-least-once delivery is arbitrated by that same claim, but
-hosts must still make their own domain side effects idempotent.
+claim. That fresh claim also rechecks durable namespace and optional group
+admission; a dispatcher precheck cannot replace it. A duplicate at-least-once
+delivery is arbitrated by that same claim, but hosts must still make their own
+domain side effects idempotent.
 
 For a long-lived single-host scheduler, `runLoop()` performs one startup
 recovery pass because it owns that process lifecycle. An ephemeral worker must
@@ -303,7 +305,9 @@ The optional `isAdmissionEnabled` callback is a fail-closed process-local
 precheck that can reduce unnecessary polling or invocation. It is not the
 admission authority because it can race with a claim. The store's final atomic
 claim is authoritative. `host.pause()` also has different semantics: it cancels
-locally active work, while closing durable admission prevents new claims only.
+locally active work, while closing durable admission blocks fresh logical work.
+An exact recovery continuation may still run through closed admission; use
+pause/drain/cancel when no execution may proceed.
 
 This host is intentionally for low-volume single-process admission. It is not a
 distributed queue, leader election service, or cross-replica concurrency limit.
@@ -342,11 +346,15 @@ for (const scenario of HeartbeatTaskStoreConformance.createScenarios(harness)) {
 }
 ```
 
-The required scenarios verify direct lookup, shared-backend round trips,
+The baseline scenarios verify direct lookup, shared-backend round trips,
 idempotent writes, request coalescing, atomic due claims, competing workers,
-claim-fenced success/failure/skip/cancellation, explicit recovery,
-close-vs-claim linearization, fail-closed assigned groups, and unrelated-group
-progress. The
+claim-fenced success/failure/skip/cancellation, and explicit recovery.
+`createAdmissionControl` is optional so an existing namespace-only harness
+remains source-compatible, but supplying it additionally verifies
+close-vs-claim linearization, active-claim survival, fail-closed assigned
+groups, exact crash recovery through closed scopes, stale-ID rejection,
+newer-request preservation, and unrelated-group progress. A harness that omits
+the port is not scoped-admission proof. The
 `makeExecutionRecoverable` hook is test-fixture authority: lease-backed stores
 expire a fixture lease there; it does not add recovery authority to production
 workers. Run-request subscriptions and history readback are checked only when
@@ -427,19 +435,33 @@ await admission.setAdmissionDecision(
 );
 ```
 
-The final claim requires the task to be enabled and eligible, namespace
-admission to be `ready`, and the assigned group (when present) to be `ready`.
+Fresh `due` and explicit `any` claims require the task to be enabled and
+eligible, namespace admission to be `ready`, and the assigned group (when
+present) to be `ready`.
 An absent namespace decision defaults to `ready`, preserving existing
 namespace-only tasks. An absent assigned-group decision defaults to `closed`,
 so a partially reconciled grouped task cannot run. Ungrouped tasks never infer
 membership from their ID or product data.
 
-Closing a target affects new claims only. It does not disable a task, change
-its due time, consume a run request, modify its checkpoint, cancel an active
-execution, or drain a worker. Those are separate explicit operations. Heddle
-does not model hosted desired state, preparing/blocked phases, transition IDs,
-retry timing, restart orchestration, or product cursor preparation; a hosted
-adapter owns that lifecycle and projects only `ready | closed` into this port.
+Group IDs are opaque, non-empty identity strings. Heddle does not canonicalize
+them: task fields, admission targets, and durable admission-map keys reject
+leading or trailing whitespace so visually similar identities cannot diverge.
+
+Closing a target affects fresh logical claims only. It does not disable a task,
+change its due time, consume a run request, modify its checkpoint, cancel an
+active execution, or drain a worker. An exact `claimMode: 'recovery'`
+continuation may bypass both closed scopes only when
+`recoveryOfExecutionId` matches the current durable pending marker. The atomic
+replacement consumes that marker once, preserves the interrupted run-request
+correlation, and leaves any newer request pending. Stale IDs, already-consumed
+markers, and recovery records from older versions without an explicit pending
+marker do not authorize bypass. Scheduler and targeted-worker paths select
+this mode only from the durable task marker created by
+`recoverInterruptedTasks`; explicit run-now never does. Use host pause, drain,
+or cancellation when no execution may proceed. Heddle does not model hosted
+desired state, preparing/blocked phases, transition IDs, retry timing, restart
+orchestration, or product cursor preparation; a hosted adapter owns that
+lifecycle and projects only `ready | closed` into this port.
 
 ### Durable event-driven run requests
 

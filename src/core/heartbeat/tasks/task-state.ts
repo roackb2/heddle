@@ -40,10 +40,17 @@ export class HeartbeatTaskStateProjector {
     now: Date;
     loadedCheckpoint: boolean;
     execution: HeartbeatTaskExecution;
+    recoveryOfExecutionId?: string;
   }): HeartbeatTask {
+    const recovery = args.recoveryOfExecutionId ?
+      HeartbeatTaskStateProjector.requirePendingRecovery(args.task, args.recoveryOfExecutionId)
+    : undefined;
     const runRequest = args.task.state?.runRequest;
-    const claimsPendingRequest = HeartbeatTaskStateProjector.hasPendingRunRequest(args.task);
-    const execution = claimsPendingRequest && runRequest ? {
+    const claimsPendingRequest = !recovery && HeartbeatTaskStateProjector.hasPendingRunRequest(args.task);
+    const execution = recovery ? {
+      ...args.execution,
+      runRequestGeneration: recovery.interruptedRunRequestGeneration,
+    } : claimsPendingRequest && runRequest ? {
       ...args.execution,
       runRequestGeneration: runRequest.generation,
     } : args.execution;
@@ -54,7 +61,11 @@ export class HeartbeatTaskStateProjector {
         ...args.task.state,
         status: 'running',
         progress:
-          args.loadedCheckpoint ?
+          recovery && args.loadedCheckpoint ?
+            'Continuing recovered heartbeat work from the last checkpoint.'
+          : recovery ?
+            'Continuing recovered heartbeat work.'
+          : args.loadedCheckpoint ?
             'Resuming heartbeat runner from the last checkpoint.'
           : 'Starting a new heartbeat runner cycle.',
         loadedCheckpoint: args.loadedCheckpoint,
@@ -64,6 +75,12 @@ export class HeartbeatTaskStateProjector {
           ...runRequest,
           claimedGeneration: runRequest.generation,
         } : runRequest,
+        recovery: recovery ? {
+          ...recovery,
+          replacementStatus: 'claimed',
+          replacementExecutionId: execution.executionId,
+          replacementClaimedAt: dayjs(args.now).toISOString(),
+        } : args.task.state?.recovery,
         updatedAt: dayjs(args.now).toISOString(),
       },
     });
@@ -116,6 +133,14 @@ export class HeartbeatTaskStateProjector {
     return Boolean(request && request.generation > request.claimedGeneration);
   }
 
+  static pendingRecoveryExecutionId(task: Pick<HeartbeatTask, 'state'>): string | undefined {
+    const recovery = task.state?.recovery;
+    if (recovery?.replacementStatus !== 'pending' || recovery.replacementExecutionId) {
+      return undefined;
+    }
+    return recovery.interruptedExecutionId;
+  }
+
   static afterRecovery(args: {
     task: HeartbeatTask;
     now: Date;
@@ -130,8 +155,10 @@ export class HeartbeatTaskStateProjector {
     const recovery: HeartbeatTaskRecovery = {
       interruptedExecutionId: execution.executionId,
       interruptedOwnerId: execution.ownerId,
+      interruptedRunRequestGeneration: execution.runRequestGeneration,
       recoveredAt,
       reason: args.reason,
+      replacementStatus: 'pending',
     };
     const task = HeartbeatTaskStateProjector.normalize({
       ...args.task,
@@ -511,6 +538,24 @@ export class HeartbeatTaskStateProjector {
     return args.decision === 'continue' ?
       args.intervalMs
     : HeartbeatDecisionPolicy.suggestNextDelayMs(args.decision) ?? args.intervalMs;
+  }
+
+  private static requirePendingRecovery(
+    task: Pick<HeartbeatTask, 'id' | 'state'>,
+    interruptedExecutionId: string,
+  ): HeartbeatTaskRecovery {
+    const recovery = task.state?.recovery;
+    if (
+      !recovery
+      || recovery.replacementStatus !== 'pending'
+      || recovery.replacementExecutionId
+      || recovery.interruptedExecutionId !== interruptedExecutionId
+    ) {
+      throw new Error(
+        `Heartbeat task ${task.id} has no pending recovery for execution ${interruptedExecutionId}.`,
+      );
+    }
+    return recovery;
   }
 
   private static formatDelay(ms: number): string {

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -43,6 +43,20 @@ describe('HeartbeatTaskStoreConformance', () => {
   it('publishes eight uniquely named scenarios', () => {
     expect(scenarios).toHaveLength(8);
     expect(new Set(scenarios.map((scenario) => scenario.name)).size).toBe(8);
+  });
+
+  it('keeps the harness source-compatible for legacy namespace-only adapters', () => {
+    const legacyHarness: HeartbeatTaskStoreConformanceHarness = {
+      createStore: harness.createStore,
+      cleanupNamespace: harness.cleanupNamespace,
+      now: harness.now,
+      makeExecutionRecoverable: harness.makeExecutionRecoverable,
+      capabilities: harness.capabilities,
+    };
+    const legacyScenarios = HeartbeatTaskStoreConformance.createScenarios(legacyHarness);
+
+    expect(legacyScenarios).toHaveLength(7);
+    expect(legacyScenarios.some((scenario) => scenario.name.includes('admission changes linearize'))).toBe(false);
   });
 
   it.each(scenarios)('$name', async ({ run }) => {
@@ -95,6 +109,32 @@ describe('HeartbeatTaskStoreConformance', () => {
 
     expect(admissionScenario).toBeDefined();
     await expect(admissionScenario?.run()).rejects.toBeInstanceOf(HeartbeatTaskStoreConformanceError);
+  });
+
+  it('rejects non-canonical group targets and durable admission keys', async () => {
+    const namespace = 'non-canonical-admission-group';
+    const store = await harness.createStore(namespace);
+    await store.saveTask({
+      id: 'identity-fixture',
+      task: 'Validate admission identity.',
+      enabled: true,
+      schedule: { intervalMs: 60_000 },
+    });
+    const admission = await harness.createAdmissionControl?.(namespace);
+    if (!admission) {
+      throw new Error('Expected the file conformance harness to expose admission control.');
+    }
+    await expect(admission.setAdmissionDecision(
+      { kind: 'group', groupId: ' publisher-a ' },
+      'ready',
+    )).rejects.toThrow(/leading or trailing whitespace/i);
+
+    await writeFile(
+      join(root, namespace, 'admission.json'),
+      JSON.stringify({ version: 1, groups: { ' publisher-a ': 'ready' } }),
+    );
+    await expect(admission.readAdmissionDecision({ kind: 'group', groupId: 'publisher-a' }))
+      .rejects.toThrow();
   });
 });
 

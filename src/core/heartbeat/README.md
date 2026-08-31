@@ -92,18 +92,25 @@ operator-facing heartbeat views.
 - Execution settlement must read and project from the latest stored task inside
   the same atomic store transition. Saving a projection derived from the
   pre-run snapshot can erase newer run requests or operator control changes.
-- A final claim is eligible only when the task is enabled, its claim mode is
-  due (unless an explicit `any` run-now claim is used), namespace admission is
-  `ready`, and its optional assigned group is `ready`. Missing namespace state
-  defaults to `ready` for legacy ungrouped tasks; a missing assigned-group state
-  defaults to `closed`. Namespace admission is the global emergency circuit
-  breaker. Group admission is one flat opaque scope, not a hierarchy, quota, or
-  fairness mechanism.
+- A fresh final claim is eligible only when the task is enabled, its `due`
+  schedule is eligible (unless explicit `any` run-now mode is used), namespace
+  admission is `ready`, and its optional assigned group is `ready`. Missing
+  namespace state defaults to `ready` for legacy ungrouped tasks; a missing
+  assigned-group state defaults to `closed`. Namespace admission is the global
+  fresh-work circuit breaker. It is not a zero-execution stop because exact
+  recovery can continue already admitted work. Group admission is one flat
+  opaque scope, not a hierarchy, quota, or fairness mechanism.
 - `HeartbeatTaskAdmissionControl.setAdmissionDecision()` must serialize with
-  `claimTaskExecution()`. Closing admission prevents only new claims. It does
-  not disable tasks, change due timestamps, consume run requests, alter
-  checkpoints, cancel active executions, or drain a worker; those remain
-  explicit lifecycle operations.
+  `claimTaskExecution()`. Closing admission prevents only fresh logical work.
+  `claimMode: 'recovery'` may bypass both closed scopes only when
+  `recoveryOfExecutionId` atomically matches the current unconsumed durable
+  recovery marker. The replacement consumes that marker once, inherits the
+  interrupted run-request correlation, and does not consume a newer request.
+  Caller-supplied, stale, legacy diagnostic, or already-consumed recovery IDs
+  cannot bypass admission. Closing admission otherwise does not disable tasks,
+  change due timestamps, consume run requests, alter
+  checkpoints, cancel active executions, or drain a worker. Use explicit host
+  pause, drain, or cancellation when no execution may proceed.
 - Custom adapters should use the public `HeartbeatTaskStateProjector` exported
   from `@heddleagent/runtime/advanced` for normalization, request, claim,
   settlement, and recovery transitions. The adapter still owns the backend
@@ -155,8 +162,10 @@ operator-facing heartbeat views.
   serialize admission changes with atomic claim, fencing, and recovery through
   database compare-and-swap, leases, or transactions.
 - Recovery preserves the latest checkpoint and run history, records the
-  interrupted execution identity under `task.state.recovery`, and makes an
-  enabled task immediately due. It does not record success or roll back host
+  interrupted execution identity plus a pending single-use replacement marker
+  under `task.state.recovery`, and makes an enabled task immediately due. A
+  missing marker on a legacy recovery record is diagnostic only and authorizes
+  no bypass. Recovery does not record success or roll back host
   domain side effects; host tools remain responsible for idempotent mutations.
 - Recovery is a lifecycle policy, not a consequence of receiving a different
   `ownerId`. The built-in file adapter can recover an execution only when its
@@ -166,11 +175,16 @@ operator-facing heartbeat views.
   final writes remain fenced after an explicit recovery.
 - Custom remote adapters should run the executable contract scenarios from
   `@heddleagent/runtime/heartbeat/testing` against two fresh store instances sharing
-  one backend namespace. Required scenarios cover exact lookup, atomic due
-  claims, coalesced requests, settlement, recovery, stale-write fencing,
-  close-vs-claim linearization, and unrelated-group progress;
-  history and subscription checks are capability-gated. The harness owns a
-  fixture-only hook for expiring a lease or simulating a dead prior process.
+  one backend namespace. Baseline scenarios cover exact lookup, atomic due
+  claims, coalesced requests, settlement, recovery, and stale-write fencing.
+  Supplying the optional `createAdmissionControl` harness port additionally
+  certifies fail-closed group state, close-vs-claim linearization, active-claim
+  survival, exact crash replacement through closed admission, stale recovery
+  rejection, newer-request preservation, and unrelated-group progress. This
+  keeps existing namespace-only harnesses source-compatible without treating
+  them as scoped-admission proof; history and subscription checks are
+  capability-gated. The harness owns a fixture-only hook for expiring a lease
+  or simulating a dead prior process.
   Passing the suite does not certify host queue delivery or exactly-once domain
   effects.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.

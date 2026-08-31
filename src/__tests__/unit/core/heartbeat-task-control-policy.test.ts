@@ -49,6 +49,11 @@ describe('HeartbeatTaskControlPolicy', () => {
       existingTasks: [],
       now: NOW,
     })).toThrow(/group id cannot be blank/i);
+    expect(() => HeartbeatTaskControlPolicy.createTask({
+      input: { task: 'Non-canonical group.', admissionGroupId: ' publisher-a ' },
+      existingTasks: [],
+      now: NOW,
+    })).toThrow(/leading or trailing whitespace/i);
   });
 
   it('updates the latest running task without erasing its claim or pending request', () => {
