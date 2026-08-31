@@ -157,7 +157,7 @@ describe('targeted heartbeat task dispatcher', () => {
     expect(outcomes).toEqual(['busy', 'not-found']);
     expect(resolveHeartbeatTargetedTaskDispatchDecision('claim-lost', 25))
       .toEqual({ kind: 'retry-transiently', delayMs: 25 });
-    for (const status of ['retry', 'failed', 'not-due', 'cancelled'] as const) {
+    for (const status of ['retry', 'failed', 'not-due', 'admission-closed', 'cancelled'] as const) {
       expect(resolveHeartbeatTargetedTaskDispatchDecision(status, 25))
         .toEqual({ kind: 'wait-for-durable-schedule' });
     }

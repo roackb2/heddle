@@ -10,24 +10,58 @@ import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import dayjs from 'dayjs';
 import type { AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
-import { AgentLoopCheckpointSchema, HeartbeatTaskRunRecordSchema, HeartbeatTaskSchema } from './schemas.js';
+import {
+  AgentLoopCheckpointSchema,
+  HeartbeatAdmissionStateSchema,
+  HeartbeatTaskRunRecordSchema,
+  HeartbeatTaskSchema,
+} from './schemas.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
+  HeartbeatAdmissionDecision,
   HeartbeatTask,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
 } from './types.js';
 
+export type FileHeartbeatAdmissionState = {
+  version: 1;
+  namespace?: HeartbeatAdmissionDecision;
+  groups: Record<string, HeartbeatAdmissionDecision>;
+};
+
 export class FileHeartbeatTaskRepository {
+  private readonly admissionPath: string;
   private readonly tasksDir: string;
   private readonly checkpointsDir: string;
   private readonly runsDir: string;
 
   constructor(options: FileHeartbeatTaskRepositoryOptions) {
+    this.admissionPath = join(options.dir, 'admission.json');
     this.tasksDir = join(options.dir, 'tasks');
     this.checkpointsDir = join(options.dir, 'checkpoints');
     this.runsDir = join(options.dir, 'runs');
+  }
+
+  /**
+   * Loads the adapter-owned binary admission projection.
+   *
+   * A missing document preserves legacy namespace readiness. Malformed state
+   * throws so claim callers fail closed instead of silently restoring defaults.
+   */
+  async loadAdmissionState(): Promise<FileHeartbeatAdmissionState> {
+    if (!existsSync(this.admissionPath)) {
+      return { version: 1, groups: {} };
+    }
+
+    return HeartbeatAdmissionStateSchema.parse(
+      JSON.parse(readFileSync(this.admissionPath, 'utf8')) as unknown,
+    ) as FileHeartbeatAdmissionState;
+  }
+
+  async saveAdmissionState(state: FileHeartbeatAdmissionState): Promise<void> {
+    this.writeJsonAtomically(this.admissionPath, HeartbeatAdmissionStateSchema.parse(state));
   }
 
   async listTasks(): Promise<HeartbeatTask[]> {

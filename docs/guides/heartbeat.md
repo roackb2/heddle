@@ -98,7 +98,9 @@ Custom stores implement this protocol through `HeartbeatTaskStore`:
 
 - `requestTaskRun` persists a monotonically distinguishable, level-triggered run request
 - `subscribeToRunRequests` optionally wakes a scheduler in the same process; polling remains the cross-process fallback
-- `claimTaskExecution` atomically establishes the current `executionId` fencing token
+- `claimTaskExecution` atomically rechecks task eligibility plus durable
+  namespace/optional-group admission and establishes the current `executionId`
+  fencing token
 - `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` project from the latest stored task and reject a stale token with `claim-lost`
 - `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
 
@@ -139,7 +141,7 @@ heartbeat store. Passing a remote task store moves only Heddle heartbeat task,
 checkpoint, and run persistence. It does not move or replace the host's product
 or domain database.
 
-A production remote adapter must make claims and fenced writes atomic, recover
+A production remote adapter must make claims, admission changes, and fenced writes atomic, recover
 only executions whose lease or owner is no longer live, and route run-request
 notifications to the scheduler process that can act on them.
 `subscribeToRunRequests` is an optional low-latency hint: if an adapter cannot
@@ -239,6 +241,8 @@ The result is typed so the dispatcher can make an explicit decision:
 - `retry`: a custom handler rejected its completed nested agent result and durably scheduled the bounded retry it requested.
 - `failed`: the task ran and entered the normal heartbeat failure/retry state.
 - `not-found`, `disabled`, or `not-due`: this delivery has no currently eligible work.
+- `admission-closed`: the namespace or assigned group currently rejects new
+  claims; the result includes that blocking target.
 - `busy`: another execution currently owns the task.
 - `claim-lost`: the worker lost ownership before final persistence; do not treat it as success.
 - `cancelled`: the worker was aborted before or during its attempt; a post-claim cancellation may include its durable record.
@@ -247,7 +251,8 @@ The method deliberately does **not** start a polling loop, subscribe to
 run-request notifications, perform a global task scan, or run interrupted-task
 recovery. Its final `due` claim rechecks durable enabled/running/schedule state,
 so a stale queue delivery cannot bypass an operator change between lookup and
-claim. A duplicate at-least-once delivery is arbitrated by that same claim, but
+claim. That claim also rechecks durable namespace and optional group admission;
+a dispatcher precheck cannot replace it. A duplicate at-least-once delivery is arbitrated by that same claim, but
 hosts must still make their own domain side effects idempotent.
 
 For a long-lived single-host scheduler, `runLoop()` performs one startup
@@ -281,7 +286,7 @@ const host = new HeartbeatTargetedTaskHost({
   recoveryIntervalMs: 30_000,
   invocationTimeoutMs: 15 * 60_000,
   maxConcurrentInvocations: 1,
-  isAdmissionEnabled: readDurableProductGate,
+  isAdmissionEnabled: readBestEffortDispatchPrecheck,
 });
 
 host.start({ handler, admissionEnabled: true });
@@ -291,7 +296,14 @@ The store must already be scoped to the task or tenant namespace this process
 may execute. An optional `taskIdPrefix` is defense in depth, not authorization.
 Notifications are latency hints; polling durable state is the correctness path.
 Only `busy` and `claim-lost` receive short delivery retries. Normal Heddle retry,
-failure, not-due, and cancellation results wait for their persisted schedule.
+failure, not-due, admission-closed, and cancellation results wait for their
+persisted schedule.
+
+The optional `isAdmissionEnabled` callback is a fail-closed process-local
+precheck that can reduce unnecessary polling or invocation. It is not the
+admission authority because it can race with a claim. The store's final atomic
+claim is authoritative. `host.pause()` also has different semantics: it cancels
+locally active work, while closing durable admission prevents new claims only.
 
 This host is intentionally for low-volume single-process admission. It is not a
 distributed queue, leader election service, or cross-replica concurrency limit.
@@ -313,6 +325,7 @@ import {
 
 const harness: HeartbeatTaskStoreConformanceHarness = {
   createStore: async (namespace) => createRemoteHeartbeatStore({ namespace }),
+  createAdmissionControl: async (namespace) => createRemoteHeartbeatAdmissionControl({ namespace }),
   cleanupNamespace: async (namespace) => deleteRemoteHeartbeatFixture(namespace),
   now: () => new Date('2026-08-08T00:00:00.000Z'),
   makeExecutionRecoverable: async ({ namespace, execution, recoverAt }) => {
@@ -331,7 +344,9 @@ for (const scenario of HeartbeatTaskStoreConformance.createScenarios(harness)) {
 
 The required scenarios verify direct lookup, shared-backend round trips,
 idempotent writes, request coalescing, atomic due claims, competing workers,
-claim-fenced success/failure/skip/cancellation, and explicit recovery. The
+claim-fenced success/failure/skip/cancellation, explicit recovery,
+close-vs-claim linearization, fail-closed assigned groups, and unrelated-group
+progress. The
 `makeExecutionRecoverable` hook is test-fixture authority: lease-backed stores
 expire a fixture lease there; it does not add recovery authority to production
 workers. Run-request subscriptions and history readback are checked only when
@@ -377,6 +392,54 @@ The administration contract is separate from `HeartbeatTargetedTaskStore` so
 execution adapters do not accidentally promise a control plane. One concrete
 class may implement both when it can uphold both atomicity contracts, as the
 built-in file service does for one Node.js process.
+
+### Scoped durable admission
+
+Use `HeartbeatTaskAdmissionControl` as the provider-neutral control boundary
+for new-claim admission. It exposes one namespace-wide emergency circuit
+breaker and one optional opaque `admissionGroupId` per task:
+
+```ts
+import type {
+  HeartbeatTaskAdministrationService,
+  HeartbeatTaskAdmissionControl,
+} from '@heddleagent/runtime/advanced';
+
+declare const tasks: HeartbeatTaskAdministrationService;
+declare const admission: HeartbeatTaskAdmissionControl;
+
+await admission.setAdmissionDecision(
+  { kind: 'group', groupId: 'publisher-a' },
+  'closed',
+);
+
+await tasks.createTask({
+  id: 'publisher-a-digest',
+  admissionGroupId: 'publisher-a',
+  task: 'Process the configured publisher work.',
+  intervalMs: 60_000,
+});
+
+// After any product-owned resume preparation commits successfully:
+await admission.setAdmissionDecision(
+  { kind: 'group', groupId: 'publisher-a' },
+  'ready',
+);
+```
+
+The final claim requires the task to be enabled and eligible, namespace
+admission to be `ready`, and the assigned group (when present) to be `ready`.
+An absent namespace decision defaults to `ready`, preserving existing
+namespace-only tasks. An absent assigned-group decision defaults to `closed`,
+so a partially reconciled grouped task cannot run. Ungrouped tasks never infer
+membership from their ID or product data.
+
+Closing a target affects new claims only. It does not disable a task, change
+its due time, consume a run request, modify its checkpoint, cancel an active
+execution, or drain a worker. Those are separate explicit operations. Heddle
+does not model hosted desired state, preparing/blocked phases, transition IDs,
+retry timing, restart orchestration, or product cursor preparation; a hosted
+adapter owns that lifecycle and projects only `ready | closed` into this port.
 
 ### Durable event-driven run requests
 

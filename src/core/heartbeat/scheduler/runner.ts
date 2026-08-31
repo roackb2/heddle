@@ -614,6 +614,14 @@ export class HeartbeatTaskRunnerService {
         failed: false,
       };
     }
+    if (claim.status === 'admission-closed') {
+      return {
+        status: 'admission-closed',
+        taskId,
+        target: claim.target,
+        failed: false,
+      };
+    }
     return { status: claim.status, taskId, failed: false };
   }
 

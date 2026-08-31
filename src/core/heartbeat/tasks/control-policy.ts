@@ -43,6 +43,7 @@ export class HeartbeatTaskControlPolicy {
       id,
       workspaceId: args.input.workspaceId,
       name: args.input.name,
+      admissionGroupId: HeartbeatTaskControlPolicy.resolveAdmissionGroupId(args.input.admissionGroupId),
       task: args.input.task.trim(),
       enabled: args.input.enabled ?? true,
       continuationMode: args.input.continuationMode ?? 'operator',
@@ -81,6 +82,9 @@ export class HeartbeatTaskControlPolicy {
     return {
       ...args.task,
       name: args.input.name ?? args.task.name,
+      admissionGroupId:
+        args.input.admissionGroupId === undefined ? args.task.admissionGroupId
+        : HeartbeatTaskControlPolicy.resolveAdmissionGroupId(args.input.admissionGroupId),
       task: args.input.task?.trim() ?? args.task.task,
       enabled,
       continuationMode: args.input.continuationMode ?? args.task.continuationMode ?? 'operator',
@@ -314,6 +318,16 @@ export class HeartbeatTaskControlPolicy {
     }
 
     throw new Error(`Unable to create a unique heartbeat task id for ${base}`);
+  }
+
+  private static resolveAdmissionGroupId(value: string | null | undefined): string | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (!value.trim()) {
+      throw new Error('Heartbeat admission group id cannot be blank.');
+    }
+    return value;
   }
 
   private static requireValidDate(value: Date, label: string) {

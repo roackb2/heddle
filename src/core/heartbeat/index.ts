@@ -48,7 +48,10 @@ export { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './tasks/index.js';
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
+  HeartbeatAdmissionDecision,
+  HeartbeatAdmissionTarget,
   HeartbeatTaskAdministrationService,
+  HeartbeatTaskAdmissionControl,
   HeartbeatTaskDetail,
   ListHeartbeatRunViewsOptions,
   ReadHeartbeatTaskOptions,

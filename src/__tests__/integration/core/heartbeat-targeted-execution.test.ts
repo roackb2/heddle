@@ -172,6 +172,42 @@ describe('targeted heartbeat execution', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('returns the durable blocking admission target without invoking the handler', async () => {
+    const store = createStore('admission-closed');
+    const task = { ...createTask('grouped-task'), admissionGroupId: 'publisher-a' };
+    await store.saveTask(task);
+    const handler = vi.fn(async (context) => context.skip({ summary: 'Unexpected handler invocation.' }));
+
+    await expect(HeartbeatSchedulerService.runTask({
+      store,
+      taskId: task.id,
+      executionOwnerId: 'missing-group',
+      now: () => NOW,
+      handler,
+    })).resolves.toEqual({
+      status: 'admission-closed',
+      taskId: task.id,
+      target: { kind: 'group', groupId: 'publisher-a' },
+      failed: false,
+    });
+
+    await store.setAdmissionDecision({ kind: 'group', groupId: 'publisher-a' }, 'ready');
+    await store.setAdmissionDecision({ kind: 'namespace' }, 'closed');
+    await expect(HeartbeatSchedulerService.runTask({
+      store,
+      taskId: task.id,
+      executionOwnerId: 'closed-namespace',
+      now: () => NOW,
+      handler,
+    })).resolves.toEqual({
+      status: 'admission-closed',
+      taskId: task.id,
+      target: { kind: 'namespace' },
+      failed: false,
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('returns normal failures and claim loss as distinct targeted outcomes', async () => {
     const failureStore = createStore('failure');
     const failureTask = createTask('failure-task');

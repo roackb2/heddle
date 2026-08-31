@@ -9,7 +9,9 @@ import { randomUUID } from 'node:crypto';
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
 import type { AgentHeartbeatResult } from '../agent/index.js';
 import type {
+  HeartbeatAdmissionTarget,
   HeartbeatTask,
+  HeartbeatTaskAdmissionControl,
   HeartbeatTaskExecution,
   HeartbeatTargetedTaskStore,
 } from './types.js';
@@ -26,6 +28,8 @@ export type HeartbeatTaskStoreConformanceCapabilities = {
 export type HeartbeatTaskStoreConformanceHarness = {
   /** Return a fresh store instance using exactly this opaque backend namespace. */
   createStore(namespace: string): MaybePromise<HeartbeatTargetedTaskStore>;
+  /** Return the binary admission control port for the same backend namespace. */
+  createAdmissionControl(namespace: string): MaybePromise<HeartbeatTaskAdmissionControl>;
   /** Remove every resource created for an opaque backend namespace. */
   cleanupNamespace(namespace: string): MaybePromise<void>;
   /** Return a deterministic base time; the suite derives fixed offsets from it. */
@@ -72,6 +76,7 @@ const scenarioName = {
   requests: 'run requests coalesce atomically and settlement preserves newer host state',
   settlement: 'success, skip, cancellation, and failure settle atomically',
   recovery: 'competing claims are busy, live work is retained, and stale settlement is fenced after recovery',
+  admission: 'namespace and group admission changes linearize with claims while unrelated groups keep progressing',
   subscription: 'optional run-request subscriptions receive cross-instance signals and unsubscribe',
   history: 'optional run history supports save, list, filter, limit, and load',
 } as const;
@@ -90,6 +95,7 @@ export class HeartbeatTaskStoreConformance {
       HeartbeatTaskStoreConformance.createScenario(scenarioName.requests, harness, HeartbeatTaskStoreConformance.verifyRunRequests),
       HeartbeatTaskStoreConformance.createScenario(scenarioName.settlement, harness, HeartbeatTaskStoreConformance.verifySettlements),
       HeartbeatTaskStoreConformance.createScenario(scenarioName.recovery, harness, HeartbeatTaskStoreConformance.verifyRecoveryAndFencing),
+      HeartbeatTaskStoreConformance.createScenario(scenarioName.admission, harness, HeartbeatTaskStoreConformance.verifyAdmission),
     ];
     if (harness.capabilities?.runRequestSubscription) {
       scenarios.push(HeartbeatTaskStoreConformance.createScenario(
@@ -380,6 +386,138 @@ export class HeartbeatTaskStoreConformance {
     assert(current.state?.execution?.executionId === replacement.executionId, 'a stale write must not replace the newer claim');
   }
 
+  private static async verifyAdmission(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
+    const first = await harness.createStore(namespace);
+    const second = await harness.createStore(namespace);
+    const admission = await harness.createAdmissionControl(namespace);
+    const namespaceTarget = { kind: 'namespace' } as const;
+    const groupA = { kind: 'group', groupId: 'publisher-a' } as const;
+    const groupB = { kind: 'group', groupId: 'publisher-b' } as const;
+
+    assert(
+      await admission.readAdmissionDecision(namespaceTarget) === 'ready',
+      'an absent namespace decision must preserve legacy readiness',
+    );
+    assert(
+      await admission.readAdmissionDecision(groupA) === 'closed',
+      'an absent assigned group must fail closed',
+    );
+
+    const legacy = createTask('admission-legacy');
+    const groupedWhileMissing = createGroupedTask('admission-missing', groupA);
+    const checkpoint = createResult('admission-checkpoint').checkpoint;
+    await first.saveTask(legacy);
+    await first.saveTask(groupedWhileMissing);
+    await first.saveCheckpoint(groupedWhileMissing, checkpoint);
+
+    const missingGroupClaim = await first.claimTaskExecution({
+      taskId: groupedWhileMissing.id,
+      execution: createExecution('missing-group-execution', 'owner-a', harness),
+      loadedCheckpoint: true,
+      claimedAt: at(harness, 1_000),
+      claimMode: 'due',
+    });
+    assertAdmissionClosed(missingGroupClaim, groupA, 'a task cannot claim before its assigned group is initialized');
+    const preserved = await requireTask(second, groupedWhileMissing.id);
+    assert(preserved.enabled, 'closing admission must not disable the task');
+    assert(
+      preserved.schedule.nextRunAt === groupedWhileMissing.schedule.nextRunAt,
+      'closing admission must preserve the due schedule',
+    );
+    assert(
+      (await second.loadCheckpoint(preserved))?.runId === checkpoint.runId,
+      'closing admission must preserve the checkpoint',
+    );
+
+    const legacyExecution = createExecution('legacy-execution', 'owner-a', harness);
+    await assertClaimed(first, legacy.id, legacyExecution, harness, 2_000);
+    const legacySettlement = await first.recordTaskExecutionOutcome({
+      taskId: legacy.id,
+      execution: legacyExecution,
+      kind: 'skipped',
+      summary: 'Legacy namespace-only work settled.',
+      finishedAt: at(harness, 3_000),
+    });
+    assert(legacySettlement.status === 'saved', 'an ungrouped legacy task must retain namespace-only behavior');
+
+    await admission.setAdmissionDecision(groupA, 'ready');
+    await admission.setAdmissionDecision(groupB, 'ready');
+    const namespaceBlocked = createGroupedTask('namespace-blocked', groupB);
+    await first.saveTask(namespaceBlocked);
+    await admission.setAdmissionDecision(namespaceTarget, 'closed');
+    const namespaceClaim = await second.claimTaskExecution({
+      taskId: namespaceBlocked.id,
+      execution: createExecution('namespace-closed-execution', 'owner-b', harness),
+      loadedCheckpoint: false,
+      claimedAt: at(harness, 4_000),
+      claimMode: 'due',
+    });
+    assertAdmissionClosed(namespaceClaim, namespaceTarget, 'namespace admission must override a ready group');
+    await admission.setAdmissionDecision(namespaceTarget, 'ready');
+
+    const alreadyClaimed = createGroupedTask('admission-active', groupA);
+    await first.saveTask(alreadyClaimed);
+    const activeExecution = createExecution('admission-active-execution', 'owner-a', harness);
+    await assertClaimed(first, alreadyClaimed.id, activeExecution, harness, 5_000);
+    await admission.setAdmissionDecision(groupA, 'closed');
+    const activeSettlement = await first.recordTaskExecutionOutcome({
+      taskId: alreadyClaimed.id,
+      execution: activeExecution,
+      kind: 'skipped',
+      summary: 'Already claimed work remained owned after admission closed.',
+      finishedAt: at(harness, 6_000),
+    });
+    assert(activeSettlement.status === 'saved', 'closing admission must not cancel an already claimed execution');
+
+    await admission.setAdmissionDecision(groupA, 'ready');
+    const racing = createGroupedTask('admission-race', groupA);
+    await first.saveTask(racing);
+    const raceExecution = createExecution('admission-race-execution', 'owner-a', harness);
+    const [, raceClaim] = await Promise.all([
+      admission.setAdmissionDecision(groupA, 'closed'),
+      second.claimTaskExecution({
+        taskId: racing.id,
+        execution: raceExecution,
+        loadedCheckpoint: false,
+        claimedAt: at(harness, 7_000),
+        claimMode: 'due',
+      }),
+    ]);
+    assert(
+      raceClaim.status === 'claimed' || raceClaim.status === 'admission-closed',
+      'a close-vs-claim race must linearize as either a claim or a closed decision',
+    );
+    assert(
+      await admission.readAdmissionDecision(groupA) === 'closed',
+      'the completed close must remain durable after the race',
+    );
+    if (raceClaim.status === 'claimed') {
+      const settlement = await first.recordTaskExecutionOutcome({
+        taskId: racing.id,
+        execution: raceExecution,
+        kind: 'skipped',
+        summary: 'The claim linearized before admission closed.',
+        finishedAt: at(harness, 8_000),
+      });
+      assert(settlement.status === 'saved', 'closing admission must not cancel an already claimed execution');
+    } else {
+      assertDeepEqual(raceClaim.target, groupA, 'the racing claim must identify the blocking group');
+    }
+
+    const groupBTask = createGroupedTask('admission-unrelated', groupB);
+    await first.saveTask(groupBTask);
+    const groupBExecution = createExecution('group-b-execution', 'owner-b', harness);
+    await assertClaimed(second, groupBTask.id, groupBExecution, harness, 9_000);
+    const groupBSettlement = await second.recordTaskExecutionOutcome({
+      taskId: groupBTask.id,
+      execution: groupBExecution,
+      kind: 'skipped',
+      summary: 'The unrelated group remained ready.',
+      finishedAt: at(harness, 10_000),
+    });
+    assert(groupBSettlement.status === 'saved', 'closing one group must not block unrelated-group progress');
+  }
+
   private static async verifyRunRequestSubscription(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
     const first = await harness.createStore(namespace);
     const second = await harness.createStore(namespace);
@@ -413,6 +551,10 @@ export class HeartbeatTaskStoreConformance {
 
 function createTask(id: string): HeartbeatTask {
   return { id, task: `Process ${id}.`, enabled: true, schedule: { intervalMs: 60_000, nextRunAt: '2000-01-01T00:00:00.000Z' } };
+}
+
+function createGroupedTask(id: string, target: Extract<HeartbeatAdmissionTarget, { kind: 'group' }>): HeartbeatTask {
+  return { ...createTask(id), admissionGroupId: target.groupId };
 }
 
 function createExecution(executionId: string, ownerId: string, harness: HeartbeatTaskStoreConformanceHarness): HeartbeatTaskExecution {
@@ -454,4 +596,13 @@ function assert(condition: unknown, detail: string): asserts condition {
 
 function assertDeepEqual(actual: unknown, expected: unknown, detail: string): void {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(detail);
+}
+
+function assertAdmissionClosed(
+  claim: Awaited<ReturnType<HeartbeatTargetedTaskStore['claimTaskExecution']>>,
+  target: HeartbeatAdmissionTarget,
+  detail: string,
+): void {
+  assert(claim.status === 'admission-closed', detail);
+  assertDeepEqual(claim.target, target, `${detail}; the result must identify the blocking target`);
 }

@@ -355,7 +355,10 @@ export {
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
+  HeartbeatAdmissionDecision,
+  HeartbeatAdmissionTarget,
   HeartbeatTaskAdministrationService,
+  HeartbeatTaskAdmissionControl,
   HeartbeatTaskDetail,
   ListHeartbeatRunViewsOptions,
   ReadHeartbeatTaskOptions,

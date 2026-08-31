@@ -15,7 +15,10 @@ export type {
 } from './administration.js';
 export type { FileHeartbeatTaskServiceOptions } from './service.js';
 export type {
+  HeartbeatAdmissionDecision,
+  HeartbeatAdmissionTarget,
   HeartbeatTask,
+  HeartbeatTaskAdmissionControl,
   HeartbeatTaskAgentRunRecord,
   HeartbeatTaskClaimResult,
   HeartbeatTaskClaimMode,

@@ -517,6 +517,7 @@ export function resolveHeartbeatTargetedTaskDispatchDecision(
     status === 'retry'
     || status === 'failed'
     || status === 'not-due'
+    || status === 'admission-closed'
     || status === 'cancelled'
   ) {
     return { kind: 'wait-for-durable-schedule' };

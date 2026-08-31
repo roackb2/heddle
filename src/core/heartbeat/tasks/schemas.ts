@@ -16,6 +16,20 @@ export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', '
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
 export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
 export const HeartbeatTaskRecoveryReasonSchema = z.enum(['host-restart', 'operator']);
+export const HeartbeatAdmissionDecisionSchema = z.enum(['ready', 'closed']);
+export const HeartbeatAdmissionTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('namespace') }),
+  z.object({
+    kind: z.literal('group'),
+    groupId: z.string().refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.'),
+  }),
+]);
+
+export const HeartbeatAdmissionStateSchema = z.object({
+  version: z.literal(1),
+  namespace: HeartbeatAdmissionDecisionSchema.optional(),
+  groups: z.record(z.string(), HeartbeatAdmissionDecisionSchema),
+});
 
 const HeartbeatTaskExecutionSchema = z.object({
   executionId: z.string().describe('Fencing token for the currently owned execution attempt.'),
@@ -52,6 +66,10 @@ export const HeartbeatTaskExecutionOutcomeSchema = z.object({
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),
   workspaceId: z.string().optional().describe('Workspace identifier this task belongs to.'),
+  admissionGroupId: z.string()
+    .refine((value) => value.trim().length > 0, 'Admission group id cannot be blank.')
+    .optional()
+    .describe('Opaque admission group checked in addition to namespace admission.'),
   task: z.string().describe('Durable task instruction the heartbeat should pursue.'),
   name: z.string().optional().describe('Human-facing task label.'),
   enabled: z.boolean().describe('Whether the scheduler may run this task.'),
