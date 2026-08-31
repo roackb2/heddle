@@ -23,6 +23,10 @@ idempotency, and deciding which task namespace this host may see. The host does
 not provide a distributed queue, leader election, or cross-process concurrency
 limit. Use a queue-backed dispatcher when scale or availability requires it;
 the replaceable invocation-target port preserves that migration seam.
+See the public heartbeat guide's
+[operating posture and scale-out path](../../../../docs/guides/heartbeat.md#operating-posture-and-scale-out-path)
+for the default-running convergence model, scaling signals, and staged queue or
+sharding architecture.
 
 `taskIdPrefix` is an optional defense-in-depth filter, not an authorization
 boundary. Prefer giving each host a store already scoped to its tenant or task

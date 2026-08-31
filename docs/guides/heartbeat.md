@@ -299,6 +299,136 @@ Replace its invocation target or the dispatcher itself when production scale
 requires a durable queue or workflow engine; keep the same targeted worker and
 task-store contracts.
 
+### Operating posture and scale-out path
+
+Most product hosts should begin with **one active heartbeat scheduler per
+durable task namespace**. The scheduler process may restart; the remote task
+store keeps schedules, run requests, execution leases, checkpoints, and run
+history durable. Process-local timers and delivery maps are disposable latency
+mechanisms, not correctness state.
+
+#### Make normal operation automatic without running stale tasks
+
+For an established product, "running by default" should mean that the
+product's durable desired state is `running` and the service automatically
+converges the scheduler to that state. It should not mean that a replacement
+scheduler blindly admits persisted tasks before the product has confirmed the
+current catalog and policy.
+
+A safe startup and restart sequence is:
+
+1. start the scheduler endpoint with admission closed;
+2. read the product's durable desired admission state and current desired task
+   catalog;
+3. when the desired state is `running`, reconcile the complete catalog while
+   admission remains closed, then resume admission last;
+4. when the desired state is `paused`, keep admission closed; and
+5. periodically compare desired and actual scheduler state so a scheduler-only
+   restart is detected and reconciled with bounded retry and backoff.
+
+The convergence check should not continuously rewrite an already-correct task
+catalog. Reconcile after a scheduler replacement or a known catalog revision
+change; otherwise leave task timing untouched.
+
+```ts
+type BackgroundWorkDesiredState = 'running' | 'paused';
+
+async function convergeBackgroundWork(): Promise<void> {
+  const desiredState = await productState.readBackgroundWorkDesiredState();
+  const actualState = await coordinator.readState();
+
+  if (desiredState === 'paused') {
+    await coordinator.pause();
+    return;
+  }
+
+  if (actualState === 'paused') {
+    await taskCatalogReconciler.reconcile({
+      desiredTasks: await productState.readDesiredHeartbeatTasks(),
+      resume: true,
+    });
+  }
+}
+```
+
+An operator stop should persist `paused` as the product's desired state before
+converging the scheduler toward it. This prevents a temporary scheduler outage
+from losing the stop instruction, and the product execution lifecycle should
+also fail closed while that durable gate is false. Resume performs the inverse:
+persist `running`, reconcile the authoritative catalog, then reopen admission.
+
+This provides an eventual-attempt guarantee under explicit liveness
+assumptions: the durable store is reachable, an eligible task remains enabled,
+a scheduler is eventually running with admission resumed, and downstream
+execution eventually becomes available. Execution remains at least once.
+Claim fencing rejects stale settlement, but product or external side effects
+must still be idempotent.
+
+#### Keep scheduling singular; scale execution first
+
+A single active scheduler does not imply a single agent execution. The
+scheduler is a small control-plane process that finds and claims work; the
+expensive agent executions can run concurrently in remote or horizontally
+scaled Execution Hosts.
+
+Scale in stages, driven by observed saturation:
+
+| Stage | Architecture | Change when |
+| --- | --- | --- |
+| Low-volume default | One targeted host polls one durable namespace and dispatches a bounded number of executions | Due-to-start latency and store load remain within the product SLO |
+| Larger catalog | One scheduler queries indexed due rows in bounded batches instead of loading and filtering the complete catalog | Full-catalog scans become a material database or latency cost |
+| Larger execution backlog | One scheduler publishes at-least-once task deliveries through a durable queue to a worker fleet | Local concurrency stays saturated or queued work misses its start-latency SLO |
+| Multi-tenant or regional scale | Partition tasks into durable namespaces or shards, with one active scheduler leader per shard | One namespace is too large or tenants need fault and quota isolation |
+| Scheduler high availability | Add active/passive leader election per namespace or shard | Scheduler replacement time no longer meets the availability SLO |
+
+Useful scale signals are due-to-start latency, due-row query duration, pending
+task count, concurrency saturation, execution failure/retry rate, and recovery
+delay. Increase bounded execution concurrency and scale the remote Runtime
+before multiplying scheduler processes.
+
+#### Queue-backed execution
+
+When a process-local dispatcher is no longer sufficient, keep PostgreSQL or
+another transactional task store as the heartbeat authority and insert a
+durable delivery layer between scheduling and execution:
+
+```text
+product desired state and catalog
+              |
+              v
+durable heartbeat task authority
+  (schedule, request, claim, lease, fence, history)
+              |
+              v
+active scheduler leader ----> durable execution queue
+                                      |
+                                      v
+                              targeted worker fleet
+                                      |
+                                      v
+                              distributed Runtime
+```
+
+Queue messages should carry only portable routing data such as the task ID,
+invocation ID, and optional observed run-request generation. Each worker still
+calls `HeartbeatSchedulerService.runTask()`, which performs the final durable
+eligibility check and atomic claim. A stale or duplicate queue delivery cannot
+bypass a disabled task, a future schedule, or another execution owner.
+
+For an AWS-hosted system, SQS is a reasonable durable delivery choice. A
+PostgreSQL-backed queue such as pg-boss can serve the same delivery role when
+operating one database is preferable. Do not let either system redefine
+heartbeat schedules, claim state, or retry settlement; that would create two
+competing workflow authorities. Redis Pub/Sub and PostgreSQL `LISTEN/NOTIFY`
+are useful wake-up hints but are not durable correctness mechanisms by
+themselves.
+
+Multiple active schedulers over one namespace require more than atomic task
+claims: admission state, global concurrency, rate limits, and operator controls
+must also be shared and durable. Prefer one leader per namespace, or explicit
+namespace sharding, over accidentally treating process-local limits as global
+limits.
+
 ### Certify a custom targeted store
 
 Before using a remote adapter with ephemeral or replicated workers, run the
