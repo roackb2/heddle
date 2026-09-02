@@ -6,6 +6,13 @@ object store, or a purpose-built implementation of `MemoryCheckpointStore`.
 The provider does not redefine Heddle's file selection, encoding, validation,
 or restore semantics.
 
+The filesystem mechanics delegate to
+[`src/core/checkpoint/portable-directory`](../../checkpoint/portable-directory/README.md).
+Memory keeps its released v1 scope, generation, manifest, store, error, and
+serialized-byte contracts. Its compatibility policy does not add new default
+file-count or byte rejection; future bounded directory domains must select
+their own explicit operational limits.
+
 ## Owns
 
 - A versioned generation and committed-manifest schema.
@@ -14,6 +21,10 @@ or restore semantics.
 - Restore-before-use into an absent or empty memory root.
 - Manifest compare-and-swap expectations for concurrent writers.
 - Explicit deletion of the authoritative manifest.
+
+The shared portable-directory service owns canonical relative paths, regular
+file integrity envelopes, symlink rejection, bounded reads, and staged local
+restore. It does not own memory's allowlist or durable generation semantics.
 
 ## Portable Files
 

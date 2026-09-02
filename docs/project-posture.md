@@ -106,6 +106,10 @@ See `docs/guides/programmatic/component-model.md` for the user-facing model.
 - `src/core/runtime/` owns host-facing runtime boundaries, default tool
   assembly, credentials, workspace catalogs, daemon discovery, and evented
   single-run execution over `src/core/agent/`.
+- `src/core/checkpoint/` owns lower shared checkpoint primitives such as safe,
+  bounded portable-directory capture and staged restore. Domain scopes,
+  manifests, stores, and lifecycle timing remain in memory, heartbeat, or the
+  future domain that gives those files meaning.
 - `src/core/heartbeat/` owns autonomous runner cycles, heartbeat scheduling,
   checkpoint reuse, and heartbeat task/run views.
 - `src/core/chat/engine/` owns persisted conversation sessions, turns,

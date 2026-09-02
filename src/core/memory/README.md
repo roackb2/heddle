@@ -40,8 +40,11 @@ guidance.
   so the same subject and owner resolve the same memory after a fresh session.
 - `checkpoint/`: provider-neutral checkpoint schemas, deterministic memory-file
   capture, integrity validation, restore-before-use, and a manifest-last store
-  contract. The host supplies the durable store and invokes checkpoints at
-  stable memory boundaries; see its [`README`](checkpoint/README.md).
+  contract. It preserves the released memory-v1 wire/storage contract while
+  delegating reusable path, integrity, and staged-directory mechanics to
+  `src/core/checkpoint/portable-directory`. The host supplies the durable store
+  and invokes checkpoints at stable memory boundaries; see its
+  [`README`](checkpoint/README.md).
 - `catalog.ts`: `MemoryCatalogService` owns catalog bootstrap, root catalog
   loading, startup system-context assembly, and required catalog shape.
 - `domain-prompt.ts`: memory-specific system context.

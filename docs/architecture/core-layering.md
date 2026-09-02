@@ -31,7 +31,7 @@ src/core/agent
 
 Layer 1: Infrastructure and domain primitives
 src/core/llm, src/core/tools, src/core/trace, src/core/auth, src/core/approvals,
-src/core/commands
+src/core/commands, src/core/checkpoint
 
 Layer 0: Shared types and utilities
 src/core/types, src/core/utils, src/core/config
@@ -83,6 +83,13 @@ under a clearly named `utils/` or helper module instead of mixing them with
 service behavior. If a utility clearly belongs to one domain, place it in that
 domain instead; for example, step-budget behavior lives under `src/core/agent`
 rather than generic `src/core/utils`.
+
+`src/core/checkpoint/portable-directory` is the lower shared filesystem
+primitive for domain-owned checkpoints. It owns safe relative paths, selected
+regular-file integrity, explicit resource policies, and staged local restore.
+Memory and future directory-backed domains retain separate scope, manifest,
+store, and lifecycle contracts above it; do not turn this primitive into a
+universal persistence provider.
 
 ## Current Violations And Improvement Areas
 

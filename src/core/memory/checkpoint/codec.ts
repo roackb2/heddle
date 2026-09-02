@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
+import {
+  PortableDirectoryCheckpointCodec,
+  PortableDirectoryCheckpointCorruptionError,
+} from '../../checkpoint/portable-directory/index.js';
 import type { MemoryScopeId } from '../scope.js';
+import { memoryCheckpointDirectoryPolicy } from './directory-policy.js';
 import { MemoryCheckpointCorruptionError } from './errors.js';
 import {
   MemoryCheckpointFileSchema,
@@ -11,11 +15,6 @@ import {
   type MemoryCheckpointGenerationId,
   type MemoryCheckpointManifest,
 } from './schemas.js';
-
-const PORTABLE_MAINTENANCE_FILES = new Set([
-  '_maintenance/candidates.jsonl',
-  '_maintenance/runs.jsonl',
-]);
 
 type CreateMemoryCheckpointGenerationInput = {
   scopeId: MemoryScopeId;
@@ -35,24 +34,11 @@ type CreateMemoryCheckpointManifestInput = {
  */
 export class MemoryCheckpointCodec {
   static isPortablePath(path: string): boolean {
-    if (!MemoryCheckpointCodec.isCanonicalRelativePath(path)) {
-      return false;
-    }
-
-    if (PORTABLE_MAINTENANCE_FILES.has(path)) {
-      return true;
-    }
-
-    return !path.startsWith('_maintenance/') && path.endsWith('.md');
+    return memoryCheckpointDirectoryPolicy.includes(path);
   }
 
   static createFile(path: string, content: Buffer): MemoryCheckpointFile {
-    return MemoryCheckpointFileSchema.parse({
-      path,
-      contentBase64: content.toString('base64'),
-      byteLength: content.byteLength,
-      sha256: MemoryCheckpointCodec.sha256(content),
-    });
+    return MemoryCheckpointFileSchema.parse(PortableDirectoryCheckpointCodec.createFile(path, content));
   }
 
   static createGeneration(input: CreateMemoryCheckpointGenerationInput): MemoryCheckpointGeneration {
@@ -60,7 +46,10 @@ export class MemoryCheckpointCodec {
       kind: 'heddle-memory-checkpoint-generation',
       schemaVersion: 1,
       ...input,
-      files: [...input.files].sort((left, right) => MemoryCheckpointCodec.comparePaths(left.path, right.path)),
+      files: [...input.files].sort((left, right) => PortableDirectoryCheckpointCodec.comparePaths(
+        left.path,
+        right.path,
+      )),
     });
 
     MemoryCheckpointCodec.validateFiles(generation.scopeId, generation.files);
@@ -158,17 +147,14 @@ export class MemoryCheckpointCodec {
       throw new MemoryCheckpointCorruptionError(scopeId, `path is not portable memory state: ${file.path}`);
     }
 
-    const content = Buffer.from(file.contentBase64, 'base64');
-    if (content.toString('base64') !== file.contentBase64) {
-      throw new MemoryCheckpointCorruptionError(scopeId, `file has invalid base64 content: ${file.path}`);
+    try {
+      return PortableDirectoryCheckpointCodec.decodeFile(file);
+    } catch (error) {
+      if (error instanceof PortableDirectoryCheckpointCorruptionError) {
+        throw new MemoryCheckpointCorruptionError(scopeId, error.detail, { cause: error });
+      }
+      throw error;
     }
-    if (content.byteLength !== file.byteLength) {
-      throw new MemoryCheckpointCorruptionError(scopeId, `file byte length does not match content: ${file.path}`);
-    }
-    if (MemoryCheckpointCodec.sha256(content) !== file.sha256) {
-      throw new MemoryCheckpointCorruptionError(scopeId, `file checksum does not match content: ${file.path}`);
-    }
-    return content;
   }
 
   private static validateFiles(scopeId: MemoryScopeId, files: MemoryCheckpointFile[]): void {
@@ -180,26 +166,12 @@ export class MemoryCheckpointCodec {
       if (paths.has(file.path)) {
         throw new MemoryCheckpointCorruptionError(scopeId, `duplicate file path: ${file.path}`);
       }
-      if (priorPath && MemoryCheckpointCodec.comparePaths(priorPath, file.path) >= 0) {
+      if (priorPath && PortableDirectoryCheckpointCodec.comparePaths(priorPath, file.path) >= 0) {
         throw new MemoryCheckpointCorruptionError(scopeId, 'generation files are not in canonical path order');
       }
       paths.add(file.path);
       priorPath = file.path;
     }
-  }
-
-  private static isCanonicalRelativePath(path: string): boolean {
-    return Boolean(path)
-      && !path.includes('\\')
-      && !path.includes('\0')
-      && !posix.isAbsolute(path)
-      && posix.normalize(path) === path
-      && path !== '.'
-      && !path.startsWith('../');
-  }
-
-  private static comparePaths(left: string, right: string): number {
-    return Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8'));
   }
 
   private static generationSha256(generation: MemoryCheckpointGeneration): string {

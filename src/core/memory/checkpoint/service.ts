@@ -1,19 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
-  lstat,
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  realpath,
-  rename,
-  rm,
-  rmdir,
-  writeFile,
-} from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+  PortableDirectoryCheckpointCaptureError,
+  PortableDirectoryCheckpointCorruptionError,
+  PortableDirectoryCheckpointRestoreTargetError,
+  PortableDirectoryCheckpointService,
+} from '../../checkpoint/portable-directory/index.js';
 import type { MemoryScopeId } from '../scope.js';
 import { MemoryCheckpointCodec } from './codec.js';
+import { memoryCheckpointDirectoryPolicy } from './directory-policy.js';
 import {
   MemoryCheckpointCaptureError,
   MemoryCheckpointCorruptionError,
@@ -38,6 +32,7 @@ import type {
 export class MemoryCheckpointService {
   private readonly now: () => Date;
   private readonly createGenerationId: NonNullable<MemoryCheckpointServiceOptions['createGenerationId']>;
+  private readonly directory: PortableDirectoryCheckpointService;
 
   constructor(
     private readonly memoryRoot: string,
@@ -47,6 +42,7 @@ export class MemoryCheckpointService {
     this.now = options.now ?? (() => new Date());
     this.createGenerationId = options.createGenerationId
       ?? (() => MemoryCheckpointGenerationIdSchema.parse(`memory-generation-v1-${randomUUID()}`));
+    this.directory = new PortableDirectoryCheckpointService(this.memoryRoot, memoryCheckpointDirectoryPolicy);
   }
 
   /**
@@ -114,9 +110,7 @@ export class MemoryCheckpointService {
       return { status: 'absent' };
     }
 
-    const memoryRoot = resolve(this.memoryRoot);
-    await this.prepareRestoreTarget(memoryRoot);
-    await this.restoreGeneration(memoryRoot, checkpoint);
+    const memoryRoot = await this.restoreGeneration(checkpoint);
     return {
       status: 'restored',
       memoryRoot,
@@ -146,95 +140,31 @@ export class MemoryCheckpointService {
   }
 
   private async captureFiles(): Promise<MemoryCheckpointFile[]> {
-    const configuredRoot = resolve(this.memoryRoot);
-    let memoryRoot: string;
     try {
-      memoryRoot = await realpath(configuredRoot);
+      return await this.directory.capture();
     } catch (error) {
-      throw new MemoryCheckpointCaptureError(configuredRoot, 'memory root does not exist', { cause: error });
-    }
-
-    const files: MemoryCheckpointFile[] = [];
-    await this.walkMemoryFiles(memoryRoot, memoryRoot, files);
-    return files;
-  }
-
-  private async walkMemoryFiles(
-    memoryRoot: string,
-    directory: string,
-    files: MemoryCheckpointFile[],
-  ): Promise<void> {
-    const entries = (await readdir(directory, { withFileTypes: true }))
-      .sort((left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)));
-
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const portablePath = relative(memoryRoot, path).split(sep).join('/');
-
-      if (entry.isSymbolicLink()) {
-        throw new MemoryCheckpointCaptureError(
-          memoryRoot,
-          `symbolic links are not portable memory state: ${portablePath}`,
-        );
-      }
-      if (entry.isDirectory()) {
-        await this.walkMemoryFiles(memoryRoot, path, files);
-        continue;
-      }
-      if (!MemoryCheckpointCodec.isPortablePath(portablePath)) {
-        continue;
-      }
-      if (!entry.isFile()) {
-        throw new MemoryCheckpointCaptureError(
-          memoryRoot,
-          `portable memory path is not a regular file: ${portablePath}`,
-        );
-      }
-
-      files.push(MemoryCheckpointCodec.createFile(portablePath, await readFile(path)));
-    }
-  }
-
-  private async prepareRestoreTarget(memoryRoot: string): Promise<void> {
-    try {
-      const target = await lstat(memoryRoot);
-      if (!target.isDirectory() || target.isSymbolicLink()) {
-        throw new MemoryCheckpointRestoreTargetError(memoryRoot);
-      }
-      if ((await readdir(memoryRoot)).length > 0) {
-        throw new MemoryCheckpointRestoreTargetError(memoryRoot);
-      }
-      await rmdir(memoryRoot);
-    } catch (error) {
-      if (MemoryCheckpointService.isErrorWithCode(error, 'ENOENT')) {
-        return;
+      if (error instanceof PortableDirectoryCheckpointCaptureError) {
+        throw new MemoryCheckpointCaptureError(error.directoryRoot, error.detail, { cause: error });
       }
       throw error;
     }
   }
 
-  private async restoreGeneration(memoryRoot: string, checkpoint: MemoryCheckpointBundle): Promise<void> {
-    const parent = dirname(memoryRoot);
-    await mkdir(parent, { recursive: true });
-    const stagingRoot = await mkdtemp(join(parent, `.${basename(memoryRoot)}.restore-`));
-
+  private async restoreGeneration(checkpoint: MemoryCheckpointBundle): Promise<string> {
     try {
-      for (const file of checkpoint.generation.files) {
-        const targetPath = resolve(stagingRoot, ...file.path.split('/'));
-        await mkdir(dirname(targetPath), { recursive: true });
-        await writeFile(
-          targetPath,
-          MemoryCheckpointCodec.decodeFile(checkpoint.manifest.scopeId, file),
-          { flag: 'wx', mode: 0o600 },
+      return await this.directory.restore(checkpoint.generation.files);
+    } catch (error) {
+      if (error instanceof PortableDirectoryCheckpointRestoreTargetError) {
+        throw new MemoryCheckpointRestoreTargetError(error.directoryRoot);
+      }
+      if (error instanceof PortableDirectoryCheckpointCorruptionError) {
+        throw new MemoryCheckpointCorruptionError(
+          checkpoint.manifest.scopeId,
+          error.detail,
+          { cause: error },
         );
       }
-      await rename(stagingRoot, memoryRoot);
-    } finally {
-      await rm(stagingRoot, { recursive: true, force: true });
+      throw error;
     }
-  }
-
-  private static isErrorWithCode(error: unknown, code: string): error is Error & { code: string } {
-    return error instanceof Error && 'code' in error && error.code === code;
   }
 }

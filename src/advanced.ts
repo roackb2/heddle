@@ -151,6 +151,23 @@ export {
 } from './core/observability/index.js';
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';
 
+// --- Building blocks: portable directory checkpoints -----------------------
+export {
+  PortableDirectoryCheckpointCaptureError,
+  PortableDirectoryCheckpointCodec,
+  PortableDirectoryCheckpointCorruptionError,
+  PortableDirectoryCheckpointFileSchema,
+  PortableDirectoryCheckpointPolicy,
+  PortableDirectoryCheckpointPolicyError,
+  PortableDirectoryCheckpointRestoreTargetError,
+  PortableDirectoryCheckpointService,
+} from './core/checkpoint/index.js';
+export type {
+  PortableDirectoryCheckpointFile,
+  PortableDirectoryCheckpointLimits,
+  PortableDirectoryCheckpointPolicyOptions,
+} from './core/checkpoint/index.js';
+
 // --- Building blocks: memory & knowledge -----------------------------------
 export { buildMemoryDomainSystemContext } from './core/memory/domain-prompt.js';
 export {
