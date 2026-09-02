@@ -5,6 +5,13 @@ restoring one explicitly selected directory. It lets durable domains share the
 same path, symlink, integrity, resource-limit, and staged-restore guarantees
 without pretending that they share one scope, manifest, store, or lifecycle.
 
+Here, a **checkpoint** means the portable, content-verified representation of
+the selected directory files at a recoverable save point. This module owns how
+those files are captured, validated, and restored. It deliberately does not
+decide when a save point is valid, how versions are committed, or which version
+is current; those lifecycle decisions belong to the domain above it, such as
+the working-set checkpoint service.
+
 ## Owns
 
 - Canonical POSIX-style relative file paths that cannot traverse the selected
@@ -14,7 +21,9 @@ without pretending that they share one scope, manifest, store, or lifecycle.
   and explicit file-count, per-file byte, and total-byte limits.
 - Deterministic, bounded capture that rejects symbolic links and selected
   non-regular files.
-- Validation of every restored file before the destination is touched.
+- Pure validation of every persisted file against the exact selection,
+  integrity, path-conflict, and resource policy before a destination is
+  touched.
 - Restore through a sibling staging directory followed by one rename into an
   absent or empty destination.
 

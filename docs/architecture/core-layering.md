@@ -21,7 +21,7 @@ src/sdk, src/cli-v2, src/server, src/web-v2
 
 Layer 4: Product/domain workflows
 src/core/chat/engine, src/core/heartbeat, src/core/memory, src/core/awareness,
-src/core/review
+src/core/review, src/core/working-set
 
 Layer 3: Runtime host foundation
 src/core/runtime
@@ -87,9 +87,11 @@ rather than generic `src/core/utils`.
 `src/core/checkpoint/portable-directory` is the lower shared filesystem
 primitive for domain-owned checkpoints. It owns safe relative paths, selected
 regular-file integrity, explicit resource policies, and staged local restore.
-Memory and future directory-backed domains retain separate scope, manifest,
-store, and lifecycle contracts above it; do not turn this primitive into a
-universal persistence provider.
+Memory and working-set domains retain separate scope, manifest, store, and
+lifecycle contracts above it; do not turn this primitive into a universal
+persistence provider. `src/core/working-set` owns the durable meaning and
+validate-before-reset recovery lifecycle of a disposable agent working copy;
+the host owns verified scope authority and the privileged local reset.
 
 ## Current Violations And Improvement Areas
 

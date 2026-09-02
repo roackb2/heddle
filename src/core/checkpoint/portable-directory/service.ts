@@ -98,6 +98,14 @@ export class PortableDirectoryCheckpointService {
     }
   }
 
+  /**
+   * Validates that a persisted file set is safe and restoreable under this
+   * service's exact selection and resource policy without touching disk.
+   */
+  validate(files: readonly PortableDirectoryCheckpointFile[]): void {
+    this.prepareFiles(files);
+  }
+
   /** Validates every file before atomically presenting a staged working copy. */
   async restore(files: readonly PortableDirectoryCheckpointFile[]): Promise<string> {
     const preparedFiles = this.prepareFiles(files);

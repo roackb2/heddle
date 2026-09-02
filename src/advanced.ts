@@ -168,6 +168,40 @@ export type {
   PortableDirectoryCheckpointPolicyOptions,
 } from './core/checkpoint/index.js';
 
+// --- Building blocks: durable working sets ---------------------------------
+export {
+  WORKING_SET_CHECKPOINT_SCHEMA_VERSION,
+  WORKING_SET_SCOPE_VERSION,
+  WorkingSetCheckpointCaptureError,
+  WorkingSetCheckpointCodec,
+  WorkingSetCheckpointConfigurationError,
+  WorkingSetCheckpointConflictError,
+  WorkingSetCheckpointCorruptionError,
+  WorkingSetCheckpointFileSchema,
+  WorkingSetCheckpointGenerationIdSchema,
+  WorkingSetCheckpointGenerationSchema,
+  WorkingSetCheckpointManifestSchema,
+  WorkingSetCheckpointRecoveryError,
+  WorkingSetCheckpointService,
+  WorkingSetScopeIdentitySchema,
+  WorkingSetScopeIdSchema,
+  deriveWorkingSetScopeId,
+} from './core/working-set/index.js';
+export type {
+  CommitWorkingSetCheckpointInput,
+  LoadWorkingSetCheckpointGenerationInput,
+  PrepareOrRecoverWorkingSetResult,
+  WorkingSetCheckpointBundle,
+  WorkingSetCheckpointFile,
+  WorkingSetCheckpointGeneration,
+  WorkingSetCheckpointGenerationId,
+  WorkingSetCheckpointManifest,
+  WorkingSetCheckpointServiceOptions,
+  WorkingSetCheckpointStore,
+  WorkingSetScopeIdentity,
+  WorkingSetScopeId,
+} from './core/working-set/index.js';
+
 // --- Building blocks: memory & knowledge -----------------------------------
 export { buildMemoryDomainSystemContext } from './core/memory/domain-prompt.js';
 export {
