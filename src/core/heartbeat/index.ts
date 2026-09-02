@@ -93,11 +93,15 @@ export type {
 } from './agent/index.js';
 export { HeartbeatRunService } from './runs/index.js';
 export type {
+  HeartbeatRunContext,
   HeartbeatRunHandle,
   HeartbeatRunPublicError,
+  HeartbeatRunResultProjector,
   HeartbeatRunServiceOptions,
   HeartbeatRunStreamItem,
   HeartbeatRunner,
+  StartHeartbeatRunInput,
+  StartProjectedHeartbeatRunInput,
 } from './runs/index.js';
 export { HeartbeatLucidPresenter, HeartbeatTaskViewProjector } from './views/index.js';
 export type {
