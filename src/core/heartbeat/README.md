@@ -14,7 +14,10 @@ operator-facing heartbeat views.
   beside it.
 - `runs/`: `HeartbeatRunService` owns the process-local lifecycle for one
   explicitly requested heartbeat cycle: run identity, cancellation, ordered
-  activity, and exactly one terminal result, cancellation, or safe error.
+  activity, awaited host result projection, and exactly one terminal result,
+  cancellation, or safe error. Result projection completes before either the
+  handle promise or canonical result stream item settles; cancellation remains
+  authoritative if it races projection.
   Hosts provide resolved model/tool/MCP options and consume its handle instead
   of rebuilding callback-to-stream coordination.
 - `checkpoint/`: `StoredHeartbeatService` and

@@ -3,17 +3,21 @@ import dayjs from 'dayjs';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import { HeartbeatRunnerAgent } from '../agent/index.js';
 import type {
+  HeartbeatRunContext,
   HeartbeatRunHandle,
+  HeartbeatRunResultProjector,
   HeartbeatRunServiceOptions,
   HeartbeatRunStreamItem,
   HeartbeatRunner,
+  StartHeartbeatRunInput,
+  StartProjectedHeartbeatRunInput,
 } from './types.js';
-import type { RunAgentHeartbeatOptions } from '../agent/index.js';
+import type { AgentHeartbeatResult } from '../agent/index.js';
 
 const HEARTBEAT_CANCELLED_MESSAGE = 'Heartbeat run was cancelled.';
 const HEARTBEAT_FAILED_MESSAGE = 'The heartbeat run could not complete.';
 
-type HeartbeatRunStreamPayload = HeartbeatRunStreamItem extends infer Item
+type HeartbeatRunStreamPayload<Result> = HeartbeatRunStreamItem<Result> extends infer Item
   ? Item extends unknown
     ? Omit<Item, 'runId' | 'sequence' | 'timestamp'>
     : never
@@ -22,6 +26,7 @@ type HeartbeatRunStreamPayload = HeartbeatRunStreamItem extends infer Item
 /**
  * Owns the process-local lifecycle for one explicitly requested heartbeat run.
  *
+ * An optional result projector is awaited before public success settlement.
  * Scheduling and durable task settlement remain in the heartbeat scheduler;
  * deployment-specific model, tool, and MCP composition remain with the host.
  */
@@ -36,17 +41,27 @@ export class HeartbeatRunService {
     this.runner = options.runner ?? HeartbeatRunnerAgent.run.bind(HeartbeatRunnerAgent);
   }
 
-  start(options: RunAgentHeartbeatOptions): HeartbeatRunHandle {
+  start<Result>(options: StartProjectedHeartbeatRunInput<Result>): HeartbeatRunHandle<Result>;
+  start(options: StartHeartbeatRunInput): HeartbeatRunHandle;
+  start<Result>(
+    options: StartHeartbeatRunInput | StartProjectedHeartbeatRunInput<Result>,
+  ): HeartbeatRunHandle<AgentHeartbeatResult | Result> {
     const runId = this.createRunId();
     const controller = new AbortController();
     const signal = options.abortSignal
       ? AbortSignal.any([options.abortSignal, controller.signal])
       : controller.signal;
-    const stream = new RuntimeSubscriptionStream<HeartbeatRunStreamItem>();
+    const stream = new RuntimeSubscriptionStream<HeartbeatRunStreamItem<AgentHeartbeatResult | Result>>();
+    const context: HeartbeatRunContext = { runId, signal };
+    const projectResult = 'projectResult' in options
+      ? options.projectResult
+      : undefined;
+    const { projectResult: _projectResult, ...runnerOptions } = options as
+      StartProjectedHeartbeatRunInput<Result>;
     let sequence = 0;
     let terminal = false;
 
-    const publish = (item: HeartbeatRunStreamPayload): void => {
+    const publish = (item: HeartbeatRunStreamPayload<AgentHeartbeatResult | Result>): void => {
       if (terminal) {
         return;
       }
@@ -60,7 +75,7 @@ export class HeartbeatRunService {
         runId,
         sequence,
         timestamp: this.now(),
-      } as HeartbeatRunStreamItem);
+      } as HeartbeatRunStreamItem<AgentHeartbeatResult | Result>);
       if (isTerminal) {
         stream.sink.close();
       }
@@ -70,27 +85,36 @@ export class HeartbeatRunService {
       .then(async () => {
         HeartbeatRunService.throwIfCancelled(signal);
         const heartbeatResult = await this.runner({
-          ...options,
+          ...runnerOptions,
           abortSignal: signal,
           onEvent: (event) => {
             publish({ kind: 'activity', activity: event });
-            options.onEvent?.(event);
+            runnerOptions.onEvent?.(event);
           },
         });
         HeartbeatRunService.throwIfCancelled(signal);
-        publish({ kind: 'result', result: heartbeatResult });
-        return heartbeatResult;
+        const projectedResult = await HeartbeatRunService.projectResult(
+          projectResult,
+          heartbeatResult,
+          context,
+        );
+        HeartbeatRunService.throwIfCancelled(signal);
+        publish({ kind: 'result', result: projectedResult });
+        return projectedResult;
       })
       .catch((error: unknown) => {
-        publish(signal.aborted
-          ? { kind: 'cancelled', reason: HEARTBEAT_CANCELLED_MESSAGE }
-          : {
-            kind: 'error',
-            error: {
-              code: 'heartbeat_run_failed',
-              message: HEARTBEAT_FAILED_MESSAGE,
-            },
-          });
+        if (signal.aborted) {
+          publish({ kind: 'cancelled', reason: HEARTBEAT_CANCELLED_MESSAGE });
+          HeartbeatRunService.throwIfCancelled(signal);
+        }
+
+        publish({
+          kind: 'error',
+          error: {
+            code: 'heartbeat_run_failed',
+            message: HEARTBEAT_FAILED_MESSAGE,
+          },
+        });
         throw error;
       });
     result.catch(() => undefined);
@@ -117,6 +141,18 @@ export class HeartbeatRunService {
     throw signal.reason instanceof Error
       ? signal.reason
       : new Error(HEARTBEAT_CANCELLED_MESSAGE);
+  }
+
+  private static async projectResult<Result>(
+    projectResult: HeartbeatRunResultProjector<Result> | undefined,
+    result: AgentHeartbeatResult,
+    run: HeartbeatRunContext,
+  ): Promise<AgentHeartbeatResult | Result> {
+    if (!projectResult) {
+      return result;
+    }
+
+    return await projectResult(result, run);
   }
 }
 

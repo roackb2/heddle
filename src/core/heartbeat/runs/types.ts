@@ -15,14 +15,31 @@ type HeartbeatRunStreamEnvelope = {
   timestamp: string;
 };
 
-export type HeartbeatRunStreamItem =
+export type HeartbeatRunContext = {
+  runId: string;
+  signal: AbortSignal;
+};
+
+export type HeartbeatRunResultProjector<Result> = (
+  result: AgentHeartbeatResult,
+  run: HeartbeatRunContext,
+) => Result | Promise<Result>;
+
+export type StartHeartbeatRunInput = RunAgentHeartbeatOptions;
+
+export type StartProjectedHeartbeatRunInput<Result> = RunAgentHeartbeatOptions & {
+  /** Runs before the canonical result terminal is published. */
+  projectResult: HeartbeatRunResultProjector<Result>;
+};
+
+export type HeartbeatRunStreamItem<Result = AgentHeartbeatResult> =
   | (HeartbeatRunStreamEnvelope & {
     kind: 'activity';
     activity: AgentHeartbeatEvent;
   })
   | (HeartbeatRunStreamEnvelope & {
     kind: 'result';
-    result: AgentHeartbeatResult;
+    result: Result;
   })
   | (HeartbeatRunStreamEnvelope & {
     kind: 'cancelled';
@@ -33,10 +50,10 @@ export type HeartbeatRunStreamItem =
     error: HeartbeatRunPublicError;
   });
 
-export type HeartbeatRunHandle = {
+export type HeartbeatRunHandle<Result = AgentHeartbeatResult> = {
   runId: string;
-  result: Promise<AgentHeartbeatResult>;
-  events(): AsyncIterable<HeartbeatRunStreamItem>;
+  result: Promise<Result>;
+  events(): AsyncIterable<HeartbeatRunStreamItem<Result>>;
   cancel(): boolean;
 };
 

@@ -329,11 +329,15 @@ export type {
 } from './core/heartbeat/agent/index.js';
 export { HeartbeatRunService } from './core/heartbeat/runs/index.js';
 export type {
+  HeartbeatRunContext,
   HeartbeatRunHandle,
   HeartbeatRunPublicError,
+  HeartbeatRunResultProjector,
   HeartbeatRunServiceOptions,
   HeartbeatRunStreamItem,
   HeartbeatRunner,
+  StartHeartbeatRunInput,
+  StartProjectedHeartbeatRunInput,
 } from './core/heartbeat/runs/index.js';
 export {
   FileHeartbeatCheckpointRepository,
