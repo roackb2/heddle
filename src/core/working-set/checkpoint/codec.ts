@@ -26,7 +26,10 @@ type CreateWorkingSetCheckpointManifestInput = {
   committedAt: string;
 };
 
-/** Owns the provider-neutral v1 wire shape and integrity rules. */
+/**
+ * Owns the provider-neutral v1 wire shape and integrity rules for immutable
+ * generations and the manifest that selects the current recovery point.
+ */
 export class WorkingSetCheckpointCodec {
   static createGeneration(
     input: CreateWorkingSetCheckpointGenerationInput,

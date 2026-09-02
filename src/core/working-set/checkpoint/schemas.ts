@@ -4,6 +4,11 @@ import { WorkingSetScopeIdSchema } from '../scope.js';
 
 export const WORKING_SET_CHECKPOINT_SCHEMA_VERSION = 1 as const;
 
+/**
+ * Identifies one immutable saved version of a working directory.
+ * Every successful checkpoint creates a new generation instead of overwriting
+ * the files belonging to the previous recovery point.
+ */
 export const WorkingSetCheckpointGenerationIdSchema = z
   .string()
   .min(1)
@@ -13,6 +18,10 @@ export const WorkingSetCheckpointGenerationIdSchema = z
 
 export const WorkingSetCheckpointFileSchema = PortableDirectoryCheckpointFileSchema;
 
+/**
+ * One immutable, content-verified directory snapshot produced by checkpointing.
+ * A generation is recoverable only after the scope manifest points to it.
+ */
 export const WorkingSetCheckpointGenerationSchema = z.object({
   kind: z.literal('heddle-working-set-checkpoint-generation'),
   schemaVersion: z.literal(WORKING_SET_CHECKPOINT_SCHEMA_VERSION),
@@ -22,6 +31,10 @@ export const WorkingSetCheckpointGenerationSchema = z.object({
   files: z.array(WorkingSetCheckpointFileSchema),
 }).strict();
 
+/**
+ * The small authoritative pointer to the currently committed generation.
+ * Advancing this record makes an already-written generation the recovery point.
+ */
 export const WorkingSetCheckpointManifestSchema = z.object({
   kind: z.literal('heddle-working-set-checkpoint-manifest'),
   schemaVersion: z.literal(WORKING_SET_CHECKPOINT_SCHEMA_VERSION),

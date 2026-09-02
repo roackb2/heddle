@@ -5,6 +5,26 @@ working directory. It gives a hosted Runtime a canonical committed generation
 that can outlive a process, microVM, or provider continuity volume without
 turning the entire workspace into one persistence boundary.
 
+## Vocabulary
+
+- **Working set:** the free-form files the agent is actively using to continue
+  work across executions.
+- **Checkpoint:** a durable recovery point containing the exact working-set
+  state that has been accepted as safe to resume. As a verb, to checkpoint is
+  to capture the directory and commit a new recovery point. It does not imply
+  that the agent's larger task is finished.
+- **Generation:** one immutable version of the checkpointed directory. Every
+  successful checkpoint writes a new generation; existing generations are
+  never edited in place.
+- **Manifest:** the small authoritative record that names which generation is
+  current. A generation may be written but is not committed recovery truth
+  until the manifest advances to it.
+
+Writing immutable generations before updating one small manifest lets the
+system survive a crash between those operations: an incomplete or orphaned
+generation is ignored, while readers continue restoring the last generation
+named by the manifest.
+
 ## Owns
 
 - `WorkingSetScopeId`, a deterministic opaque address derived from already
