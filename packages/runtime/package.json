@@ -1,6 +1,6 @@
 {
   "name": "@heddleagent/runtime",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "description": "Embeddable TypeScript and Node.js agent runtime and SDK for Heddle-powered products",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
