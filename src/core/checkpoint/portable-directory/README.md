@@ -14,7 +14,9 @@ without pretending that they share one scope, manifest, store, or lifecycle.
   and explicit file-count, per-file byte, and total-byte limits.
 - Deterministic, bounded capture that rejects symbolic links and selected
   non-regular files.
-- Validation of every restored file before the destination is touched.
+- Pure validation of every persisted file against the exact selection,
+  integrity, path-conflict, and resource policy before a destination is
+  touched.
 - Restore through a sibling staging directory followed by one rename into an
   absent or empty destination.
 
