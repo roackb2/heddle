@@ -7,7 +7,8 @@ export const WORKING_SET_CHECKPOINT_SCHEMA_VERSION = 1 as const;
 /**
  * Identifies one immutable saved version of a working directory.
  * Every successful checkpoint creates a new generation instead of overwriting
- * the files belonging to the previous recovery point.
+ * the files belonging to the previous recovery point. This is a storage
+ * generation, unrelated to an LLM/model generation.
  */
 export const WorkingSetCheckpointGenerationIdSchema = z
   .string()
@@ -20,7 +21,8 @@ export const WorkingSetCheckpointFileSchema = PortableDirectoryCheckpointFileSch
 
 /**
  * One immutable, content-verified directory snapshot produced by checkpointing.
- * A generation is recoverable only after the scope manifest points to it.
+ * A generation is recoverable only after the scope manifest points to it. In
+ * this module, "generation" always means a snapshot version, never model output.
  */
 export const WorkingSetCheckpointGenerationSchema = z.object({
   kind: z.literal('heddle-working-set-checkpoint-generation'),

@@ -15,7 +15,8 @@ turning the entire workspace into one persistence boundary.
   that the agent's larger task is finished.
 - **Generation:** one immutable version of the checkpointed directory. Every
   successful checkpoint writes a new generation; existing generations are
-  never edited in place.
+  never edited in place. This is storage/versioning vocabulary and is unrelated
+  to an LLM or model generation.
 - **Manifest:** the small authoritative record that names which generation is
   current. A generation may be written but is not committed recovery truth
   until the manifest advances to it.
