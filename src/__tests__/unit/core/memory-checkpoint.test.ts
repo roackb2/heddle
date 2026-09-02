@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  MemoryCheckpointCodec,
   MemoryCheckpointConflictError,
   MemoryCheckpointCorruptionError,
   MemoryCheckpointGenerationIdSchema,
@@ -98,6 +99,47 @@ describe('MemoryCheckpointService', () => {
       .resolves.toBe('# Music\nAmbient and post-rock.\n');
     await expect(stat(join(fixture.memoryRoot, '_maintenance/maintenance.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(stat(join(fixture.memoryRoot, 'credentials.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('preserves the exact released memory-v1 generation and manifest bytes', () => {
+    const generation = MemoryCheckpointCodec.createGeneration({
+      scopeId,
+      generationId: MemoryCheckpointGenerationIdSchema.parse('generation-1'),
+      createdAt: '2026-08-26T00:00:00.000Z',
+      files: [MemoryCheckpointCodec.createFile('README.md', Buffer.from('# Memory\n'))],
+    });
+    const manifest = MemoryCheckpointCodec.createManifest({
+      generation,
+      committedAt: '2026-08-26T00:00:00.000Z',
+    });
+
+    expect(MemoryCheckpointCodec.serializeGeneration(generation)).toBe(`{
+  "kind": "heddle-memory-checkpoint-generation",
+  "schemaVersion": 1,
+  "scopeId": "memory-v1-f6c317c8362c7f6a261782e0c296239075d478fdbf9e861bc6a7a5c3ffc50a97",
+  "generationId": "generation-1",
+  "createdAt": "2026-08-26T00:00:00.000Z",
+  "files": [
+    {
+      "path": "README.md",
+      "contentBase64": "IyBNZW1vcnkK",
+      "byteLength": 9,
+      "sha256": "d7870cdadd1ac3b46461cce0776275aeb54f15f19338e597fafd0f277b1f0070"
+    }
+  ]
+}
+`);
+    expect(MemoryCheckpointCodec.serializeManifest(manifest)).toBe(`{
+  "kind": "heddle-memory-checkpoint-manifest",
+  "schemaVersion": 1,
+  "scopeId": "memory-v1-f6c317c8362c7f6a261782e0c296239075d478fdbf9e861bc6a7a5c3ffc50a97",
+  "generationId": "generation-1",
+  "generationSha256": "e114fc81376990386a2bac155bd20dd7875c4595b056f7f3fa6a0790ef0d0a3b",
+  "fileCount": 1,
+  "totalBytes": 9,
+  "committedAt": "2026-08-26T00:00:00.000Z"
+}
+`);
   });
 
   it('rejects corrupt durable content before creating a local working copy', async () => {

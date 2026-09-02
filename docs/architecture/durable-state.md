@@ -329,6 +329,16 @@ boundaries. A shutdown checkpoint may reduce loss, but must not be the sole
 commit path. An official object-store adapter, periodic long-session trigger,
 and Execution Host recovery integration are not implemented yet.
 
+Memory's local capture and restore delegate to the reusable
+[`PortableDirectoryCheckpointService`](../../src/core/checkpoint/portable-directory/README.md).
+That lower primitive requires an explicit selection and resource policy,
+rejects unsafe paths and symlinks, validates per-file integrity, and stages a
+complete directory before rename. It does not define durable scope, generation
+identity, manifest compare-and-swap, or execution settlement. Memory v1 uses
+compatibility ceilings so this extraction does not silently reject previously
+accepted memory checkpoints; a future working-directory specialization must
+choose narrower operational limits in its own public contract.
+
 ### Approval policy and project configuration
 
 Remembered project approvals live in `command-approvals.json` through
