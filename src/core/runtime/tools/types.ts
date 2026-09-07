@@ -28,4 +28,5 @@ export type DefaultAgentToolsOptions = {
   toolProfile?: RuntimeToolSelectionProfile;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
+  includeDefaultTools?: boolean;
 };

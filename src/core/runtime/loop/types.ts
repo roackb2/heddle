@@ -19,6 +19,7 @@ import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } 
 import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type { AgentModelContextRecovery } from '@/core/agent/index.js';
+import type { ToolToolkit } from '@/core/tools/index.js';
 
 export type AgentLoopStatus = 'finished';
 
@@ -93,6 +94,8 @@ export type RunAgentLoopOptions = {
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
   credential?: RuntimeProviderCredential;
+  /** Optional credential store independent from runtime state/checkpoint roots. */
+  credentialStorePath?: string;
   preferApiKey?: boolean;
   maxSteps?: number;
   maxToolConcurrency?: number;
@@ -105,6 +108,8 @@ export type RunAgentLoopOptions = {
   resumeFrom?: AgentLoopState | AgentLoopCheckpoint;
   llm?: LlmAdapter;
   tools?: ToolDefinition[];
+  /** Construct request-scoped tools after Heddle resolves the run credential. */
+  toolkits?: ToolToolkit[];
   extraTools?: ToolDefinition[];
   includeDefaultTools?: boolean;
   includePlanTool?: boolean;

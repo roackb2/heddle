@@ -54,13 +54,14 @@ describe('custom heartbeat runner credentials', () => {
       credentials: {
         apiKey: undefined,
         credential: expect.objectContaining({
-          type: 'oauth',
+          type: 'oauth-access-token',
           provider: 'openai',
           accessToken: 'stored-access-token',
         }),
         credentialStorePath,
       },
     }));
+    expect(createAdapter.mock.calls[0]?.[0].credentials?.credential).not.toHaveProperty('refreshToken');
 
     const externallyVisibleState = JSON.stringify({
       tasks: execution.savedTasks,

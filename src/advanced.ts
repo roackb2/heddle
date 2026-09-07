@@ -111,9 +111,39 @@ export type { MoveFileToolOptions } from './core/tools/toolkits/coding-files/mov
 export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './core/tools/toolkits/coding-files/search-files.js';
 export type { SearchFilesOptions } from './core/tools/toolkits/coding-files/search-files.js';
 export { webSearchTool, createWebSearchTool } from './core/tools/toolkits/external-context/web-search.js';
-export type { WebSearchToolOptions } from './core/tools/toolkits/external-context/web-search.js';
-export { viewImageTool, createViewImageTool } from './core/tools/toolkits/external-context/view-image.js';
-export type { ViewImageToolOptions } from './core/tools/toolkits/external-context/view-image.js';
+export type {
+  WebSearchToolDefinition,
+  WebSearchToolOptions,
+} from './core/tools/toolkits/external-context/web-search.js';
+export {
+  DEFAULT_MAX_IMAGE_BYTES,
+  viewImageTool,
+  createViewImageTool,
+} from './core/tools/toolkits/external-context/view-image.js';
+export type {
+  ViewImageResource,
+  ViewImageResourceResolver,
+  ViewImageToolDefinition,
+  ViewImageToolOptions,
+} from './core/tools/toolkits/external-context/view-image.js';
+export {
+  MAX_EXTERNAL_CONTEXT_PROMPT_LENGTH,
+  MAX_VIEW_IMAGE_INPUTS,
+  MAX_WEB_SEARCH_CITATION_TITLE_LENGTH,
+  MAX_WEB_SEARCH_CITATIONS,
+  ViewImageInputSchema,
+  ViewImageOutputSchema,
+  WebSearchCitationSchema,
+  WebSearchInputSchema,
+  WebSearchOutputSchema,
+} from './core/tools/toolkits/external-context/schemas.js';
+export type {
+  ViewImageInput,
+  ViewImageOutput,
+  WebSearchCitation,
+  WebSearchInput,
+  WebSearchOutput,
+} from './core/tools/toolkits/external-context/schemas.js';
 export { updatePlanTool } from './core/tools/toolkits/internal/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './core/tools/toolkits/internal/update-plan.js';
 export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/shell-process/run-shell.js';
