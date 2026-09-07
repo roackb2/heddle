@@ -15,6 +15,9 @@ the normal agent loop path.
 Programmatic hosts can also pass additional `ToolToolkit` values. Runtime tools
 compose host toolkits after the default toolkit list, using the same
 duplicate-id and duplicate-tool-name checks as built-in toolkits.
+`AgentLoopRuntimeService.run(...)` can compose only those request-scoped
+toolkits by setting `includeDefaultTools: false`; the toolkit context then
+contains the provider credential already resolved for that run.
 
 Runtime tools also enforce resolved default-tool visibility policy. For MCP,
 `hiddenMcpServerIds` hides host-owned servers from the generic `mcp_*` toolkit

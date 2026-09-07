@@ -350,6 +350,7 @@ export class OpenAiCodexSseService {
     oauthFetch: ReturnType<typeof OpenAiOAuthFetchService.create> | undefined;
     body: unknown;
     endpoint?: string;
+    signal?: AbortSignal;
   }): Promise<string> {
     if (!args.oauthFetch) {
       throw new Error('Missing OAuth fetch implementation for OpenAI Codex request.');
@@ -359,6 +360,7 @@ export class OpenAiCodexSseService {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(args.body),
+      signal: args.signal,
     });
 
     if (!response.ok) {

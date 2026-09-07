@@ -12,7 +12,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
-import type { ToolDefinition, ToolResult } from '../../../types.js';
+import type { ToolDefinition, ToolExecutionContext, ToolResult } from '../../../types.js';
 import { LlmAdapterService } from '../../../llm/index.js';
 import {
   OpenAiCodexSseService,
@@ -26,11 +26,15 @@ import {
   type ProviderCredentialSource,
   type ResolvedProviderCredential,
 } from '../../../runtime/credentials/index.js';
-
-type WebSearchInput = {
-  query: string;
-  contextSize?: 'low' | 'medium' | 'high';
-};
+import {
+  MAX_WEB_SEARCH_CITATIONS,
+  WebSearchCitationSchema,
+  WebSearchInputSchema,
+  WebSearchOutputSchema,
+  type WebSearchCitation,
+  type WebSearchInput,
+  type WebSearchOutput,
+} from './schemas.js';
 
 export type WebSearchToolOptions = {
   model?: string;
@@ -41,9 +45,11 @@ export type WebSearchToolOptions = {
   credentialStorePath?: string;
 };
 
-export const webSearchTool: ToolDefinition = createWebSearchTool();
+export type WebSearchToolDefinition = ToolDefinition<WebSearchInput, WebSearchOutput>;
 
-export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDefinition {
+export const webSearchTool: WebSearchToolDefinition = createWebSearchTool();
+
+export function createWebSearchTool(options: WebSearchToolOptions = {}): WebSearchToolDefinition {
   return {
     name: 'web_search',
     description:
@@ -64,23 +70,26 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
       },
       required: ['query'],
     },
-    async execute(raw: unknown): Promise<ToolResult> {
-      if (!isWebSearchInput(raw)) {
+    inputSchema: WebSearchInputSchema,
+    outputSchema: WebSearchOutputSchema,
+    async execute(raw: unknown, context?: ToolExecutionContext): Promise<ToolResult<WebSearchOutput>> {
+      const parsed = WebSearchInputSchema.safeParse(raw);
+      if (!parsed.success) {
         return {
           ok: false,
           error: 'Invalid input for web_search. Required field: query. Optional field: contextSize ("low", "medium", or "high").',
         };
       }
 
-      const input = raw as WebSearchInput;
+      const input = parsed.data;
       const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
 
       try {
         switch (provider) {
           case 'openai':
-            return await executeOpenAiWebSearch(input, options);
+            return await executeOpenAiWebSearch(input, options, context?.signal);
           case 'anthropic':
-            return await executeAnthropicWebSearch(input, options);
+            return await executeAnthropicWebSearch(input, options, context?.signal);
           case 'google':
             return {
               ok: false,
@@ -110,7 +119,11 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
   };
 }
 
-async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
+async function executeOpenAiWebSearch(
+  input: WebSearchInput,
+  options: WebSearchToolOptions,
+  signal?: AbortSignal,
+): Promise<ToolResult<WebSearchOutput>> {
   const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
   const oauthCredential =
     OpenAiOAuthFetchService.isAccountCredential(options.credential) ? options.credential
@@ -143,7 +156,7 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
   }
 
   if (oauthCredential) {
-    return await executeOpenAiOAuthWebSearch(input, { ...options, model }, oauthCredential);
+    return await executeOpenAiOAuthWebSearch(input, { ...options, model }, oauthCredential, signal);
   }
 
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
@@ -162,11 +175,11 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
       type: 'web_search',
       search_context_size: input.contextSize ?? 'medium',
     } satisfies WebSearchTool],
-  });
+  }, { signal });
 
   return {
     ok: true,
-    output: formatOpenAiWebSearchResult(response),
+    output: WebSearchOutputSchema.parse(formatOpenAiWebSearchResult(response)),
   };
 }
 
@@ -174,7 +187,8 @@ async function executeOpenAiOAuthWebSearch(
   input: WebSearchInput,
   options: WebSearchToolOptions & { model: string },
   oauthCredential: Parameters<typeof OpenAiOAuthFetchService.create>[0],
-): Promise<ToolResult> {
+  signal?: AbortSignal,
+): Promise<ToolResult<WebSearchOutput>> {
   const oauthFetch = OpenAiOAuthFetchService.create(oauthCredential, { storePath: options.credentialStorePath });
   const sseText = await OpenAiCodexSseService.execute({
     oauthFetch,
@@ -191,14 +205,19 @@ async function executeOpenAiOAuthWebSearch(
         search_context_size: input.contextSize ?? 'medium',
       }],
     },
+    signal,
   });
   return {
     ok: true,
-    output: formatOpenAiOAuthWebSearchSseResult(sseText, options.model),
+    output: WebSearchOutputSchema.parse(formatOpenAiOAuthWebSearchSseResult(sseText, options.model)),
   };
 }
 
-async function executeAnthropicWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
+async function executeAnthropicWebSearch(
+  input: WebSearchInput,
+  options: WebSearchToolOptions,
+  signal?: AbortSignal,
+): Promise<ToolResult<WebSearchOutput>> {
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
   if (!apiKey) {
     return {
@@ -223,34 +242,16 @@ async function executeAnthropicWebSearch(input: WebSearchInput, options: WebSear
       role: 'user',
       content: `Search the web for the following query and answer concisely with citations when available:\n\n${input.query}`,
     }],
-  });
+  }, { signal });
 
   return {
     ok: true,
-    output: formatAnthropicWebSearchResult(response),
+    output: WebSearchOutputSchema.parse(formatAnthropicWebSearchResult(response)),
   };
 }
 
 function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0);
-}
-
-function isWebSearchInput(raw: unknown): raw is WebSearchInput {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return false;
-  }
-
-  const input = raw as Record<string, unknown>;
-  const keys = Object.keys(input);
-  if (keys.some((key) => key !== 'query' && key !== 'contextSize')) {
-    return false;
-  }
-
-  if (typeof input.query !== 'string' || input.query.trim().length === 0) {
-    return false;
-  }
-
-  return input.contextSize === undefined || input.contextSize === 'low' || input.contextSize === 'medium' || input.contextSize === 'high';
 }
 
 function formatOpenAiWebSearchResult(response: Response): {
@@ -266,7 +267,7 @@ function formatOpenAiWebSearchResult(response: Response): {
     provider: 'openai',
     model: response.model,
     summary,
-    citations,
+    citations: normalizeWebSearchCitations(citations),
   };
 }
 
@@ -316,7 +317,7 @@ function formatOpenAiOAuthWebSearchSseResult(sseText: string, model: string): {
     provider: 'openai',
     model,
     summary: OpenAiCodexSseService.extractOutputText(sseText).trim() || 'No summary returned.',
-    citations: extractSseWebSearchSources(sseText),
+    citations: normalizeWebSearchCitations(extractSseWebSearchSources(sseText)),
   };
 }
 
@@ -366,8 +367,19 @@ function formatAnthropicWebSearchResult(response: Message): {
     provider: 'anthropic',
     model: response.model,
     summary,
-    citations,
+    citations: normalizeWebSearchCitations(citations),
   };
+}
+
+function normalizeWebSearchCitations(
+  citations: Array<{ title: string; url: string }>,
+): WebSearchCitation[] {
+  return citations
+    .flatMap((citation) => {
+      const parsed = WebSearchCitationSchema.safeParse(citation);
+      return parsed.success ? [parsed.data] : [];
+    })
+    .slice(0, MAX_WEB_SEARCH_CITATIONS);
 }
 
 function extractAnthropicUrlCitations(citationsInput: TextCitation[]): Array<{ title: string; url: string }> {

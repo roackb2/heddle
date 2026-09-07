@@ -28,14 +28,15 @@ export class RuntimeToolService {
       join(stateRoot, 'memory');
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
+    const defaultToolkits = options.includeDefaultTools === false ? [] : this.createDefaultToolkits({
+      artifactsEnabled: options.artifactsEnabled ?? true,
+      includePlanTool: options.includePlanTool,
+      browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
+      stateRoot,
+    });
     const tools = RuntimeToolService.withHostTools({
       defaultTools: ToolBundleComposer.compose({
-        toolkits: this.createDefaultToolkits({
-          artifactsEnabled: options.artifactsEnabled ?? true,
-          includePlanTool: options.includePlanTool,
-          browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
-          stateRoot,
-        }).concat(options.toolkits ?? []),
+        toolkits: defaultToolkits.concat(options.toolkits ?? []),
         context: {
           workspaceRoot,
           stateRoot,

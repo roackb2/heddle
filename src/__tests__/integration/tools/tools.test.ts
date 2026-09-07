@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -775,6 +776,169 @@ describe('viewImageTool', () => {
       ok: false,
       error: 'view_image supports .png, .jpg, .jpeg, .gif, and .webp files.',
     });
+  });
+
+  it('fails closed when a host does not authorize an opaque image reference', async () => {
+    const resourceResolver = vi.fn().mockResolvedValue(null);
+    const tool = createViewImageTool({ resourceResolver });
+
+    const result = await tool.execute({ reference: 'image-123' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Image view failed: The host did not authorize or resolve the requested image reference.',
+    });
+    expect(resourceResolver).toHaveBeenCalledWith('image-123', {});
+  });
+
+  it('rejects unsupported host-resolved media before any provider call', async () => {
+    const tool = createViewImageTool({
+      resourceResolver: async () => ({
+        bytes: Buffer.from('not-an-image'),
+        mediaType: 'application/octet-stream',
+      }),
+    });
+
+    const result = await tool.execute({ reference: 'image-123' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Image view failed: Host-resolved images must use image/png, image/jpeg, image/gif, or image/webp.',
+    });
+  });
+
+  it('bounds host-resolved image streams before provider invocation', async () => {
+    const tool = createViewImageTool({
+      maxImageBytes: 4,
+      resourceResolver: async () => ({
+        bytes: (async function* () {
+          yield Buffer.from('123');
+          yield Buffer.from('45');
+        })(),
+        mediaType: 'image/png',
+      }),
+    });
+
+    const result = await tool.execute({ reference: 'image-123' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Image view failed: Image exceeds the configured 4-byte inspection limit.',
+    });
+  });
+
+  it.each([
+    {
+      label: 'byte count',
+      metadata: { byteSize: 100 },
+      error: 'Image view failed: Host-resolved image byte count does not match its metadata.',
+    },
+    {
+      label: 'SHA-256',
+      metadata: { checksumSha256: '0'.repeat(64) },
+      error: 'Image view failed: Host-resolved image failed its SHA-256 integrity check.',
+    },
+  ])('rejects mismatched host-resolved $label metadata', async ({ metadata, error }) => {
+    const tool = createViewImageTool({
+      resourceResolver: async () => ({
+        bytes: Buffer.from('image-bytes'),
+        mediaType: 'image/png',
+        ...metadata,
+      }),
+    });
+
+    await expect(tool.execute({ reference: 'image-123' })).resolves.toEqual({
+      ok: false,
+      error,
+    });
+  });
+
+  it('honors cancellation before resolving host image content', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('cancelled by host'));
+    const resourceResolver = vi.fn();
+    const tool = createViewImageTool({ resourceResolver });
+
+    const result = await tool.execute({ reference: 'image-123' }, { signal: controller.signal });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Image view failed: cancelled by host',
+    });
+    expect(resourceResolver).not.toHaveBeenCalled();
+  });
+
+  it('inspects host-resolved bytes directly with request-scoped credentials', async () => {
+    const bytes = Buffer.from('host-owned-image-bytes');
+    const credential = {
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+    } as const;
+    const resourceResolver = vi.fn(async () => ({
+      bytes: (async function* () {
+        yield bytes.subarray(0, 8);
+        yield bytes.subarray(8);
+      })(),
+      mediaType: 'image/png',
+      byteSize: bytes.byteLength,
+      checksumSha256: createHash('sha256').update(bytes).digest('hex'),
+    }));
+    const requests: Array<{ headers: Headers; body: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        headers: new Headers(init?.headers),
+        body: String(init?.body ?? ''),
+      });
+      return new Response([
+        'event: response.output_text.done',
+        'data: {"type":"response.output_text.done","text":"Stored project image.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":1}',
+        '',
+        'event: response.completed',
+        'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"gpt-5.4","output_text":"Stored project image.","output":[]}}',
+        '',
+      ].join('\n'), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    }));
+    const tool = createViewImageTool({
+      model: 'gpt-5.4',
+      credential,
+      providerCredentialSource: {
+        type: 'oauth-access-token',
+        provider: 'openai',
+        expiresAt: credential.expiresAt,
+        accountId: credential.accountId,
+      },
+      resourceResolver,
+    });
+
+    const result = await tool.execute({
+      reference: 'image-123',
+      prompt: 'Describe the stored image.',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        reference: 'image-123',
+        summary: 'Stored project image.',
+      },
+    });
+    expect(resourceResolver).toHaveBeenCalledWith('image-123', {});
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer request-access-token');
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      input?: Array<{ content?: Array<{ image_url?: string }> }>;
+    };
+    expect(body.input?.[0]?.content?.[1]?.image_url).toBe(
+      `data:image/png;base64,${bytes.toString('base64')}`,
+    );
   });
 
   it('fails clearly when no OpenAI key is available for the default provider', async () => {

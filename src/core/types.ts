@@ -30,7 +30,13 @@ export type ToolExecutionContext = {
   signal?: AbortSignal;
 };
 
-export type ToolDefinition = {
+export type ToolValidationSchema<Value> = {
+  safeParse(input: unknown):
+    | { success: true; data: Value }
+    | { success: false; error: unknown };
+};
+
+export type ToolDefinition<Input = unknown, Output = unknown> = {
   name: string;
   description: string;
   requiresApproval?: boolean;
@@ -48,12 +54,22 @@ export type ToolDefinition = {
    */
   concurrency?: ToolConcurrencyMode;
   parameters: Record<string, unknown>; // JSON Schema object
+  /** Canonical host-side validation schema for the model-provided input. */
+  inputSchema?: ToolValidationSchema<Input>;
+  /** Canonical host-side validation schema for successful output. */
+  outputSchema?: ToolValidationSchema<Output>;
   /** Immutable execution provenance owned by the host, never by the model. */
   hostPolicy?: ToolPolicyHostContext;
   /** Resolve host provenance for broker tools whose authority is input-selected. */
   resolveHostPolicy?: (input: unknown) => ToolPolicyHostContext | undefined;
-  execute: (input: unknown, context?: ToolExecutionContext) => Promise<ToolResult>;
+  execute: (input: unknown, context?: ToolExecutionContext) => Promise<ToolResult<Output>>;
 };
+
+export type ToolInput<Definition extends ToolDefinition> =
+  Definition extends ToolDefinition<infer Input, unknown> ? Input : never;
+
+export type ToolOutput<Definition extends ToolDefinition> =
+  Definition extends ToolDefinition<unknown, infer Output> ? Output : never;
 
 /**
  * What the model asked the runtime to do.
@@ -77,9 +93,9 @@ export type AssistantDiagnostics = {
 /**
  * What came back from executing a tool.
  */
-export type ToolResult = {
+export type ToolResult<Output = unknown> = {
   ok: boolean;
-  output?: unknown;
+  output?: Output;
   error?: string;
 };
 

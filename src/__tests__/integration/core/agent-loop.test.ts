@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../advanced.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -19,6 +21,90 @@ import {
 const silentLogger = createLogger({ level: 'silent', console: false });
 
 describe('AgentLoopRuntimeService.run', () => {
+  it('constructs an exact host toolkit with the run-scoped OAuth credential', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-run-toolkit-credential-'));
+    const credentialStorePath = join(root, 'auth.json');
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'stored-access-token',
+      refreshToken: 'stored-refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-09-07T00:00:00.000Z',
+      updatedAt: '2026-09-07T00:00:00.000Z',
+    });
+
+    let adapterCredential: unknown;
+    let toolkitCredential: unknown;
+    let toolkitCredentialSource: unknown;
+    let modelVisibleTools: string[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(_messages, tools): Promise<LlmResponse> {
+        modelVisibleTools = tools.map((tool) => tool.name);
+        return { content: 'Done.' };
+      },
+    };
+    const createLlm = vi.spyOn(LlmAdapterService, 'create').mockImplementation((input) => {
+      adapterCredential = input.credentials?.credential;
+      return fakeLlm;
+    });
+    const toolkit: ToolToolkit = {
+      id: 'host-project-context',
+      createTools(context) {
+        toolkitCredential = context.credential;
+        toolkitCredentialSource = context.providerCredentialSource;
+        return [{
+          name: 'host_context_read',
+          description: 'Read bounded host context.',
+          parameters: { type: 'object', properties: {} },
+          execute: async () => ({ ok: true, output: 'context' }),
+        }];
+      },
+    };
+
+    try {
+      const result = await AgentLoopRuntimeService.run({
+        goal: 'Answer from bounded context.',
+        model: 'gpt-5.4',
+        credentialStorePath,
+        includeDefaultTools: false,
+        toolkits: [toolkit],
+        maxSteps: 1,
+        logger: silentLogger,
+        workspaceRoot: root,
+      });
+
+      expect(result.outcome).toBe('done');
+    } finally {
+      createLlm.mockRestore();
+    }
+
+    expect(adapterCredential).toMatchObject({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'stored-access-token',
+      accountId: 'account-123',
+    });
+    expect(toolkitCredential).toBe(adapterCredential);
+    expect(toolkitCredentialSource).toMatchObject({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accountId: 'account-123',
+    });
+    expect(modelVisibleTools).toEqual(['host_context_read']);
+  });
+
   it('runs through the public execution loop and emits loop events around trace events', async () => {
     const workspaceRoot = resolve('/tmp/heddle-loop-test');
     const seenMessages: ChatMessage[][] = [];

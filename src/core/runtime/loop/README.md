@@ -12,6 +12,19 @@ Use `AgentLoopCheckpointService` for state/checkpoint conversion and resume
 history extraction. Do not put chat sessions, heartbeat scheduling, or host UI
 logic in this folder.
 
+## Request-scoped toolkits and credentials
+
+Hosts that need an exact tool surface can pass `toolkits` together with
+`includeDefaultTools: false`. The runtime resolves or acquires the provider
+credential once, then builds every toolkit with the existing
+`ToolToolkitContext`; hosts should not pre-resolve credentials merely to create
+provider-backed tools. `credentialStorePath` can be set independently when a
+host's runtime state root and credential store are intentionally different.
+
+Static `tools` remain supported. Toolkit and tool names are duplicate-checked
+through the same runtime tool assembly path whether default tools are enabled
+or disabled.
+
 ## Tool Concurrency
 
 `maxToolConcurrency` bounds parallel-safe tool execution for one run. The

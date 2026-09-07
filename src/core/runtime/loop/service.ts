@@ -14,6 +14,7 @@ import type {
   ProviderCredentialSource,
   ResolvedProviderCredential,
 } from '../credentials/index.js';
+import { RuntimeCredentialService } from '../credentials/index.js';
 import { LlmProviderRuntimeService } from '../provider-runtime/index.js';
 import { RuntimeToolService } from '../tools/index.js';
 import { AgentLoopCheckpointService } from './checkpoint.js';
@@ -27,8 +28,12 @@ export class AgentLoopRuntimeService {
     const runId = AgentLoopCheckpointService.resolveRunId(options.runId);
     const model = options.model ?? options.llm?.info?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
     const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
-    const credentialStorePath = this.resolveCredentialStorePath({ workspaceRoot, stateDir: options.stateDir });
-    const providerRuntime = LlmProviderRuntimeService.resolve({
+    const credentialStorePath = this.resolveCredentialStorePath({
+      workspaceRoot,
+      stateDir: options.stateDir,
+      credentialStorePath: options.credentialStorePath,
+    });
+    const providerRuntime = await this.resolveProviderRuntime({
       model,
       apiKey: options.apiKey,
       apiKeyProvider: options.apiKeyProvider,
@@ -36,6 +41,8 @@ export class AgentLoopRuntimeService {
       credentialStorePath,
       preferApiKey: options.preferApiKey,
       reasoningEffort: options.reasoningEffort,
+      signal: options.abortSignal,
+      acquireRequestCredential: !options.llm || Boolean(options.toolkits?.length),
     });
     if (!options.llm) {
       LlmProviderRuntimeService.assertRunnable(providerRuntime);
@@ -177,10 +184,43 @@ export class AgentLoopRuntimeService {
   private static resolveCredentialStorePath(args: {
     workspaceRoot: string;
     stateDir?: string;
+    credentialStorePath?: string;
   }): string | undefined {
+    if (args.credentialStorePath) {
+      return resolve(args.workspaceRoot, args.credentialStorePath);
+    }
     return args.stateDir
       ? ProviderCredentialRepository.resolveStorePath(resolve(args.workspaceRoot, args.stateDir))
       : undefined;
+  }
+
+  private static async resolveProviderRuntime(
+    args: Parameters<typeof LlmProviderRuntimeService.resolve>[0] & {
+      signal?: AbortSignal;
+      acquireRequestCredential: boolean;
+    },
+  ): Promise<ReturnType<typeof LlmProviderRuntimeService.resolve>> {
+    const { signal, acquireRequestCredential, ...input } = args;
+    const initial = LlmProviderRuntimeService.resolve(input);
+    if (!acquireRequestCredential || initial.credentialSource.type !== 'oauth') {
+      return initial;
+    }
+
+    const credential = await RuntimeCredentialService.acquireRequestScopedCredentialForModel(
+      input.model,
+      {
+        storePath: input.credentialStorePath,
+        ...(signal ? { signal } : {}),
+      },
+    );
+    if (!credential) {
+      throw new Error(`Heddle could not acquire the stored ${initial.provider} credential for ${input.model}.`);
+    }
+
+    return LlmProviderRuntimeService.resolve({
+      ...input,
+      credential,
+    });
   }
 
   private static async createLoopLlmAdapter(options: {
@@ -218,27 +258,22 @@ export class AgentLoopRuntimeService {
   ): ToolDefinition[] {
     const providedTools = options.tools ?? [];
     const extraTools = options.extraTools ?? [];
-    if (options.includeDefaultTools === false) {
-      return [...providedTools, ...extraTools];
-    }
-
-    return [
-      ...RuntimeToolService.createDefaultAgentTools({
-        model: runtime.model,
-        apiKey: runtime.apiKey,
-        credential: runtime.credential,
-        providerCredentialSource: runtime.providerCredentialSource,
-        credentialStorePath: runtime.credentialStorePath,
-        workspaceRoot: runtime.workspaceRoot,
-        stateDir: options.stateDir,
-        stateRoot: this.resolveStateRoot(runtime.workspaceRoot, options.stateDir),
-        memoryDir: options.memoryDir,
-        searchIgnoreDirs: options.searchIgnoreDirs,
-        includePlanTool: options.includePlanTool,
-      }),
-      ...providedTools,
-      ...extraTools,
-    ];
+    return RuntimeToolService.createDefaultAgentTools({
+      model: runtime.model,
+      apiKey: runtime.apiKey,
+      credential: runtime.credential,
+      providerCredentialSource: runtime.providerCredentialSource,
+      credentialStorePath: runtime.credentialStorePath,
+      workspaceRoot: runtime.workspaceRoot,
+      stateDir: options.stateDir,
+      stateRoot: this.resolveStateRoot(runtime.workspaceRoot, options.stateDir),
+      memoryDir: options.memoryDir,
+      searchIgnoreDirs: options.searchIgnoreDirs,
+      includePlanTool: options.includePlanTool,
+      includeDefaultTools: options.includeDefaultTools,
+      toolkits: options.toolkits,
+      tools: [...providedTools, ...extraTools],
+    });
   }
 
   private static async resolveSystemContext(args: {
