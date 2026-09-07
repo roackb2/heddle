@@ -356,7 +356,7 @@ export type {
   RunAgentOptions,
 } from './core/agent/index.js';
 export { AgentLoopCheckpointService, AgentLoopRuntimeService } from './core/runtime/loop/index.js';
-export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
+export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopEventListener, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
 
 // --- Specialized runtimes: read-only delegation ---------------------------
 export {
