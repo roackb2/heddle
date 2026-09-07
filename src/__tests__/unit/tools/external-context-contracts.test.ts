@@ -36,7 +36,8 @@ describe('external-context public contracts', () => {
 
     expect(search.inputSchema).toBe(WebSearchInputSchema);
     expect(search.outputSchema).toBe(WebSearchOutputSchema);
-    expect(image.inputSchema).toBe(ViewImageInputSchema);
+    expect(image.inputSchema?.safeParse({ path: 'screen.png' }).success).toBe(true);
+    expect(image.inputSchema?.safeParse({ reference: 'host-image' }).success).toBe(false);
     expect(image.outputSchema).toBe(ViewImageOutputSchema);
   });
 

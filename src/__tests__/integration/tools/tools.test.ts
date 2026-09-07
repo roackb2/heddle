@@ -778,6 +778,56 @@ describe('viewImageTool', () => {
     });
   });
 
+  it('can expose a reference-only schema that does not advertise or accept local paths', async () => {
+    const resourceResolver = vi.fn();
+    const tool = createViewImageTool({
+      resourceResolver,
+      sourcePolicy: 'references-only',
+    });
+
+    expect(tool.description).toContain('host-authorized opaque image references');
+    expect(tool.description).not.toContain('local image paths');
+    expect(tool.parameters).toMatchObject({
+      properties: {
+        reference: expect.any(Object),
+        references: expect.any(Object),
+        prompt: expect.any(Object),
+      },
+      anyOf: [
+        { required: ['reference'] },
+        { required: ['references'] },
+      ],
+    });
+    expect((tool.parameters.properties as Record<string, unknown>).path).toBeUndefined();
+    expect((tool.parameters.properties as Record<string, unknown>).paths).toBeUndefined();
+
+    await expect(tool.execute({ path: 'screen.png' })).resolves.toEqual({
+      ok: false,
+      error: 'Invalid input for view_image. Required field: reference or references. Optional field: prompt.',
+    });
+    expect(tool.inputSchema?.safeParse({ path: 'screen.png' }).success).toBe(false);
+    expect(resourceResolver).not.toHaveBeenCalled();
+  });
+
+  it('requires a resource resolver when source policy enables references', () => {
+    expect(() => createViewImageTool({ sourcePolicy: 'references-only' })).toThrow(
+      'view_image sourcePolicy requires a resourceResolver when references are enabled.',
+    );
+    expect(() => createViewImageTool({ sourcePolicy: 'paths-and-references' })).toThrow(
+      'view_image sourcePolicy requires a resourceResolver when references are enabled.',
+    );
+  });
+
+  it('keeps path-only behavior when a host resolver is omitted', async () => {
+    const tool = createViewImageTool();
+
+    expect((tool.parameters.properties as Record<string, unknown>).reference).toBeUndefined();
+    await expect(tool.execute({ reference: 'image-123' })).resolves.toEqual({
+      ok: false,
+      error: 'Invalid input for view_image. Required field: path or paths. Optional field: prompt.',
+    });
+  });
+
   it('fails closed when a host does not authorize an opaque image reference', async () => {
     const resourceResolver = vi.fn().mockResolvedValue(null);
     const tool = createViewImageTool({ resourceResolver });
@@ -866,6 +916,70 @@ describe('viewImageTool', () => {
       error: 'Image view failed: cancelled by host',
     });
     expect(resourceResolver).not.toHaveBeenCalled();
+  });
+
+  it('uses a host-specific default prompt when view_image input omits prompt', async () => {
+    const bytes = Buffer.from('host-owned-image-bytes');
+    const credential = {
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+    } as const;
+    const requests: Array<{ body: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ body: String(init?.body ?? '') });
+      return new Response([
+        'event: response.output_text.done',
+        'data: {"type":"response.output_text.done","text":"Stored project image.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":1}',
+        '',
+        'event: response.completed',
+        'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"gpt-5.4","output_text":"Stored project image.","output":[]}}',
+        '',
+      ].join('\n'), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    }));
+    const tool = createViewImageTool({
+      model: 'gpt-5.4',
+      credential,
+      defaultPrompt: 'Describe visible project evidence only.',
+      providerCredentialSource: {
+        type: 'oauth-access-token',
+        provider: 'openai',
+        expiresAt: credential.expiresAt,
+        accountId: credential.accountId,
+      },
+      resourceResolver: async () => ({
+        bytes,
+        mediaType: 'image/png',
+      }),
+    });
+
+    await expect(tool.execute({ reference: 'image-123' })).resolves.toEqual({
+      ok: true,
+      output: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        reference: 'image-123',
+        summary: 'Stored project image.',
+      },
+    });
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      input?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    expect(body.input?.[0]?.content?.[0]?.text).toBe('Describe visible project evidence only.');
+  });
+
+  it('rejects invalid host-specific default prompts at construction time', () => {
+    expect(() => createViewImageTool({ defaultPrompt: '' })).toThrow(
+      'view_image defaultPrompt must be a non-empty string up to 2000 characters.',
+    );
+    expect(() => createViewImageTool({ defaultPrompt: 'x'.repeat(2_001) })).toThrow(
+      'view_image defaultPrompt must be a non-empty string up to 2000 characters.',
+    );
   });
 
   it('inspects host-resolved bytes directly with request-scoped credentials', async () => {
