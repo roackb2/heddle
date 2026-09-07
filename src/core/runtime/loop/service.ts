@@ -18,6 +18,7 @@ import { RuntimeCredentialService } from '../credentials/index.js';
 import { LlmProviderRuntimeService } from '../provider-runtime/index.js';
 import { RuntimeToolService } from '../tools/index.js';
 import { AgentLoopCheckpointService } from './checkpoint.js';
+import { AgentLoopEventDelivery } from './event-delivery.js';
 import type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './types.js';
 
 /**
@@ -72,89 +73,100 @@ export class AgentLoopRuntimeService {
     });
     const now = () => new Date().toISOString();
     const startedAt = now();
+    const eventDelivery = new AgentLoopEventDelivery(options.onEvent);
 
-    logger.info({
-      model,
-      provider: providerRuntime.provider,
-      credentialSource: providerRuntime.credentialSource.type,
-      credentialProvider: 'provider' in providerRuntime.credentialSource ? providerRuntime.credentialSource.provider : undefined,
-    }, 'Agent runtime configured');
+    try {
+      logger.info({
+        model,
+        provider: providerRuntime.provider,
+        credentialSource: providerRuntime.credentialSource.type,
+        credentialProvider: 'provider' in providerRuntime.credentialSource ? providerRuntime.credentialSource.provider : undefined,
+      }, 'Agent runtime configured');
 
-    const resumeMetadata = AgentLoopCheckpointService.resolveResumeMetadata(options.resumeFrom);
+      const resumeMetadata = AgentLoopCheckpointService.resolveResumeMetadata(options.resumeFrom);
 
-    options.onEvent?.({
-      source: 'agent-loop',
-      type: HeddleEventType.loopStarted,
-      runId,
-      goal: options.goal,
-      model,
-      provider: providerRuntime.provider,
-      workspaceRoot,
-      resumedFromCheckpoint: resumeMetadata?.checkpointRunId,
-      timestamp: startedAt,
-    });
-
-    if (resumeMetadata) {
-      options.onEvent?.({
-        type: HeddleEventType.loopResumed,
+      eventDelivery.emit({
+        source: 'agent-loop',
+        type: HeddleEventType.loopStarted,
         runId,
-        fromCheckpoint: resumeMetadata.checkpointRunId,
-        priorTraceEvents: resumeMetadata.priorTraceEvents,
-        timestamp: now(),
+        goal: options.goal,
+        model,
+        provider: providerRuntime.provider,
+        workspaceRoot,
+        resumedFromCheckpoint: resumeMetadata?.checkpointRunId,
+        timestamp: startedAt,
       });
+
+      if (resumeMetadata) {
+        eventDelivery.emit({
+          type: HeddleEventType.loopResumed,
+          runId,
+          fromCheckpoint: resumeMetadata.checkpointRunId,
+          priorTraceEvents: resumeMetadata.priorTraceEvents,
+          timestamp: now(),
+        });
+      }
+
+      const result = await AgentRunService.run({
+        goal: options.goal,
+        llm,
+        tools,
+        workspaceRoot,
+        maxSteps: options.maxSteps,
+        maxToolConcurrency: options.maxToolConcurrency,
+        logger,
+        history: AgentLoopCheckpointService.resolveHistory(options),
+        systemContext,
+        onEvent: (event) => {
+          AgentLoopRuntimeService.emitAgentRunEvent({
+            event,
+            runId,
+            now,
+            eventDelivery,
+            onTraceEvent: options.onTraceEvent,
+          });
+        },
+        approvalPolicies: options.approvalPolicies,
+        approveToolCall: options.approveToolCall,
+        shouldStop: options.shouldStop,
+        abortSignal: options.abortSignal,
+        recoverModelContext: options.recoverModelContext,
+      });
+
+      const finishedAt = now();
+      const state = AgentLoopCheckpointService.createFinishedState({
+        runId,
+        goal: options.goal,
+        model,
+        provider: providerRuntime.provider,
+        workspaceRoot,
+        startedAt,
+        finishedAt,
+        result,
+      });
+
+      eventDelivery.emit({
+        source: 'agent-loop',
+        type: HeddleEventType.loopFinished,
+        runId,
+        outcome: result.outcome,
+        summary: result.summary,
+        ...(result.failure ? { failure: result.failure } : {}),
+        usage: result.usage,
+        state,
+        timestamp: finishedAt,
+      });
+
+      return {
+        ...result,
+        model,
+        provider: providerRuntime.provider,
+        workspaceRoot,
+        state,
+      };
+    } finally {
+      await eventDelivery.settle();
     }
-
-    const result = await AgentRunService.run({
-      goal: options.goal,
-      llm,
-      tools,
-      workspaceRoot,
-      maxSteps: options.maxSteps,
-      maxToolConcurrency: options.maxToolConcurrency,
-      logger,
-      history: AgentLoopCheckpointService.resolveHistory(options),
-      systemContext,
-      onEvent: (event) => {
-        AgentLoopRuntimeService.emitAgentRunEvent({ event, runId, now, options });
-      },
-      approvalPolicies: options.approvalPolicies,
-      approveToolCall: options.approveToolCall,
-      shouldStop: options.shouldStop,
-      abortSignal: options.abortSignal,
-      recoverModelContext: options.recoverModelContext,
-    });
-
-    const finishedAt = now();
-    const state = AgentLoopCheckpointService.createFinishedState({
-      runId,
-      goal: options.goal,
-      model,
-      provider: providerRuntime.provider,
-      workspaceRoot,
-      startedAt,
-      finishedAt,
-      result,
-    });
-
-    options.onEvent?.({
-      source: 'agent-loop',
-      type: HeddleEventType.loopFinished,
-      runId,
-      outcome: result.outcome,
-      summary: result.summary,
-      ...(result.failure ? { failure: result.failure } : {}),
-      usage: result.usage,
-      state,
-      timestamp: finishedAt,
-    });
-
-    return {
-      ...result,
-      model,
-      provider: providerRuntime.provider,
-      workspaceRoot,
-      state,
-    };
   }
 
   static isConversationActivity(
@@ -169,16 +181,17 @@ export class AgentLoopRuntimeService {
     event: AgentRunEvent;
     runId: string;
     now: () => string;
-    options: RunAgentLoopOptions;
+    eventDelivery: AgentLoopEventDelivery;
+    onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
   }): void {
-    const { event, runId, now, options } = args;
+    const { event, runId, now, eventDelivery, onTraceEvent } = args;
     if (event.type === HeddleEventType.trace) {
-      options.onEvent?.({ type: HeddleEventType.trace, runId, event: event.event, timestamp: now() });
-      options.onTraceEvent?.(event.event);
+      eventDelivery.emit({ type: HeddleEventType.trace, runId, event: event.event, timestamp: now() });
+      onTraceEvent?.(event.event);
       return;
     }
 
-    options.onEvent?.({ source: 'agent-loop', ...event, runId, timestamp: now() });
+    eventDelivery.emit({ source: 'agent-loop', ...event, runId, timestamp: now() });
   }
 
   private static resolveCredentialStorePath(args: {

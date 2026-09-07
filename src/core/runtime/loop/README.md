@@ -25,6 +25,18 @@ Static `tools` remain supported. Toolkit and tool names are duplicate-checked
 through the same runtime tool assembly path whether default tools are enabled
 or disabled.
 
+## Event delivery
+
+`onEvent` may be synchronous or asynchronous. Synchronous listeners retain
+immediate streaming delivery. After a listener returns a Promise, Heddle queues
+later callbacks behind it in exact emission order and waits for the complete
+chain—including `loop.finished` on successful runs—before the run Promise
+settles. A callback rejection rejects the run; hosts therefore never receive a
+settled run while required durable activity writes are still pending or failed.
+
+Product schemas, persistence transactions, retry policy, and UI projection stay
+outside this lifecycle boundary.
+
 ## Tool Concurrency
 
 `maxToolConcurrency` bounds parallel-safe tool execution for one run. The

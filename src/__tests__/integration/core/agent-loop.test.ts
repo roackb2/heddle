@@ -105,6 +105,129 @@ describe('AgentLoopRuntimeService.run', () => {
     expect(modelVisibleTools).toEqual(['host_context_read']);
   });
 
+  it('serializes async event listeners and settles them before the run resolves', async () => {
+    let releaseFirst!: () => void;
+    const firstWrite = new Promise<void>((resolveFirst) => {
+      releaseFirst = resolveFirst;
+    });
+    const entered: string[] = [];
+    const completed: string[] = [];
+    let first = true;
+    let runSettled = false;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done.' };
+      },
+    };
+
+    const run = AgentLoopRuntimeService.run({
+      goal: 'Complete one turn.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: async (event) => {
+        entered.push(event.type);
+        if (first) {
+          first = false;
+          await firstWrite;
+        }
+        completed.push(event.type);
+      },
+    });
+    void run.then(() => {
+      runSettled = true;
+    });
+
+    await new Promise<void>((resolveTurn) => setImmediate(resolveTurn));
+    expect(entered).toEqual(['loop.started']);
+    expect(completed).toEqual([]);
+    expect(runSettled).toBe(false);
+
+    releaseFirst();
+    await run;
+
+    expect(entered).toEqual(completed);
+    expect(completed.at(-1)).toBe('loop.finished');
+    expect(runSettled).toBe(true);
+  });
+
+  it('rejects the run when an async event listener fails', async () => {
+    const projectionFailure = new Error('durable activity write failed');
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done.' };
+      },
+    };
+
+    await expect(AgentLoopRuntimeService.run({
+      goal: 'Complete one turn.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => event.type === 'loop.started'
+        ? Promise.reject(projectionFailure)
+        : Promise.resolve(),
+    })).rejects.toBe(projectionFailure);
+  });
+
+  it('delivers synchronous start events before model execution', async () => {
+    let observedStart = false;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        expect(observedStart).toBe(true);
+        return { content: 'Done.' };
+      },
+    };
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Complete one turn.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => {
+        if (event.type === 'loop.started') {
+          observedStart = true;
+        }
+      },
+    });
+  });
+
   it('runs through the public execution loop and emits loop events around trace events', async () => {
     const workspaceRoot = resolve('/tmp/heddle-loop-test');
     const seenMessages: ChatMessage[][] = [];

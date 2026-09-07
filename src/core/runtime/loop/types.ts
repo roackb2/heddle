@@ -82,6 +82,10 @@ export type AgentLoopEvent =
       state: AgentLoopState;
     };
 
+export type AgentLoopEventListener = (
+  event: AgentLoopEvent,
+) => void | Promise<void>;
+
 export type RunAgentLoopOptions = {
   /**
    * Optional host-preallocated identity for this run. Omit it to preserve the
@@ -114,7 +118,8 @@ export type RunAgentLoopOptions = {
   includeDefaultTools?: boolean;
   includePlanTool?: boolean;
   logger?: Logger;
-  onEvent?: (event: AgentLoopEvent) => void;
+  /** Async listeners are serialized and settled before the run settles. */
+  onEvent?: AgentLoopEventListener;
   onTraceEvent?: (event: TraceEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (
