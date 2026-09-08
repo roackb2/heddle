@@ -123,6 +123,7 @@ export {
 export type {
   ViewImageResource,
   ViewImageResourceResolver,
+  ViewImageSourcePolicy,
   ViewImageToolDefinition,
   ViewImageToolOptions,
 } from './core/tools/toolkits/external-context/view-image.js';

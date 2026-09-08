@@ -29,6 +29,7 @@ import {
   type ResolvedProviderCredential,
 } from '../../../runtime/credentials/index.js';
 import {
+  MAX_EXTERNAL_CONTEXT_PROMPT_LENGTH,
   ViewImageInputSchema,
   ViewImageOutputSchema,
   type ViewImageInput,
@@ -55,6 +56,8 @@ export type ViewImageResourceResolver = (
   context: ToolExecutionContext,
 ) => Promise<ViewImageResource | null | undefined>;
 
+export type ViewImageSourcePolicy = 'paths-only' | 'references-only' | 'paths-and-references';
+
 export type ViewImageToolOptions = {
   model?: string;
   provider?: LlmProvider;
@@ -64,7 +67,18 @@ export type ViewImageToolOptions = {
   credentialStorePath?: string;
   workspaceRoot?: string;
   resourceResolver?: ViewImageResourceResolver;
+  /**
+   * Controls which image locator kinds the model-visible schema advertises and
+   * execution accepts. Omit to keep today's local-path behavior unless a host
+   * resolver opts into `paths-and-references` explicitly.
+   */
+  sourcePolicy?: ViewImageSourcePolicy;
   maxImageBytes?: number;
+  /**
+   * Host-specific fallback used when the model omits `prompt` in a view_image
+   * call. Omit to preserve Heddle's coding-assistant default prompt.
+   */
+  defaultPrompt?: string;
 };
 
 const DEFAULT_IMAGE_PROMPT =
@@ -77,61 +91,21 @@ export const viewImageTool: ViewImageToolDefinition = createViewImageTool();
 
 export function createViewImageTool(options: ViewImageToolOptions = {}): ViewImageToolDefinition {
   const maxImageBytes = resolveMaxImageBytes(options.maxImageBytes);
-  const supportsReferences = Boolean(options.resourceResolver);
+  const defaultPrompt = resolveDefaultImagePrompt(options.defaultPrompt);
+  const sourcePolicy = resolveSourcePolicy(options);
+  const inputSchema = createViewImageInputSchema(sourcePolicy);
   return {
     name: 'view_image',
-    description:
-      supportsReferences ?
-        'Inspect one or more local image paths or host-authorized opaque image references when visual contents are needed. Input examples: { "path": "/absolute/path/to/screenshot.png" } or { "reference": "host-image-reference" }. Optional field: prompt for a more specific visual question. Returns a concise text description.'
-      : 'Inspect one or more local image files when the user references screenshots, diagrams, or other visual file paths and the image contents are actually needed. Use this only after the user has provided or implied concrete image paths. Input examples: { "path": "/absolute/path/to/screenshot.png" } or { "paths": ["/absolute/path/to/a.png", "/absolute/path/to/b.png"] }. Optional field: prompt for a more specific visual question. Returns a concise text description of the image contents.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        path: {
-          type: 'string',
-          description: 'Path to the local image file.',
-        },
-        paths: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Paths to local image files.',
-        },
-        ...(supportsReferences ? {
-          reference: {
-            type: 'string',
-            description: 'Opaque host-authorized image reference.',
-          },
-          references: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Opaque host-authorized image references.',
-          },
-        } : {}),
-        prompt: {
-          type: 'string',
-          description: 'Optional focused instruction for what to extract from the image.',
-        },
-      },
-      anyOf: [
-        { required: ['path'] },
-        { required: ['paths'] },
-        ...(supportsReferences ? [
-          { required: ['reference'] },
-          { required: ['references'] },
-        ] : []),
-      ],
-    },
-    inputSchema: ViewImageInputSchema,
+    description: describeViewImageTool(sourcePolicy),
+    parameters: createViewImageParameters(sourcePolicy),
+    inputSchema,
     outputSchema: ViewImageOutputSchema,
     async execute(raw: unknown, context?: ToolExecutionContext): Promise<ToolResult<ViewImageOutput>> {
-      const parsed = ViewImageInputSchema.safeParse(raw);
+      const parsed = inputSchema.safeParse(raw);
       if (!parsed.success) {
         return {
           ok: false,
-          error: supportsReferences ?
-              'Invalid input for view_image. Required field: path, paths, reference, or references. Optional field: prompt.'
-            : 'Invalid input for view_image. Required field: path or paths. Optional field: prompt.',
+          error: invalidInputMessage(sourcePolicy),
         };
       }
 
@@ -153,7 +127,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ViewIma
       }
 
       const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
-      const prompt = input.prompt || DEFAULT_IMAGE_PROMPT;
+      const prompt = input.prompt || defaultPrompt;
 
       try {
         const files = await resolveImageViewFiles({
@@ -196,6 +170,104 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ViewIma
       }
     },
   };
+}
+
+function resolveSourcePolicy(options: ViewImageToolOptions): ViewImageSourcePolicy {
+  const sourcePolicy = options.sourcePolicy ?? (options.resourceResolver ? 'paths-and-references' : 'paths-only');
+  if (
+    (sourcePolicy === 'references-only' || sourcePolicy === 'paths-and-references')
+    && !options.resourceResolver
+  ) {
+    throw new Error('view_image sourcePolicy requires a resourceResolver when references are enabled.');
+  }
+  return sourcePolicy;
+}
+
+function createViewImageInputSchema(sourcePolicy: ViewImageSourcePolicy) {
+  return ViewImageInputSchema.superRefine((input, context) => {
+    const paths = normalizeImagePaths(input);
+    const references = normalizeImageReferences(input);
+    if (sourcePolicy === 'references-only' && paths.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local image paths are disabled for this view_image tool.',
+      });
+    }
+    if (sourcePolicy === 'paths-only' && references.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Opaque image references are disabled for this view_image tool.',
+      });
+    }
+  });
+}
+
+function describeViewImageTool(sourcePolicy: ViewImageSourcePolicy): string {
+  switch (sourcePolicy) {
+    case 'references-only':
+      return 'Inspect one or more host-authorized opaque image references when visual contents are needed. Input examples: { "reference": "host-image-reference" } or { "references": ["host-image-reference"] }. Optional field: prompt for a more specific visual question. Returns a concise text description.';
+    case 'paths-and-references':
+      return 'Inspect one or more local image paths or host-authorized opaque image references when visual contents are needed. Input examples: { "path": "/absolute/path/to/screenshot.png" } or { "reference": "host-image-reference" }. Optional field: prompt for a more specific visual question. Returns a concise text description.';
+    case 'paths-only':
+      return 'Inspect one or more local image files when the user references screenshots, diagrams, or other visual file paths and the image contents are actually needed. Use this only after the user has provided or implied concrete image paths. Input examples: { "path": "/absolute/path/to/screenshot.png" } or { "paths": ["/absolute/path/to/a.png", "/absolute/path/to/b.png"] }. Optional field: prompt for a more specific visual question. Returns a concise text description of the image contents.';
+  }
+}
+
+function createViewImageParameters(sourcePolicy: ViewImageSourcePolicy): Record<string, unknown> {
+  const pathProperties = sourcePolicy === 'references-only' ? {} : {
+    path: {
+      type: 'string',
+      description: 'Path to the local image file.',
+    },
+    paths: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Paths to local image files.',
+    },
+  };
+  const referenceProperties = sourcePolicy === 'paths-only' ? {} : {
+    reference: {
+      type: 'string',
+      description: 'Opaque host-authorized image reference.',
+    },
+    references: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Opaque host-authorized image references.',
+    },
+  };
+  const pathRequirements = sourcePolicy === 'references-only' ? [] : [
+    { required: ['path'] },
+    { required: ['paths'] },
+  ];
+  const referenceRequirements = sourcePolicy === 'paths-only' ? [] : [
+    { required: ['reference'] },
+    { required: ['references'] },
+  ];
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      ...pathProperties,
+      ...referenceProperties,
+      prompt: {
+        type: 'string',
+        description: 'Optional focused instruction for what to extract from the image.',
+      },
+    },
+    anyOf: [...pathRequirements, ...referenceRequirements],
+  };
+}
+
+function invalidInputMessage(sourcePolicy: ViewImageSourcePolicy): string {
+  switch (sourcePolicy) {
+    case 'references-only':
+      return 'Invalid input for view_image. Required field: reference or references. Optional field: prompt.';
+    case 'paths-and-references':
+      return 'Invalid input for view_image. Required field: path, paths, reference, or references. Optional field: prompt.';
+    case 'paths-only':
+      return 'Invalid input for view_image. Required field: path or paths. Optional field: prompt.';
+  }
 }
 
 async function executeOpenAiImageView(args: {
@@ -570,6 +642,19 @@ function resolveMaxImageBytes(value: number | undefined): number {
     throw new RangeError('view_image maxImageBytes must be a positive safe integer.');
   }
   return maxImageBytes;
+}
+
+function resolveDefaultImagePrompt(value: string | undefined): string {
+  if (value === undefined) {
+    return DEFAULT_IMAGE_PROMPT;
+  }
+  const parsed = ViewImageInputSchema.shape.prompt.safeParse(value);
+  if (!parsed.success || parsed.data === undefined || parsed.data.length === 0) {
+    throw new RangeError(
+      `view_image defaultPrompt must be a non-empty string up to ${MAX_EXTERNAL_CONTEXT_PROMPT_LENGTH} characters.`,
+    );
+  }
+  return parsed.data;
 }
 
 function formatImageOutputSources(files: ImageViewFile[]) {
