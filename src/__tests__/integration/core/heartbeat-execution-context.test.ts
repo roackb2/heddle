@@ -95,6 +95,80 @@ describe('heartbeat execution context', () => {
     expect(() => retainedContext?.skip({ summary: 'too late' })).toThrow(/no longer active/);
   });
 
+  it('persists successful host work without provider calls, fabricated agent state, or checkpoint changes', async () => {
+    const dir = createStateRoot('completed');
+    const store = new FileHeartbeatTaskService({ dir });
+    const task: HeartbeatTask = {
+      ...createTask('host-work'),
+      runtime: { model: 'gpt-5.4' },
+    };
+    const priorCheckpoint = createHeartbeatResult('pause', 'prior-host-run').checkpoint;
+    await store.saveTask(task);
+    await store.saveCheckpoint(task, priorCheckpoint);
+    const runAgent = vi.spyOn(HeartbeatRunnerAgent, 'run');
+    const createAdapter = vi.spyOn(LlmAdapterService, 'create');
+    const events: HeartbeatSchedulerEvent[] = [];
+    let retainedContext: HeartbeatExecutionContext | undefined;
+
+    const result = await HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      handler: async (context) => {
+        retainedContext = context;
+        return context.complete({ summary: '  Imported one durable source event.  ' });
+      },
+      onEvent: (event) => events.push(structuredClone(event)),
+    });
+
+    expect(result).toMatchObject({ checked: 1, ran: 1, failed: 0 });
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(createAdapter).not.toHaveBeenCalled();
+    await expect(store.loadCheckpoint(task)).resolves.toEqual(priorCheckpoint);
+    await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      schedule: { nextRunAt: '2026-08-01T05:01:00.000Z' },
+      state: {
+        status: 'waiting',
+        lastExecution: {
+          kind: 'completed',
+          summary: 'Imported one durable source event.',
+        },
+      },
+    });
+    const savedTask = await store.requireTask(task.id);
+    expect(savedTask.state?.runId).toBeUndefined();
+    expect(savedTask.state?.result).toBeUndefined();
+
+    const [entry] = await store.listRunRecords({ taskId: task.id });
+    expect(entry).toMatchObject({
+      executionId: expect.any(String),
+      runId: undefined,
+      record: {
+        outcome: {
+          kind: 'completed',
+          summary: 'Imported one durable source event.',
+        },
+      },
+    });
+    expect(entry?.record.result).toBeUndefined();
+    expect(entry?.record.loadedCheckpoint).toBeUndefined();
+    expect(JSON.stringify(entry?.record)).not.toMatch(/checkpoint|transcript|provider|runId/);
+    await expect(store.listTaskViews()).resolves.toMatchObject([{
+      taskId: task.id,
+      state: { result: { kind: 'completed', summary: 'Imported one durable source event.' } },
+    }]);
+    await expect(store.listRunViews({ taskId: task.id })).resolves.toMatchObject([{
+      runId: undefined,
+      result: { kind: 'completed', outcome: 'completed' },
+    }]);
+    expect(events.map((event) => event.type)).toEqual([
+      'heartbeat.task.due',
+      'heartbeat.task.started',
+      'heartbeat.task.completed',
+    ]);
+    expect(events[2]).toMatchObject({ executionId: entry?.executionId });
+    expect(() => retainedContext?.complete({ summary: 'too late' })).toThrow(/no longer active/);
+  });
+
   it('routes dynamic prompts, tools, policy, abort, and events through the standard agent builder', async () => {
     const dir = createStateRoot('dynamic');
     const store = new FileHeartbeatTaskService({ dir });
@@ -587,6 +661,41 @@ describe('heartbeat execution context', () => {
 
   it('rejects forged, premature, oversized, and invalid-delay handler outcomes as failures', async () => {
     const cases = [
+      {
+        id: 'forged-completion',
+        handler: async () => ({ kind: 'completed', summary: 'Forged.' } as never),
+        error: /must return the completed or skipped outcome/i,
+      },
+      {
+        id: 'discarded-completion',
+        handler: async (context: HeartbeatExecutionContext) => {
+          context.complete({ summary: 'This selected outcome must be returned.' });
+          return undefined as never;
+        },
+        error: /must return the completed or skipped outcome.*after selecting/i,
+      },
+      {
+        id: 'multiple-outcomes',
+        handler: async (context: HeartbeatExecutionContext) => {
+          const outcome = context.complete({ summary: 'The first outcome.' });
+          context.skip({ summary: 'A second outcome.' });
+          return outcome;
+        },
+        error: /select only one outcome/i,
+      },
+      {
+        id: 'completion-after-agent',
+        handler: async (context: HeartbeatExecutionContext) => {
+          await context.runAgent();
+          return context.complete({ summary: 'This is not a non-agent execution.' });
+        },
+        error: /cannot complete.*after runAgent/i,
+      },
+      {
+        id: 'oversized-completion-summary',
+        handler: async (context: HeartbeatExecutionContext) => context.complete({ summary: 'x'.repeat(501) }),
+        error: /at most 500 characters/i,
+      },
       {
         id: 'premature-retry',
         handler: async (context: HeartbeatExecutionContext) => context.retry({ summary: 'Too early.' }),

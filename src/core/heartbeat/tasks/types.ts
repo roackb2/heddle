@@ -93,9 +93,9 @@ export type HeartbeatTaskRuntime = Pick<
 /**
  * Identifies one owned attempt to execute a heartbeat task.
  *
- * Hosted stores must treat `executionId` as a fencing token: completion,
- * failure, skip, and cancellation writes are valid only while this exact
- * execution still owns the task. `ownerId` identifies the scheduler process/
+ * Hosted stores must treat `executionId` as a fencing token: agent completion,
+ * host completion, failure, skip, and cancellation writes are valid only while
+ * this exact execution still owns the task. `ownerId` identifies the scheduler process/
  * worker generation for operator diagnostics and explicit recovery.
  */
 export type HeartbeatTaskExecution = {
@@ -129,6 +129,7 @@ type HeartbeatTaskExecutionOutcomeBase = {
 
 export type HeartbeatTaskExecutionOutcome =
   | (HeartbeatTaskExecutionOutcomeBase & { kind: 'agent' })
+  | (HeartbeatTaskExecutionOutcomeBase & { kind: 'completed' })
   | (HeartbeatTaskExecutionOutcomeBase & { kind: 'skipped' })
   | (HeartbeatTaskExecutionOutcomeBase & {
       kind: 'retry';
@@ -188,7 +189,7 @@ export type HeartbeatTaskAgentRunRecord = {
 
 export type HeartbeatTaskNonAgentRunRecord = {
   task: HeartbeatTask;
-  outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' | 'retry' | 'blocked' };
+  outcome: HeartbeatTaskExecutionOutcome & { kind: 'completed' | 'skipped' | 'cancelled' | 'retry' | 'blocked' };
   result?: never;
   loadedCheckpoint?: never;
 };
@@ -281,7 +282,7 @@ export type HeartbeatTaskStore = {
   recordTaskExecutionOutcome: (input: {
     execution: HeartbeatTaskExecution;
     taskId: string;
-    kind: 'skipped' | 'cancelled' | 'retry' | 'blocked';
+    kind: 'completed' | 'skipped' | 'cancelled' | 'retry' | 'blocked';
     summary: string;
     /** Nested agent run rejected by an explicit custom-handler outcome. */
     agentRunId?: string;

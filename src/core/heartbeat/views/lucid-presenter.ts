@@ -111,6 +111,7 @@ export class HeartbeatLucidPresenter {
           HeartbeatLucidPresenter.responseMessage(agentId, result.summary, event.timestamp),
         ];
       }
+      case 'heartbeat.task.completed':
       case 'heartbeat.task.skipped':
       case 'heartbeat.task.cancelled':
       case 'heartbeat.task.retry':

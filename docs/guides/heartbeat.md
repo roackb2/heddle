@@ -17,10 +17,10 @@ A heartbeat runner cycle:
 - returns a decision: `continue`, `pause`, `complete`, or `escalate`
 
 Scheduler state records the latest outer execution outcome. Agent executions
-also retain their real agent result and checkpoint. A no-work skip or
-cancellation instead stores a lightweight outcome with the outer `executionId`,
-summary, kind, and timestamp; it does not fabricate an agent run ID, model,
-provider, transcript, or checkpoint.
+also retain their real agent result and checkpoint. A successful host-owned
+completion, no-work skip, or cancellation instead stores a lightweight outcome
+with the outer `executionId`, summary, kind, and timestamp; it does not fabricate
+an agent run ID, model, provider, transcript, or checkpoint.
 
 Task continuation is explicit. A task can be configured for operator-controlled
 continuation or agent-selected continuation, and a blocked or paused task must be
@@ -73,9 +73,9 @@ For repeated runner cycles, Heddle also exposes a local-first scheduler core:
 - `FileHeartbeatTaskService`
 
 `HeartbeatSchedulerService.runDueTasks` returns durable execution records.
-`heartbeat.task.finished`, `heartbeat.task.skipped`, and
-`heartbeat.task.cancelled` events include the corresponding record. If you need a
-compact display shape for a UI or service integration, use
+`heartbeat.task.finished`, `heartbeat.task.completed`,
+`heartbeat.task.skipped`, and `heartbeat.task.cancelled` events include the
+corresponding record. If you need a compact display shape for a UI or service integration, use
 `FileHeartbeatTaskService` task/run view methods instead of flattening task
 state yourself.
 
@@ -613,8 +613,9 @@ An idle enabled task becomes due immediately. If the task is already running,
 Heddle persists one pending follow-up. Additional requests advance the durable
 generation but coalesce into that same follow-up. The execution claim records
 which generation it consumed, so a request arriving after the claim remains
-pending for the next run. Success, failure, skip, and cancellation settle from
-the latest stored task state and cannot overwrite a newer request.
+pending for the next run. Agent success, host completion, failure, skip, and
+cancellation settle from the latest stored task state and cannot overwrite a
+newer request.
 
 `HeartbeatSchedulerService.start()` and `runLoop()` subscribe to configured-store
 run requests and rescan promptly. `heartbeat.task.run_requested`,
@@ -627,7 +628,7 @@ Task views expose `state.runRequest.pending`, the latest generation,
 completed, and blocked tasks reject requests; they must be enabled or resumed
 explicitly instead of retaining hidden work that might run later.
 
-### Custom host work with the standard agent runtime
+### Custom host work with or without the standard agent runtime
 
 A custom handler owns domain discovery and acknowledgement. Heddle owns the
 execution identity, credential resolution, agent defaults, abort signal,
@@ -677,11 +678,42 @@ The host does not receive credential records or token fields and must not retain
 the execution context. Set `preferApiKey: true` in `runtime` only when an
 environment API key should take precedence over stored OpenAI OAuth state.
 
+When the handler itself completes admitted host-owned work without invoking the
+Heddle agent loop, return `context.complete()` instead:
+
+```ts
+const handler: HeartbeatTaskHandler = async (context) => {
+  const work = await domainQueue.claimNext({ signal: context.signal });
+  if (!work) {
+    return context.skip({ summary: 'No eligible domain work was available.' });
+  }
+
+  await hostWorkflow.execute(work, { signal: context.signal });
+  return context.complete({ summary: 'Processed one admitted work item.' });
+};
+```
+
+`complete` means the current execution succeeded; it does not mark an enabled
+recurring task terminal. Heddle retains the previous checkpoint, schedules the
+next interval, writes a claim-fenced non-agent run record with kind `completed`,
+and emits `heartbeat.task.completed`. The host remains responsible for making
+its domain claim and effects idempotent across crash recovery.
+
 Call `context.runAgent()` at most once, or return the exact outcome from
-`context.skip()`. Context methods are invalid after the handler settles. The
+`context.complete()` or `context.skip()`. A non-agent outcome cannot be selected
+after `runAgent()` starts, and only one context-created outcome may be selected.
+All custom-handler outcome summaries are trimmed, non-empty, and limited to 500
+characters. They are durable operator text, so never include secrets, prompts,
+or domain payloads. Context methods are invalid after the handler settles. The
 older positional `runner(task, checkpoint, context)` callback remains as a
 deprecated compatibility adapter, but it uses this same internal execution and
 persistence pipeline.
+
+Custom `HeartbeatTaskStore` implementations must handle `completed` in
+`recordTaskExecutionOutcome()` with the same atomic claim fence and run-history
+guarantees as the other outcome kinds. Adapter packages must not advertise
+compatibility with a Runtime major that can emit `completed` until their store,
+view codecs, and execution-activity projections support it.
 
 ### Awaitable shutdown and cancellation
 

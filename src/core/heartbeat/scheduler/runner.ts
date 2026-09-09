@@ -142,11 +142,11 @@ export class HeartbeatTaskRunnerService {
       }
 
       const settledAt = options.now?.() ?? dayjs().toDate();
-      if (HeartbeatTaskRunnerService.isSkippedOutcome(result)) {
+      if (HeartbeatTaskRunnerService.isStandaloneHandlerOutcome(result)) {
         const completion = await options.store.recordTaskExecutionOutcome({
           execution,
           taskId: task.id,
-          kind: 'skipped',
+          kind: result.kind,
           summary: result.summary,
           finishedAt: settledAt,
           signal: options.signal,
@@ -158,13 +158,30 @@ export class HeartbeatTaskRunnerService {
             execution,
           });
         }
-        if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'skipped')) {
+        if (completion.status !== 'saved') {
           if (completion.status === 'claim-lost') {
             return HeartbeatTaskRunnerService.claimLostResult(task.id, execution.executionId);
           }
-          throw new Error(`Heartbeat store saved an invalid skipped record for task ${task.id}.`);
+          throw new Error(`Heartbeat store failed to save the ${result.kind} record for task ${task.id}.`);
         }
 
+        if (result.kind === 'completed') {
+          if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'completed')) {
+            throw new Error(`Heartbeat store saved an invalid completed record for task ${task.id}.`);
+          }
+          options.onEvent?.({
+            type: 'heartbeat.task.completed',
+            taskId: task.id,
+            executionId: execution.executionId,
+            record: completion.record,
+            timestamp: completion.record.outcome.finishedAt,
+          });
+          return HeartbeatTaskRunnerService.settledResult(task.id, execution.executionId, completion.record);
+        }
+
+        if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'skipped')) {
+          throw new Error(`Heartbeat store saved an invalid skipped record for task ${task.id}.`);
+        }
         options.onEvent?.({
           type: 'heartbeat.task.skipped',
           taskId: task.id,
@@ -334,8 +351,7 @@ export class HeartbeatTaskRunnerService {
     let active = true;
     let agentInvocation: Promise<AgentHeartbeatResult> | undefined;
     let agentResult: AgentHeartbeatResult | undefined;
-    let skipSelected = false;
-    let explicitOutcome: HeartbeatHandlerOutcome | undefined;
+    let selectedOutcome: HeartbeatHandlerOutcome | undefined;
 
     const context: HeartbeatExecutionContext = Object.freeze({
       task: structuredClone(args.task),
@@ -345,7 +361,7 @@ export class HeartbeatTaskRunnerService {
       signal: args.signal,
       runAgent: async (options?: HeartbeatTaskRunnerAgentOptions) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
-        if (skipSelected || explicitOutcome) {
+        if (selectedOutcome) {
           throw new Error('Cannot run an agent after selecting a heartbeat execution outcome.');
         }
         if (agentInvocation) {
@@ -366,26 +382,42 @@ export class HeartbeatTaskRunnerService {
         agentResult = await agentInvocation;
         return agentResult;
       },
+      complete: (input: { summary: string }) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        if (agentInvocation) {
+          throw new Error('Cannot complete a non-agent heartbeat execution after runAgent() has started.');
+        }
+        if (selectedOutcome) {
+          throw new Error('Heartbeat execution context may select only one outcome.');
+        }
+
+        const outcome = Object.freeze({
+          kind: 'completed' as const,
+          summary: HeartbeatTaskRunnerService.normalizeHandlerOutcomeSummary(input.summary),
+        });
+        selectedOutcome = outcome;
+        return outcome;
+      },
       skip: (input: { summary: string }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
         if (agentInvocation) {
           throw new Error('Cannot skip a heartbeat execution after runAgent() has started.');
         }
-        if (skipSelected) {
-          throw new Error('Heartbeat execution context skip() may be called only once.');
+        if (selectedOutcome) {
+          throw new Error('Heartbeat execution context may select only one outcome.');
         }
 
-        const summary = input.summary.trim();
-        if (!summary) {
-          throw new Error('A skipped heartbeat execution requires a non-empty summary.');
-        }
-        skipSelected = true;
-        return Object.freeze({ kind: 'skipped' as const, summary });
+        const outcome = Object.freeze({
+          kind: 'skipped' as const,
+          summary: HeartbeatTaskRunnerService.normalizeHandlerOutcomeSummary(input.summary),
+        });
+        selectedOutcome = outcome;
+        return outcome;
       },
       retry: (input: { summary: string; delayMs?: number }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
         const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
-        if (skipSelected || explicitOutcome) {
+        if (selectedOutcome) {
           throw new Error('Heartbeat execution context may select only one outcome.');
         }
 
@@ -395,13 +427,13 @@ export class HeartbeatTaskRunnerService {
           delayMs: HeartbeatTaskRunnerService.normalizeHandlerRetryDelay(input.delayMs),
           agentRunId: result.state.runId,
         });
-        explicitOutcome = outcome;
+        selectedOutcome = outcome;
         return outcome;
       },
       block: (input: { summary: string }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
         const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
-        if (skipSelected || explicitOutcome) {
+        if (selectedOutcome) {
           throw new Error('Heartbeat execution context may select only one outcome.');
         }
 
@@ -410,7 +442,7 @@ export class HeartbeatTaskRunnerService {
           summary: HeartbeatTaskRunnerService.normalizeHandlerOutcomeSummary(input.summary),
           agentRunId: result.state.runId,
         });
-        explicitOutcome = outcome;
+        selectedOutcome = outcome;
         return outcome;
       },
     });
@@ -428,20 +460,23 @@ export class HeartbeatTaskRunnerService {
 
     try {
       const result = await handler(context);
-      if (HeartbeatTaskRunnerService.isSkippedOutcome(result)) {
-        if (!skipSelected || agentInvocation) {
-          throw new Error('Custom heartbeat handlers must return the outcome created by context.skip().');
+      if (HeartbeatTaskRunnerService.isStandaloneHandlerOutcome(result)) {
+        if (agentInvocation || result !== selectedOutcome) {
+          throw new Error('Custom heartbeat handlers must return the completed or skipped outcome created by their execution context before runAgent().');
         }
         return result;
       }
       if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(result)) {
-        if (!agentInvocation || !agentResult || result !== explicitOutcome) {
+        if (!agentInvocation || !agentResult || result !== selectedOutcome) {
           throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after runAgent() settles.');
         }
         return result;
       }
-      if (explicitOutcome) {
+      if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(selectedOutcome)) {
         throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after selecting it.');
+      }
+      if (selectedOutcome) {
+        throw new Error('Custom heartbeat handlers must return the completed or skipped outcome created by their execution context after selecting it.');
       }
       if (!HeartbeatTaskRunnerService.isAgentResult(result)) {
         throw new Error('Custom heartbeat handler returned an unsupported execution outcome.');
@@ -671,8 +706,15 @@ export class HeartbeatTaskRunnerService {
     }
   }
 
-  private static isSkippedOutcome(value: unknown): value is HeartbeatHandlerOutcome {
-    return Boolean(value && typeof value === 'object' && 'kind' in value && value.kind === 'skipped');
+  private static isStandaloneHandlerOutcome(
+    value: unknown,
+  ): value is Extract<HeartbeatHandlerOutcome, { kind: 'completed' | 'skipped' }> {
+    return Boolean(
+      value
+      && typeof value === 'object'
+      && 'kind' in value
+      && (value.kind === 'completed' || value.kind === 'skipped'),
+    );
   }
 
   private static isExplicitHandlerOutcome(value: unknown): value is Extract<HeartbeatHandlerOutcome, { kind: 'retry' | 'blocked' }> {
@@ -694,7 +736,7 @@ export class HeartbeatTaskRunnerService {
     return Boolean(record?.result);
   }
 
-  private static isNonAgentRecord<K extends 'skipped' | 'cancelled' | 'retry' | 'blocked'>(
+  private static isNonAgentRecord<K extends 'completed' | 'skipped' | 'cancelled' | 'retry' | 'blocked'>(
     record: HeartbeatTaskRunRecord | undefined,
     kind: K,
   ): record is HeartbeatTaskNonAgentRunRecord & { outcome: { kind: K } } {
@@ -711,10 +753,10 @@ export class HeartbeatTaskRunnerService {
   private static normalizeHandlerOutcomeSummary(summary: string): string {
     const normalized = summary.trim();
     if (!normalized) {
-      throw new Error('A heartbeat retry or blocked outcome requires a non-empty, non-secret summary.');
+      throw new Error('A heartbeat handler outcome requires a non-empty, non-secret summary.');
     }
     if (normalized.length > MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH) {
-      throw new Error(`Heartbeat retry and blocked summaries must be at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
+      throw new Error(`Heartbeat handler outcome summaries must be at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
     }
     return normalized;
   }

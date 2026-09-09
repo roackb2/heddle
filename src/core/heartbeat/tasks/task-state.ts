@@ -260,39 +260,32 @@ export class HeartbeatTaskStateProjector {
     }));
   }
 
+  static afterHandlerCompletion(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    now: Date;
+  }): HeartbeatTask {
+    return HeartbeatTaskStateProjector.afterRecurringNonAgentOutcome({
+      ...args,
+      kind: 'completed',
+      enabledProgress: `Custom heartbeat handler completed successfully. Waiting until the next scheduled run in ${HeartbeatTaskStateProjector.formatDelay(args.task.schedule.intervalMs)}.`,
+      disabledProgress: 'Custom heartbeat handler completed successfully. Task remains disabled.',
+    });
+  }
+
   static afterSkip(args: {
     task: HeartbeatTask;
     execution: HeartbeatTaskExecution;
     summary: string;
     now: Date;
   }): HeartbeatTask {
-    const finishedAt = dayjs(args.now).toISOString();
-    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
-      ...args.task,
-      schedule: {
-        ...args.task.schedule,
-        nextRunAt: args.task.enabled ? dayjs(args.now).add(args.task.schedule.intervalMs, 'millisecond').toISOString() : undefined,
-      },
-      state: {
-        status: args.task.enabled ? 'waiting' : 'idle',
-        progress: args.task.enabled ?
-          `No work was available. Waiting until the next scheduled run in ${HeartbeatTaskStateProjector.formatDelay(args.task.schedule.intervalMs)}.`
-        : 'No work was available. Task remains disabled.',
-        runAt: finishedAt,
-        resumable: true,
-        error: undefined,
-        execution: undefined,
-        runRequest: args.task.state?.runRequest,
-        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
-          kind: 'skipped',
-          execution: args.execution,
-          summary: args.summary,
-          finishedAt,
-        }),
-        recovery: args.task.state?.recovery,
-        updatedAt: finishedAt,
-      },
-    }));
+    return HeartbeatTaskStateProjector.afterRecurringNonAgentOutcome({
+      ...args,
+      kind: 'skipped',
+      enabledProgress: `No work was available. Waiting until the next scheduled run in ${HeartbeatTaskStateProjector.formatDelay(args.task.schedule.intervalMs)}.`,
+      disabledProgress: 'No work was available. Task remains disabled.',
+    });
   }
 
   static afterHandlerRetry(args: {
@@ -414,6 +407,42 @@ export class HeartbeatTaskStateProjector {
       status: state?.status ?? 'idle',
       resumable: state?.resumable ?? true,
     };
+  }
+
+  private static afterRecurringNonAgentOutcome(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    now: Date;
+    kind: 'completed' | 'skipped';
+    enabledProgress: string;
+    disabledProgress: string;
+  }): HeartbeatTask {
+    const finishedAt = dayjs(args.now).toISOString();
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: args.task.enabled ? dayjs(args.now).add(args.task.schedule.intervalMs, 'millisecond').toISOString() : undefined,
+      },
+      state: {
+        status: args.task.enabled ? 'waiting' : 'idle',
+        progress: args.task.enabled ? args.enabledProgress : args.disabledProgress,
+        runAt: finishedAt,
+        resumable: true,
+        error: undefined,
+        execution: undefined,
+        runRequest: args.task.state?.runRequest,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: args.kind,
+          execution: args.execution,
+          summary: args.summary,
+          finishedAt,
+        }),
+        recovery: args.task.state?.recovery,
+        updatedAt: finishedAt,
+      },
+    }));
   }
 
   private static afterExecutionSettlement(task: HeartbeatTask): HeartbeatTask {
@@ -592,6 +621,8 @@ export class HeartbeatTaskStateProjector {
     switch (args.kind) {
       case 'agent':
         return { ...base, kind: 'agent' };
+      case 'completed':
+        return { ...base, kind: 'completed' };
       case 'skipped':
         return { ...base, kind: 'skipped' };
       case 'failed':

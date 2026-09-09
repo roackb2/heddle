@@ -331,10 +331,16 @@ export class FileHeartbeatTaskService implements
       }
 
       const execution = currentTask.state?.execution ?? input.execution;
-      const summary = input.kind === 'retry' || input.kind === 'blocked' ?
-        FileHeartbeatTaskService.normalizeHandlerOutcomeSummary(input.summary)
-      : input.summary;
+      const summary = input.kind === 'cancelled' ?
+        input.summary
+      : FileHeartbeatTaskService.normalizeHandlerOutcomeSummary(input.summary);
       const projectors = {
+        completed: () => HeartbeatTaskStateProjector.afterHandlerCompletion({
+          task: currentTask,
+          execution,
+          summary,
+          now: input.finishedAt,
+        }),
         skipped: () => HeartbeatTaskStateProjector.afterSkip({
           task: currentTask,
           execution,
@@ -595,7 +601,7 @@ export class FileHeartbeatTaskService implements
   private static normalizeHandlerOutcomeSummary(summary: string): string {
     const normalized = summary.trim();
     if (!normalized || normalized.length > MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH) {
-      throw new Error(`Heartbeat retry and blocked summaries must be non-empty and at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
+      throw new Error(`Heartbeat handler outcome summaries must be non-empty and at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
     }
     return normalized;
   }
