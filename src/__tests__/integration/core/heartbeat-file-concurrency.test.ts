@@ -150,6 +150,103 @@ describe('file-backed heartbeat task concurrency', () => {
     await expect(store.requireTask('representative-obsolete')).rejects.toThrow(/not found/i);
   });
 
+  it('atomically synchronizes code-owned configuration while retaining durable lifecycle data', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-file-config-reconcile-'));
+    const store = new FileHeartbeatTaskService({ dir });
+    const task = {
+      ...createTask('managed-periodic'),
+      name: 'Old managed task',
+      task: 'Old managed instructions.',
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2099-01-01T00:00:00.000Z',
+      },
+      runtime: {
+        model: 'old-model',
+        workspaceRoot: '/durable/workspace',
+      },
+      state: {
+        status: 'waiting' as const,
+        resumable: true,
+        runRequest: {
+          generation: 3,
+          claimedGeneration: 2,
+          requestedAt: NOW.toISOString(),
+        },
+        lastExecution: {
+          kind: 'skipped' as const,
+          executionId: 'previous-execution',
+          summary: 'Previous durable result.',
+          finishedAt: NOW.toISOString(),
+        },
+      },
+    };
+    const checkpoint = AgentLoopCheckpointService.createCheckpoint({
+      status: 'running',
+      runId: 'durable-run',
+      goal: 'Retain this checkpoint.',
+      model: 'gpt-test',
+      provider: 'openai',
+      workspaceRoot: '/durable/workspace',
+      startedAt: NOW.toISOString(),
+      transcript: [],
+      trace: [],
+    }, { createdAt: NOW.toISOString() });
+    await store.saveTask(task);
+    await store.saveCheckpoint(task, checkpoint);
+    await store.saveRunRecord({
+      task,
+      outcome: task.state.lastExecution,
+    });
+    const runHistory = await store.listRunRecords({ taskId: task.id });
+    const desired = {
+      ...createTask(task.id),
+      name: 'Current managed task',
+      task: 'Current managed instructions.',
+      schedule: {
+        intervalMs: 120_000,
+        nextRunAt: '2000-01-01T00:00:00.000Z',
+      },
+      runtime: {
+        model: 'current-model',
+        workspaceRoot: '/ignored/workspace',
+      },
+    };
+
+    const result = await store.reconcileTasks({
+      namespace: 'managed-',
+      desired: [desired],
+      existingTaskPolicy: 'synchronize-configuration',
+    });
+
+    expect(result.created).toEqual([]);
+    expect(result.deleted).toEqual([]);
+    expect(result.updated).toEqual([expect.objectContaining({ id: task.id })]);
+    await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      name: desired.name,
+      task: desired.task,
+      schedule: {
+        intervalMs: desired.schedule.intervalMs,
+        nextRunAt: task.schedule.nextRunAt,
+      },
+      runtime: {
+        model: desired.runtime.model,
+        workspaceRoot: task.runtime.workspaceRoot,
+      },
+      state: {
+        runRequest: task.state.runRequest,
+        lastExecution: task.state.lastExecution,
+      },
+    });
+    await expect(store.loadCheckpoint(task)).resolves.toEqual(checkpoint);
+    await expect(store.listRunRecords({ taskId: task.id })).resolves.toEqual(runHistory);
+    await expect(store.reconcileTasks({
+      namespace: 'managed-',
+      desired: [desired],
+      existingTaskPolicy: 'synchronize-configuration',
+    })).resolves.toMatchObject({ updated: [] });
+  });
+
   it('allows scheduler polling to overlap host mutations without malformed reads', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-file-scheduler-'));
     const store = new FileHeartbeatTaskService({ stateRoot });

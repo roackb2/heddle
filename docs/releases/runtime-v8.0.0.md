@@ -1,7 +1,8 @@
 # `@heddleagent/runtime` 8.0.0
 
-This major release adds explicit terminal completion for successful tools and
-successful host-owned heartbeat work without fabricating an agent result.
+This major release adds explicit terminal completion for successful tools,
+successful host-owned heartbeat work without fabricating an agent result, and
+atomic configuration reconciliation for code-owned heartbeat catalogs.
 
 ## What changed
 
@@ -17,6 +18,12 @@ successful host-owned heartbeat work without fabricating an agent result.
 - Extend task, run, event, control-plane, and executable store-conformance
   projections so adapters can preserve the successful non-agent outcome
   without inventing an agent run ID or result.
+- Add the opt-in `reconcileTasks()` policy
+  `existingTaskPolicy: 'synchronize-configuration'` for code-owned catalogs.
+  It atomically updates mutable configuration while preserving checkpoints,
+  history, execution fencing state, and—when enablement is unchanged—the current
+  scheduling position and pending intent. Unchanged startup reconciliation
+  performs no write.
 
 ## Upgrade note
 
@@ -26,6 +33,13 @@ This is a major release because `HeartbeatExecutionContext`,
 `HeartbeatTaskStore.recordTaskExecutionOutcome` gain the public `completed`
 case. Custom stores, event codecs, and exhaustive TypeScript consumers must
 handle that variant before upgrading.
+
+`ReconcileHeartbeatTasksResult` also gains `updated`. Custom administration
+adapters must persist every updated task in the same transaction as membership
+reconciliation, and pass a current timestamp to `HeartbeatTaskControlPolicy`
+when configuration synchronization is requested. The default reconciliation
+policy remains `preserve`, so operator-managed catalogs keep their existing
+configuration unless a host opts in.
 
 Custom handlers must still settle each execution exactly once. Use
 `complete()` only after successful host-owned work, keep its durable summary

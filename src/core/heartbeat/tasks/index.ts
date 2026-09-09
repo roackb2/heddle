@@ -5,6 +5,7 @@ export { HeartbeatTaskStateProjector } from './task-state.js';
 export type { HeartbeatTaskExecutionEligibility } from './execution-eligibility.js';
 export type {
   CreateHeartbeatTaskInput,
+  HeartbeatExistingTaskPolicy,
   HeartbeatTaskAdministrationService,
   HeartbeatTaskDetail,
   ListHeartbeatRunViewsOptions,

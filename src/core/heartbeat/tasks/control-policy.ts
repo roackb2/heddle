@@ -6,7 +6,9 @@
  * mutation boundary.
  */
 import dayjs from 'dayjs';
+import isEqual from 'lodash/isEqual.js';
 import omit from 'lodash/omit.js';
+import pickBy from 'lodash/pickBy.js';
 import type {
   CreateHeartbeatTaskInput,
   ReconcileHeartbeatTasksInput,
@@ -23,6 +25,13 @@ import type {
 } from './types.js';
 
 export class HeartbeatTaskControlPolicy {
+  private static readonly synchronizedRuntimeConfigurationKeys = [
+    'model',
+    'maxSteps',
+    'searchIgnoreDirs',
+    'systemContext',
+  ] as const;
+
   static createTask(args: {
     input: CreateHeartbeatTaskInput;
     existingTasks: readonly HeartbeatTask[];
@@ -179,6 +188,7 @@ export class HeartbeatTaskControlPolicy {
   static reconcileTasks(args: {
     currentTasks: readonly HeartbeatTask[];
     input: ReconcileHeartbeatTasksInput;
+    now?: Date;
   }): ReconcileHeartbeatTasksResult {
     HeartbeatTaskControlPolicy.assertReconciliationInput(args.input);
 
@@ -187,11 +197,23 @@ export class HeartbeatTaskControlPolicy {
     const namespaceTasks = args.currentTasks.filter((task) => task.id.startsWith(args.input.namespace));
     const created = [...desiredById.values()].filter((task) => !currentById.has(task.id));
     const obsolete = namespaceTasks.filter((task) => !desiredById.has(task.id));
+    const updated =
+      args.input.existingTaskPolicy === 'synchronize-configuration' ?
+        HeartbeatTaskControlPolicy.synchronizeDesiredTaskConfigurations({
+          currentById,
+          desired: args.input.desired,
+          now: HeartbeatTaskControlPolicy.requireReconciliationNow(args.now),
+        })
+      : [];
+    const updatedById = new Map(updated.map((task) => [task.id, task]));
 
     return {
       created,
+      updated,
       deleted: obsolete.filter((task) => task.state?.status !== 'running'),
-      preservedRunning: namespaceTasks.filter((task) => task.state?.status === 'running'),
+      preservedRunning: namespaceTasks
+        .filter((task) => task.state?.status === 'running')
+        .map((task) => updatedById.get(task.id) ?? task),
     };
   }
 
@@ -257,6 +279,13 @@ export class HeartbeatTaskControlPolicy {
     if (!input.namespace) {
       throw new Error('Heartbeat reconciliation namespace cannot be empty.');
     }
+    if (
+      input.existingTaskPolicy !== undefined
+      && input.existingTaskPolicy !== 'preserve'
+      && input.existingTaskPolicy !== 'synchronize-configuration'
+    ) {
+      throw new Error(`Unsupported existing heartbeat task policy: ${String(input.existingTaskPolicy)}`);
+    }
 
     const desiredIds = input.desired.map((task) => task.id);
     if (new Set(desiredIds).size !== desiredIds.length) {
@@ -265,6 +294,107 @@ export class HeartbeatTaskControlPolicy {
     if (desiredIds.some((taskId) => !taskId.startsWith(input.namespace))) {
       throw new Error(`Heartbeat reconciliation desired task IDs must start with namespace ${input.namespace}.`);
     }
+  }
+
+  private static synchronizeDesiredTaskConfigurations(args: {
+    currentById: ReadonlyMap<string, HeartbeatTask>;
+    desired: readonly HeartbeatTask[];
+    now: Date;
+  }): HeartbeatTask[] {
+    return args.desired.flatMap((desiredTask) => {
+      const currentTask = args.currentById.get(desiredTask.id);
+      if (!currentTask) {
+        return [];
+      }
+
+      const synchronized = HeartbeatTaskControlPolicy.synchronizeTaskConfiguration({
+        currentTask,
+        desiredTask,
+        now: args.now,
+      });
+      return synchronized === currentTask ? [] : [synchronized];
+    });
+  }
+
+  private static synchronizeTaskConfiguration(args: {
+    currentTask: HeartbeatTask;
+    desiredTask: HeartbeatTask;
+    now: Date;
+  }): HeartbeatTask {
+    const desiredConfiguration = HeartbeatTaskControlPolicy.projectSynchronizedConfiguration({
+      ...args.desiredTask,
+      admissionGroupId: HeartbeatTaskControlPolicy.resolveAdmissionGroupId(
+        args.desiredTask.admissionGroupId,
+      ),
+      task: args.desiredTask.task.trim(),
+      continuationMode: args.desiredTask.continuationMode ?? 'operator',
+    });
+    if (isEqual(
+      HeartbeatTaskControlPolicy.projectSynchronizedConfiguration(args.currentTask),
+      desiredConfiguration,
+    )) {
+      return args.currentTask;
+    }
+
+    const taskWithDesiredEnablement =
+      args.currentTask.enabled === desiredConfiguration.enabled ? args.currentTask
+      : HeartbeatTaskControlPolicy.setTaskEnabled({
+          task: args.currentTask,
+          enabled: desiredConfiguration.enabled,
+          now: args.now,
+        });
+    const runtime = {
+      ...omit(
+        taskWithDesiredEnablement.runtime ?? {},
+        HeartbeatTaskControlPolicy.synchronizedRuntimeConfigurationKeys,
+      ),
+      ...pickBy(desiredConfiguration.runtime, (value) => value !== undefined),
+    };
+
+    return {
+      ...taskWithDesiredEnablement,
+      name: desiredConfiguration.name,
+      admissionGroupId: desiredConfiguration.admissionGroupId,
+      task: desiredConfiguration.task,
+      enabled: desiredConfiguration.enabled,
+      continuationMode: desiredConfiguration.continuationMode,
+      schedule: {
+        ...taskWithDesiredEnablement.schedule,
+        intervalMs: desiredConfiguration.intervalMs,
+      },
+      runtime: Object.keys(runtime).length > 0 ? runtime : undefined,
+      state: {
+        ...taskWithDesiredEnablement.state,
+        updatedAt: args.now.toISOString(),
+      },
+    };
+  }
+
+  private static projectSynchronizedConfiguration(task: HeartbeatTask) {
+    return {
+      name: task.name,
+      admissionGroupId: task.admissionGroupId,
+      task: task.task.trim(),
+      enabled: task.enabled,
+      continuationMode: task.continuationMode ?? 'operator',
+      intervalMs: task.schedule.intervalMs,
+      runtime: {
+        model: task.runtime?.model,
+        maxSteps: task.runtime?.maxSteps,
+        searchIgnoreDirs: task.runtime?.searchIgnoreDirs,
+        systemContext: task.runtime?.systemContext,
+      },
+    };
+  }
+
+  private static requireReconciliationNow(now: Date | undefined): Date {
+    if (!now) {
+      throw new Error('Heartbeat configuration reconciliation requires a current timestamp.');
+    }
+    return HeartbeatTaskControlPolicy.requireValidDate(
+      now,
+      'Heartbeat configuration reconciliation timestamp',
+    ).toDate();
   }
 
   private static consumePendingRunRequest(

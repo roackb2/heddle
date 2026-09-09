@@ -156,10 +156,15 @@ operator-facing heartbeat views.
   `createTask` calls for the same ID produce one creation and one explicit
   conflict; distinct IDs are independent. `reconcileTasks({ namespace, desired
   })` atomically creates missing members and removes obsolete non-running members
-  from one host-owned namespace, while retaining existing configuration/state and
-  never rewriting a live running claim. Use the explicit task update APIs for
-  existing-task configuration changes. Its process-local wake signal reduces event
-  latency; polling remains the restart fallback. This is reliable for one Node.js
+  from one host-owned namespace. Existing task configuration and state are retained
+  by default. Code-owned catalogs may set `existingTaskPolicy` to
+  `synchronize-configuration`; Heddle then updates only mutable configuration and
+  returns those tasks in `updated`, while preserving checkpoint identity, history,
+  and live execution state. The current next-run time and pending intent also remain
+  intact when enablement is unchanged. Normal enablement safety applies to an
+  actual transition, so reconciliation cannot silently resume a blocked task. Its
+  process-local wake signal reduces event latency; polling remains the restart
+  fallback. This is reliable for one Node.js
   process owning a state root; it is not a distributed lease. Multiple processes
   or replicas must provide a remote
   `HeartbeatTaskStore` plus `HeartbeatTaskAdmissionControl` implementations that
