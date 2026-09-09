@@ -432,7 +432,6 @@ describe('conversation turn lifecycle', () => {
       prompt: 'Finish the durable workflow.',
       apiKey: 'explicit-key',
       tools: [commitWorkflowResult],
-      toolProfile: { preset: 'custom', memoryMode: 'none' },
       maxSteps: 3,
       memoryMaintenanceMode: 'none',
       artifactRoot: storage.artifactRoot,

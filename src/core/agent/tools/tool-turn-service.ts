@@ -195,6 +195,8 @@ export class AgentToolTurnService {
     args: HandleAgentToolResultArgs,
   ): ReturnDirectToolCompletion | undefined {
     const { context, effectiveCall, toolCallId, result } = args;
+    const returnDirect = result.ok
+      && context.registry.get(effectiveCall.tool)?.returnDirect === true;
     if (!result.ok) {
       AgentToolTurnService.handleFailedExecution(context);
     } else {
@@ -218,8 +220,10 @@ export class AgentToolTurnService {
       content: JSON.stringify(result),
       toolCallId,
     });
-    AgentToolTurnService.pushHostRequirementReminders(context);
-    return result.ok && context.registry.get(effectiveCall.tool)?.returnDirect
+    if (!returnDirect) {
+      AgentToolTurnService.pushHostRequirementReminders(context);
+    }
+    return returnDirect
       ? { toolName: effectiveCall.tool, result }
       : undefined;
   }
