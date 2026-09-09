@@ -9,6 +9,8 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Calling the LLM adapter step by step.
 - Streaming assistant content to host callbacks.
 - Executing model-requested tools through a registry.
+- Completing a run directly from a successful host-declared return-direct tool
+  result, without a ceremonial follow-up model response.
 - Scheduling explicitly parallel-safe tool calls within a bounded concurrency
   limit while preserving deterministic transcript order.
 - Recording low-level `TraceEvent` evidence.
@@ -53,6 +55,11 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Mark a tool `concurrency: 'parallel-safe'` only when independent invocations
   can overlap without shared-state, capability, or ordering conflicts. Adapter
   support and the host concurrency limit must also opt in before calls overlap.
+- Mark a host tool `returnDirect: true` when its successful execution is itself
+  the canonical completion of the run. Heddle records every tool result already
+  present in that assistant turn, then emits one terminal run result using the
+  return-direct output as its summary. A failed return-direct tool remains a
+  normal tool failure so the model can recover within the remaining step budget.
 - Add trace detail by emitting typed `TraceEvent` values and updating the
   observability summarizer/projection path. If the same moment is also
   user-facing, use the live recorder helper to emit trace and activity together

@@ -11,6 +11,8 @@ workspace.
   tool names.
 - Tool registry creation and duplicate-name protection at execution time.
 - Tool execution wrapper, timeout behavior, and cooperative cancellation.
+- The host-authored `returnDirect` declaration on tool definitions. The agent
+  loop, not the tools domain, owns applying it to run completion.
 - Shared tool policy-envelope schema injection and input stripping.
 - Coding file tools under `toolkits/coding-files/`.
 - Knowledge and memory-surface tools under `toolkits/knowledge/`.
@@ -92,6 +94,11 @@ workspace.
 - Use `ToolDefinition.timeoutMs: null` only when the tool owns a bounded or
   host-cancellable lifecycle that must not race the generic wrapper timeout.
   This field is host-only and is never projected into model-visible schemas.
+- Use `ToolDefinition.returnDirect: true` only when a successful tool result is
+  already the host's canonical final outcome. The host still owns the durable
+  effect, idempotency, authorization, and result payload. Heddle owns ending the
+  run without another model request. Failed results never trigger direct
+  completion.
 - Extend the shared `ToolPolicyEnvelope` only when all tool families can use
   the field consistently. Tool-specific arguments stay in each tool schema.
 

@@ -1,7 +1,7 @@
 import { INTERRUPTED_SUMMARY } from '../constants.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import type { LlmResponse } from '@/core/llm/types.js';
-import type { RunResult, StopReason } from '@/core/types.js';
+import type { RunResult, StopReason, ToolResult } from '@/core/types.js';
 import type { AgentRunContext } from '../types.js';
 import type { FinishAgentRunOptions } from './types.js';
 
@@ -57,6 +57,24 @@ export class AgentRunFinisher {
     });
   }
 
+  static finishToolResult(
+    context: AgentRunContext,
+    toolName: string,
+    result: ToolResult,
+  ): RunResult {
+    return AgentRunFinisher.finish(
+      context,
+      'done',
+      AgentRunFinisher.summarizeToolResult(toolName, result),
+      {
+        logging: {
+          logLevel: 'info',
+          logMessage: 'Agent run finished from return-direct tool',
+        },
+      },
+    );
+  }
+
   static maxSteps(context: AgentRunContext): RunResult {
     return AgentRunFinisher.finish(context, 'max_steps', `Reached maximum step limit (${context.maxSteps})`, {
       logging: {
@@ -103,5 +121,20 @@ export class AgentRunFinisher {
 
   static isRunResult(value: LlmResponse | RunResult): value is RunResult {
     return 'outcome' in value;
+  }
+
+  private static summarizeToolResult(toolName: string, result: ToolResult): string {
+    if (typeof result.output === 'string' && result.output.trim()) {
+      return result.output;
+    }
+
+    if (result.output !== undefined) {
+      const serialized = JSON.stringify(result.output);
+      if (serialized) {
+        return serialized;
+      }
+    }
+
+    return `${toolName} completed successfully.`;
   }
 }

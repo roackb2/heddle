@@ -111,6 +111,105 @@ describe('AgentRunService.run', () => {
     });
   });
 
+  it('finishes from a successful return-direct tool without another model request', async () => {
+    let modelCalls = 0;
+    let toolExecutions = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        modelCalls += 1;
+        return {
+          toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+        };
+      },
+    };
+    const commitWorkflowResult: ToolDefinition = {
+      name: 'commit_workflow_result',
+      description: 'Commit the canonical workflow result.',
+      returnDirect: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        toolExecutions += 1;
+        return { ok: true, output: 'Workflow result committed.' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Finish the workflow.',
+      llm: fakeLlm,
+      tools: [commitWorkflowResult],
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Workflow result committed.');
+    expect(modelCalls).toBe(1);
+    expect(toolExecutions).toBe(1);
+    expect(result.transcript).toEqual([
+      { role: 'user', content: 'Finish the workflow.' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+      },
+      {
+        role: 'tool',
+        content: JSON.stringify({ ok: true, output: 'Workflow result committed.' }),
+        toolCallId: 'call-terminal',
+      },
+    ]);
+    expect(result.trace.map((event) => event.type)).toEqual([
+      'run.started',
+      'assistant.turn',
+      'tool.calling',
+      'tool.completed',
+      'run.finished',
+    ]);
+  });
+
+  it('keeps a failed return-direct tool recoverable within the same run', async () => {
+    let modelCalls = 0;
+    let toolExecutions = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        modelCalls += 1;
+        return modelCalls === 1
+          ? {
+              toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+            }
+          : { content: 'Recovered after the host rejected the commit.' };
+      },
+    };
+    const commitWorkflowResult: ToolDefinition = {
+      name: 'commit_workflow_result',
+      description: 'Commit the canonical workflow result.',
+      returnDirect: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        toolExecutions += 1;
+        return { ok: false, error: 'Canonical result was not committed.' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Finish the workflow.',
+      llm: fakeLlm,
+      tools: [commitWorkflowResult],
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Recovered after the host rejected the commit.');
+    expect(modelCalls).toBe(2);
+    expect(toolExecutions).toBe(1);
+    expect(result.transcript).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify({ ok: false, error: 'Canonical result was not committed.' }),
+      toolCallId: 'call-terminal',
+    });
+  });
+
   it('records an error outcome when the LLM chat throws a non-retryable error', async () => {
     let calls = 0;
     const providerSecret = 'sk-provider-error-sentinel';

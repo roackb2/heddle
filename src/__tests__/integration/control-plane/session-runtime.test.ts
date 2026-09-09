@@ -402,6 +402,81 @@ describe('conversation turn lifecycle', () => {
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
   });
 
+  it('persists one completed conversation turn from a return-direct tool result', async () => {
+    const storage = await createConversationTurnStorage();
+    let modelCalls = 0;
+    let toolExecutions = 0;
+    vi.spyOn(LlmAdapterService, 'create').mockReturnValue(testAdapter(async () => {
+      modelCalls += 1;
+      return {
+        toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+      };
+    }));
+    const commitWorkflowResult: ToolDefinition = {
+      name: 'commit_workflow_result',
+      description: 'Commit the canonical workflow result.',
+      returnDirect: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        toolExecutions += 1;
+        return { ok: true, output: 'Workflow result committed exactly once.' };
+      },
+    };
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Finish the durable workflow.',
+      apiKey: 'explicit-key',
+      tools: [commitWorkflowResult],
+      maxSteps: 3,
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(turnResult).toMatchObject({
+      outcome: 'done',
+      summary: 'Workflow result committed exactly once.',
+      toolResults: [{
+        call: { id: 'call-terminal', tool: 'commit_workflow_result', input: {} },
+        result: { ok: true, output: 'Workflow result committed exactly once.' },
+      }],
+    });
+    expect(modelCalls).toBe(1);
+    expect(toolExecutions).toBe(1);
+
+    const reopened = await readStoredChatSession(
+      new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+      storage.sessionId,
+    );
+    expect(reopened?.turns).toHaveLength(1);
+    expect(reopened?.turns[0]).toMatchObject({
+      prompt: 'Finish the durable workflow.',
+      outcome: 'done',
+      summary: 'Workflow result committed exactly once.',
+    });
+    expect(reopened?.history).toEqual([
+      { role: 'user', content: 'Finish the durable workflow.' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+      },
+      {
+        role: 'tool',
+        content: JSON.stringify({
+          ok: true,
+          output: 'Workflow result committed exactly once.',
+        }),
+        toolCallId: 'call-terminal',
+      },
+    ]);
+  });
+
   it('persists two completed child records and reopens them with the parent turn', async () => {
     const storage = await createConversationTurnStorage();
     const childMessages: ChatMessage[][] = [];
