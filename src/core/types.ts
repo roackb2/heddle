@@ -53,6 +53,13 @@ export type ToolDefinition<Input = unknown, Output = unknown> = {
    * shared mutable state.
    */
   concurrency?: ToolConcurrencyMode;
+  /**
+   * Complete the current run from this tool's successful result without
+   * requesting another model turn. Failed results remain ordinary recoverable
+   * tool failures. A string output becomes the run summary directly; other
+   * outputs are JSON serialized.
+   */
+  returnDirect?: boolean;
   parameters: Record<string, unknown>; // JSON Schema object
   /** Canonical host-side validation schema for the model-provided input. */
   inputSchema?: ToolValidationSchema<Input>;

@@ -10,7 +10,7 @@ import type {
   HandleAgentToolResultArgs,
   HandleAgentToolTurnArgs,
 } from './types.js';
-import type { RunResult, ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
+import type { ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 
 type ToolCallScheduleEntry = {
   index: number;
@@ -23,6 +23,11 @@ type ProjectedToolCall = {
   effectiveCall: ToolCall;
   result: ToolResult;
   executed: boolean;
+};
+
+type ReturnDirectToolCompletion = {
+  toolName: string;
+  result: ToolResult;
 };
 
 /**
@@ -135,6 +140,7 @@ export class AgentToolTurnService {
       return interruptedDuringExecution;
     }
 
+    let returnDirectCompletion: ReturnDirectToolCompletion | undefined;
     for (const [index, call] of toolCalls.entries()) {
       const projected = projectedByIndex.get(index);
       if (!projected) {
@@ -151,25 +157,31 @@ export class AgentToolTurnService {
       }
 
       context.state.executedToolCalls++;
-      const toolCallResult = AgentToolTurnService.handleExecutedResult({
+      const completion = AgentToolTurnService.handleExecutedResult({
         context,
         effectiveCall: projected.effectiveCall,
         toolCallId: call.id,
         result: projected.result,
       });
-      if (toolCallResult) {
-        return toolCallResult;
+      if (!returnDirectCompletion && completion) {
+        returnDirectCompletion = completion;
       }
     }
 
-    return 'continue';
+    return returnDirectCompletion
+      ? AgentRunFinisher.finishToolResult(
+          context,
+          returnDirectCompletion.toolName,
+          returnDirectCompletion.result,
+        )
+      : 'continue';
   }
 
   private static handleDeniedResult(
     context: HandleAgentToolTurnArgs['context'],
     toolCallId: string,
     result: ToolResult,
-  ): RunResult | undefined {
+  ): void {
     context.state.consecutiveErrors++;
 
     context.messages.push({
@@ -177,16 +189,14 @@ export class AgentToolTurnService {
       content: JSON.stringify(result),
       toolCallId,
     });
-    return undefined;
   }
 
-  private static handleExecutedResult(args: HandleAgentToolResultArgs): RunResult | undefined {
+  private static handleExecutedResult(
+    args: HandleAgentToolResultArgs,
+  ): ReturnDirectToolCompletion | undefined {
     const { context, effectiveCall, toolCallId, result } = args;
     if (!result.ok) {
-      const maybeFailure = AgentToolTurnService.handleFailedExecution(context, result);
-      if (maybeFailure) {
-        return maybeFailure;
-      }
+      AgentToolTurnService.handleFailedExecution(context);
     } else {
       context.state.consecutiveErrors = 0;
       AgentMutationTracker.trackToolResult({ state: context.mutation, effectiveCall, result });
@@ -209,12 +219,13 @@ export class AgentToolTurnService {
       toolCallId,
     });
     AgentToolTurnService.pushHostRequirementReminders(context);
-    return undefined;
+    return result.ok && context.registry.get(effectiveCall.tool)?.returnDirect
+      ? { toolName: effectiveCall.tool, result }
+      : undefined;
   }
 
-  private static handleFailedExecution(context: HandleAgentToolTurnArgs['context'], _result: ToolResult): RunResult | undefined {
+  private static handleFailedExecution(context: HandleAgentToolTurnArgs['context']): void {
     context.state.consecutiveErrors++;
-    return undefined;
   }
 
   private static pushHostRequirementReminders(context: HandleAgentToolTurnArgs['context']): void {

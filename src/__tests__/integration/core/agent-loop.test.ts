@@ -163,6 +163,75 @@ describe('AgentLoopRuntimeService.run', () => {
     expect(runSettled).toBe(true);
   });
 
+  it('awaits ordered return-direct tool completion before loop.finished', async () => {
+    let releaseToolCompletion!: () => void;
+    const toolCompletionPersisted = new Promise<void>((resolveCompletion) => {
+      releaseToolCompletion = resolveCompletion;
+    });
+    const entered: string[] = [];
+    const completed: string[] = [];
+    let runSettled = false;
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls += 1;
+        return {
+          toolCalls: [{ id: 'call-terminal', tool: 'commit_workflow_result', input: {} }],
+        };
+      },
+    };
+    const commitWorkflowResult: ToolDefinition = {
+      name: 'commit_workflow_result',
+      description: 'Commit the canonical workflow result.',
+      returnDirect: true,
+      parameters: { type: 'object', properties: {} },
+      execute: async () => ({ ok: true, output: 'Workflow result committed.' }),
+    };
+
+    const run = AgentLoopRuntimeService.run({
+      goal: 'Finish one workflow.',
+      llm: fakeLlm,
+      tools: [commitWorkflowResult],
+      includeDefaultTools: false,
+      maxSteps: 3,
+      logger: silentLogger,
+      onEvent: async (event) => {
+        entered.push(event.type);
+        if (event.type === 'tool.completed') {
+          await toolCompletionPersisted;
+        }
+        completed.push(event.type);
+      },
+    });
+    void run.then(() => {
+      runSettled = true;
+    });
+
+    await vi.waitFor(() => expect(entered).toContain('tool.completed'));
+    expect(entered).not.toContain('loop.finished');
+    expect(runSettled).toBe(false);
+
+    releaseToolCompletion();
+    const result = await run;
+
+    expect(result.outcome).toBe('done');
+    expect(modelCalls).toBe(1);
+    expect(completed.filter(
+      (type) => type === 'tool.completed' || type === 'loop.finished',
+    )).toEqual(['tool.completed', 'loop.finished']);
+    expect(runSettled).toBe(true);
+  });
+
   it('rejects the run when an async event listener fails', async () => {
     const projectionFailure = new Error('durable activity write failed');
     const fakeLlm: LlmAdapter = {

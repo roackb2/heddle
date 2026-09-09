@@ -42,3 +42,36 @@ const engine = createConversationEngine({
 When multiple extensions are provided, Heddle composes them in declaration
 order. Tool names and toolkit ids must be unique. Heddle rejects duplicates
 before the first turn runs.
+
+## Return-direct terminal tools
+
+Use `returnDirect: true` when a successful host tool invocation is already the
+canonical end of the run—for example, committing a workflow result through a
+host-owned durable service:
+
+```ts
+const commitWorkflowResult: ToolDefinition = {
+  name: 'commit_workflow_result',
+  description: 'Commit the final workflow result after all required work is complete.',
+  returnDirect: true,
+  parameters: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string' },
+    },
+    required: ['summary'],
+  },
+  execute: async (input) => {
+    const { summary } = input as { summary: string }
+    await workflowResults.commit({ summary })
+    return { ok: true, output: summary }
+  },
+}
+```
+
+After a successful return-direct result, Heddle records the tool result and
+finishes the run without requesting ceremonial final text from the model. A
+failed result remains in the transcript as an ordinary tool failure and the
+model may recover within the remaining step budget. Heddle owns this portable
+loop transition; the host continues to own authorization, durable effects,
+idempotency, domain schemas, and the result text returned by the tool.
