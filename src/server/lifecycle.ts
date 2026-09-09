@@ -265,6 +265,7 @@ function logHeartbeatSchedulerEvent(
     'heartbeat.task.agent_event': 'Heartbeat task agent event',
     'heartbeat.task.agent_activity': 'Heartbeat task remote agent activity',
     'heartbeat.task.finished': 'Heartbeat task finished',
+    'heartbeat.task.completed': 'Heartbeat custom handler completed successfully',
     'heartbeat.task.skipped': 'Heartbeat task skipped because no work was available',
     'heartbeat.task.cancelled': 'Heartbeat task execution cancelled',
     'heartbeat.task.retry': 'Heartbeat task retry requested by custom handler',

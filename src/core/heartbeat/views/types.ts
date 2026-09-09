@@ -8,7 +8,7 @@ import type {
 } from '../tasks/index.js';
 
 export type HeartbeatTaskResultView = {
-  kind: 'agent' | 'skipped' | 'cancelled' | 'retry' | 'blocked' | 'failed';
+  kind: 'agent' | 'completed' | 'skipped' | 'cancelled' | 'retry' | 'blocked' | 'failed';
   decision?: HeartbeatDecision;
   summary: string;
   outcome: string;

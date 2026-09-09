@@ -44,6 +44,7 @@ describe('custom heartbeat runner credentials', () => {
       'runAt',
       'signal',
       'runAgent',
+      'complete',
       'skip',
       'retry',
       'block',

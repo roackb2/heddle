@@ -86,7 +86,7 @@ const HeartbeatTaskRecoverySchema = z.object({
 });
 
 export const HeartbeatTaskExecutionOutcomeSchema = z.object({
-  kind: z.enum(['agent', 'skipped', 'cancelled', 'retry', 'blocked', 'failed']).describe('How this outer heartbeat execution settled.'),
+  kind: z.enum(['agent', 'completed', 'skipped', 'cancelled', 'retry', 'blocked', 'failed']).describe('How this outer heartbeat execution settled.'),
   executionId: z.string().describe('Outer heartbeat execution fencing identity.'),
   summary: z.string().describe('Operator-facing execution outcome summary.'),
   agentRunId: z.string().optional().describe('Nested agent run rejected by an explicit custom-handler outcome.'),
@@ -173,7 +173,7 @@ const HeartbeatTaskAgentRunRecordSchema = z.object({
 const HeartbeatTaskNonAgentRunRecordSchema = z.object({
   task: HeartbeatTaskSchema.describe('Task state captured after this execution.'),
   outcome: HeartbeatTaskExecutionOutcomeSchema.extend({
-    kind: z.enum(['skipped', 'cancelled', 'retry', 'blocked']),
+    kind: z.enum(['completed', 'skipped', 'cancelled', 'retry', 'blocked']),
   }).describe('Lightweight execution outcome with no fabricated agent state.'),
 }).strict();
 

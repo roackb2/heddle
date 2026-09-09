@@ -47,6 +47,7 @@ export function useControlPlaneHeartbeatEvents({
 
     if (
       event.type === 'heartbeat.task.finished'
+      || event.type === 'heartbeat.task.completed'
       || event.type === 'heartbeat.task.skipped'
       || event.type === 'heartbeat.task.cancelled'
       || event.type === 'heartbeat.task.retry'
@@ -176,6 +177,7 @@ function projectHeartbeatTaskEvent(
         progress: event.record.task.state.progress ?? 'Heartbeat runner finished.',
         runId: event.record.runId,
       };
+    case 'heartbeat.task.completed':
     case 'heartbeat.task.skipped':
     case 'heartbeat.task.cancelled':
     case 'heartbeat.task.retry':

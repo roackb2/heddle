@@ -98,6 +98,13 @@ export type HeartbeatSchedulerEvent =
       timestamp: string;
     }
   | {
+      type: 'heartbeat.task.completed';
+      taskId: string;
+      executionId: string;
+      record: HeartbeatTaskNonAgentRunRecord & { outcome: { kind: 'completed' } };
+      timestamp: string;
+    }
+  | {
       type: 'heartbeat.task.skipped';
       taskId: string;
       executionId: string;
@@ -178,6 +185,18 @@ export type HeartbeatExecutionContext = {
   runAt: Date;
   signal: AbortSignal;
   runAgent: (options?: HeartbeatTaskRunnerAgentOptions) => Promise<AgentHeartbeatResult>;
+  /**
+   * Records successful host-owned work without fabricating an agent result.
+   * This completes only the current execution; an enabled recurring task is
+   * scheduled normally. The summary is durable operator text and must be
+   * concise and free of credentials, tokens, prompts, or domain payloads.
+   */
+  complete: (input: { summary: string }) => HeartbeatHandlerOutcome;
+  /**
+   * Records that no eligible host-owned work was available for this execution.
+   * The summary follows the same durable, bounded, non-secret contract as
+   * other custom-handler outcomes.
+   */
   skip: (input: { summary: string }) => HeartbeatHandlerOutcome;
   /**
    * Rejects the completed nested agent result and schedules a bounded retry.
@@ -194,6 +213,7 @@ export type HeartbeatExecutionContext = {
 };
 
 export type HeartbeatHandlerOutcome =
+  | { kind: 'completed'; summary: string }
   | { kind: 'skipped'; summary: string }
   | { kind: 'retry'; summary: string; delayMs: number; agentRunId: string }
   | { kind: 'blocked'; summary: string; agentRunId: string };
@@ -298,9 +318,9 @@ export type RunDueHeartbeatTasksResult = {
 /**
  * Machine-readable result of one claim-fenced heartbeat execution attempt.
  *
- * `settled` covers agent, skipped, and blocked outcomes. An explicit custom
- * handler retry is surfaced separately so a dispatcher can distinguish it
- * from successful settlement without inspecting record internals.
+ * `settled` covers agent, completed, skipped, and blocked outcomes. An explicit
+ * custom handler retry is surfaced separately so a dispatcher can distinguish
+ * it from successful settlement without inspecting record internals.
  */
 export type HeartbeatTaskExecutionResult = {
   taskId: string;

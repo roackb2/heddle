@@ -37,8 +37,8 @@ operator-facing heartbeat views.
   `ready | closed` projection for the namespace and one optional opaque task
   group. The final claim checks that projection under the same mutation
   boundary. `HeartbeatTaskStateProjector`
-  owns task state transitions after agent success, no-work skip, cancellation,
-  failure, request, claim, or recovery.
+  owns task state transitions after agent success, host completion, no-work
+  skip, cancellation, failure, request, claim, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
   periodic scheduler loop. It selects due work in stable oldest-due-first order
   and uses `p-limit` to enforce the configured task concurrency ceiling. It delegates execution to
@@ -55,8 +55,9 @@ operator-facing heartbeat views.
   propagation, checkpoint persistence, task state transitions, and execution
   history persistence. Default and custom handlers share its framework-owned
   `context.runAgent()` path, so hosts can add domain prompts and tools without
-  receiving or translating provider credentials. `context.skip()` records
-  explicit no-work without fabricating agent state.
+  receiving or translating provider credentials. `context.complete()` records
+  successful host-owned work and `context.skip()` records explicit no-work;
+  neither fabricates agent state.
   An optional provider-neutral `HeartbeatAgentExecutionTransport` replaces only
   the nested agent call. Task lookup, claim fencing, checkpoint load,
   cancellation, settlement, history, and recovery remain in this service; when
@@ -85,8 +86,8 @@ operator-facing heartbeat views.
   task authority. It must not claim tasks, persist checkpoints, or settle task
   history.
 - `executionId` is the fencing token for one task attempt. A store must reject
-  completion, failure, skip, or cancellation persistence when that execution
-  no longer owns the task.
+  agent completion, host completion, failure, skip, or cancellation persistence
+  when that execution no longer owns the task.
 - Run requests are durable, level-triggered intent. `generation` advances for
   accepted requests, `claimedGeneration` identifies work already admitted, and
   an execution records the request generation it claimed. Multiple requests
@@ -204,20 +205,25 @@ operator-facing heartbeat views.
   `HeartbeatTask` objects, write heartbeat JSON, or run its own scheduler loop.
 - A custom scheduler handler may claim domain work before model execution. It
   must either delegate model work to execution-scoped `context.runAgent()` or
-  return `context.skip()` when no work exists. The context owns model credential
-  resolution, OAuth refresh, unattended approval defaults, checkpoint
-  continuation, abort propagation, and heartbeat event forwarding. It is valid
-  only during the current execution and must never be serialized or retained by
-  the host. The positional runner API is deprecated and adapted through this
-  same pipeline.
+  return `context.complete()` after successful host-owned work, or
+  `context.skip()` when no work exists. A completed non-agent execution retains
+  the previous checkpoint, schedules the next interval when enabled, persists a
+  claim-fenced `completed` run record, and emits `heartbeat.task.completed`.
+  It does not mean the recurring task is terminal. The context owns model
+  credential resolution, OAuth refresh, unattended approval defaults,
+  checkpoint continuation, abort propagation, and heartbeat event forwarding.
+  It is valid only during the current execution and must never be serialized or
+  retained by the host. The positional runner API is deprecated and adapted
+  through this same pipeline.
 - A custom handler can reject a completed nested agent result without throwing
   by returning `context.retry()` or `context.block()` after `await
   context.runAgent()`. Retry retains the previous checkpoint, records a
   claim-fenced non-agent outcome, and schedules one bounded retry delay.
   Block retains the previous checkpoint, records the nested agent run id for
   correlation, disables the task, and requires `resumeTask()` before another
-  run. Handler-outcome summaries are durable operator text: keep them concise,
-  non-secret, and free of prompts or domain payloads.
+  run. All context-created handler outcomes are mutually exclusive. Their
+  summaries are trimmed, non-empty, limited to 500 characters, and persisted as
+  operator text: keep them non-secret and free of prompts or domain payloads.
 
 ```ts
 handler: async (context) => {

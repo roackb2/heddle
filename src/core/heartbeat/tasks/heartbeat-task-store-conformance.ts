@@ -299,8 +299,10 @@ export class HeartbeatTaskStoreConformance {
 
   private static async verifySettlements(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
     const store = await harness.createStore(namespace);
-    const tasks = ['success', 'skip', 'cancel', 'failure'].map(createTask);
+    const tasks = ['success', 'completed', 'skip', 'cancel', 'failure'].map(createTask);
     await Promise.all(tasks.map(async (task) => await store.saveTask(task)));
+    const retainedCheckpoint = createResult('completed-prior').checkpoint;
+    await store.saveCheckpoint(createTask('completed'), retainedCheckpoint);
 
     const successExecution = createExecution('success-execution', 'owner-a', harness);
     await assertClaimed(store, 'success', successExecution, harness, 1_000);
@@ -324,19 +326,46 @@ export class HeartbeatTaskStoreConformance {
     });
     assert(repeatedSuccess.status === 'claim-lost', 'repeating a settled execution must not duplicate or overwrite it');
 
+    const completedExecution = createExecution('completed-execution', 'owner-a', harness);
+    await assertClaimed(store, 'completed', completedExecution, harness, 3_000);
+    const completed = await store.recordTaskExecutionOutcome({
+      taskId: 'completed',
+      execution: completedExecution,
+      kind: 'completed',
+      summary: 'Host-owned work completed.',
+      finishedAt: at(harness, 4_000),
+    });
+    assert(completed.status === 'saved' && completed.record?.outcome?.kind === 'completed', 'host completion must atomically return its durable run record');
+    const persistedCompletion = await requireTask(store, 'completed');
+    assert(persistedCompletion.state?.lastExecution?.kind === 'completed', 'host completion must durably settle the task state');
+    assert((await store.loadCheckpoint(persistedCompletion))?.runId === retainedCheckpoint.runId, 'host completion must retain the previous checkpoint');
+    if (harness.capabilities?.runHistory) {
+      assert(store.listRunRecords, 'runHistory requires listRunRecords');
+      const records = await store.listRunRecords({ taskId: 'completed' });
+      assert(records.some((entry) => entry.executionId === completedExecution.executionId), 'host completion must durably persist its run record');
+    }
+    const repeatedCompletion = await store.recordTaskExecutionOutcome({
+      taskId: 'completed',
+      execution: completedExecution,
+      kind: 'completed',
+      summary: 'Duplicate host completion.',
+      finishedAt: at(harness, 4_000),
+    });
+    assert(repeatedCompletion.status === 'claim-lost', 'repeating a completed execution must not duplicate or overwrite it');
+
     const skipExecution = createExecution('skip-execution', 'owner-a', harness);
-    await assertClaimed(store, 'skip', skipExecution, harness, 3_000);
-    const skipped = await store.recordTaskExecutionOutcome({ taskId: 'skip', execution: skipExecution, kind: 'skipped', summary: 'No work.', finishedAt: at(harness, 4_000) });
+    await assertClaimed(store, 'skip', skipExecution, harness, 5_000);
+    const skipped = await store.recordTaskExecutionOutcome({ taskId: 'skip', execution: skipExecution, kind: 'skipped', summary: 'No work.', finishedAt: at(harness, 6_000) });
     assert(skipped.status === 'saved' && skipped.record?.outcome?.kind === 'skipped', 'skip must atomically return its durable run record');
 
     const cancelledExecution = createExecution('cancel-execution', 'owner-a', harness);
-    await assertClaimed(store, 'cancel', cancelledExecution, harness, 5_000);
-    const cancelled = await store.recordTaskExecutionOutcome({ taskId: 'cancel', execution: cancelledExecution, kind: 'cancelled', summary: 'Stopped.', reason: 'operator-request', finishedAt: at(harness, 6_000) });
+    await assertClaimed(store, 'cancel', cancelledExecution, harness, 7_000);
+    const cancelled = await store.recordTaskExecutionOutcome({ taskId: 'cancel', execution: cancelledExecution, kind: 'cancelled', summary: 'Stopped.', reason: 'operator-request', finishedAt: at(harness, 8_000) });
     assert(cancelled.status === 'saved' && cancelled.record?.outcome?.kind === 'cancelled', 'cancellation must atomically return its durable run record');
 
     const failureExecution = createExecution('failure-execution', 'owner-a', harness);
-    await assertClaimed(store, 'failure', failureExecution, harness, 7_000);
-    const failed = await store.failTaskExecution({ taskId: 'failure', execution: failureExecution, error: new Error('temporary failure'), failedAt: at(harness, 8_000), retryMs: 60_000 });
+    await assertClaimed(store, 'failure', failureExecution, harness, 9_000);
+    const failed = await store.failTaskExecution({ taskId: 'failure', execution: failureExecution, error: new Error('temporary failure'), failedAt: at(harness, 10_000), retryMs: 60_000 });
     assert(failed.status === 'saved' && failed.task.state?.lastExecution?.kind === 'failed', 'failure must settle only the current claim');
   }
 

@@ -231,15 +231,20 @@ describe('targeted heartbeat execution', () => {
     const claimLossStore = createStore('claim-loss');
     const claimLossTask = createTask('claim-loss-task');
     await claimLossStore.saveTask(claimLossTask);
-    vi.spyOn(claimLossStore, 'recordTaskExecutionOutcome').mockResolvedValueOnce({ status: 'claim-lost' });
+    const recordOutcome = vi.spyOn(claimLossStore, 'recordTaskExecutionOutcome')
+      .mockResolvedValueOnce({ status: 'claim-lost' });
 
     await expect(HeartbeatSchedulerService.runTask({
       store: claimLossStore,
       taskId: claimLossTask.id,
       executionOwnerId: 'claim-loss-invocation',
       now: () => NOW,
-      handler: async (context) => context.skip({ summary: 'Settlement lost its claim.' }),
+      handler: async (context) => context.complete({ summary: 'Host work lost its execution claim.' }),
     })).resolves.toMatchObject({ status: 'claim-lost', taskId: claimLossTask.id, executionId: expect.any(String), failed: false });
+    expect(recordOutcome).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: claimLossTask.id,
+      kind: 'completed',
+    }));
   });
 
   it('returns an explicit custom-handler retry as a dispatcher-visible outcome', async () => {
