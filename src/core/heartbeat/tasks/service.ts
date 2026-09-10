@@ -446,18 +446,25 @@ export class FileHeartbeatTaskService implements
    * Reconciles membership for one host-owned task namespace under the same
    * mutation boundary used by scheduler claims and task control operations.
    *
-   * It only creates missing desired tasks and deletes obsolete non-running
-   * tasks. Existing tasks are left intact so reconciliation cannot erase an
-   * operator change, run-request generation, checkpoint association, or live
-   * execution fencing token. Call the explicit task update APIs when a host
-   * needs to change an existing task's configuration.
+   * It creates missing desired tasks and deletes obsolete non-running tasks.
+   * Existing tasks remain intact by default. An explicitly code-owned catalog
+   * may synchronize mutable configuration while retaining checkpoints, history,
+   * and live execution fencing state. Scheduling position and pending requests
+   * remain intact unless desired enablement requires a lifecycle transition.
    */
   async reconcileTasks(input: ReconcileHeartbeatTasksInput): Promise<ReconcileHeartbeatTasksResult> {
     return await this.mutationMutex.runExclusive(async () => {
       const currentTasks = await this.repository.listTasks();
-      const reconciliation = HeartbeatTaskControlPolicy.reconcileTasks({ currentTasks, input });
+      const reconciliation = HeartbeatTaskControlPolicy.reconcileTasks({
+        currentTasks,
+        input,
+        now: dayjs().toDate(),
+      });
 
-      await Promise.all(reconciliation.created.map(async (task) => await this.repository.saveTask(task)));
+      await Promise.all(
+        [...reconciliation.created, ...reconciliation.updated]
+          .map(async (task) => await this.repository.saveTask(task)),
+      );
       await Promise.all(reconciliation.deleted.map(async (task) => await this.repository.deleteTask(task)));
 
       return reconciliation;

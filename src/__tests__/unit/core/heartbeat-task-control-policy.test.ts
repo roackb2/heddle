@@ -180,6 +180,7 @@ describe('HeartbeatTaskControlPolicy', () => {
       input: { namespace: 'representative-', desired: [replacement, added] },
     });
     expect(reconciliation.created).toEqual([added]);
+    expect(reconciliation.updated).toEqual([]);
     expect(reconciliation.deleted).toEqual([obsolete]);
     expect(reconciliation.preservedRunning).toEqual([live]);
     expect(() => HeartbeatTaskControlPolicy.assertTaskCanBeDeleted(live)).toThrow(/running/i);
@@ -187,6 +188,183 @@ describe('HeartbeatTaskControlPolicy', () => {
       currentTasks: [],
       input: { namespace: 'representative-', desired: [outside] },
     })).toThrow(/must start with namespace/i);
+    expect(() => HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: [],
+      input: {
+        namespace: 'representative-',
+        desired: [],
+        existingTaskPolicy: 'replace-state' as never,
+      },
+    })).toThrow(/unsupported existing heartbeat task policy/i);
+  });
+
+  it('synchronizes code-owned configuration without replacing durable execution state', () => {
+    const current = createTask({
+      id: 'managed-task',
+      workspaceId: 'durable-workspace',
+      checkpointPath: '/durable/checkpoint.json',
+      name: 'Old name',
+      admissionGroupId: 'old-group',
+      task: 'Old instructions.',
+      continuationMode: 'operator',
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2026-08-08T05:00:00.000Z',
+      },
+      runtime: {
+        model: 'old-model',
+        maxSteps: 2,
+        workspaceRoot: '/durable/workspace',
+        stateDir: '/durable/state',
+        memoryDir: '/durable/memory',
+        searchIgnoreDirs: ['old-ignore'],
+        systemContext: 'Old context.',
+      },
+      state: {
+        status: 'running',
+        execution: {
+          executionId: 'execution-live',
+          ownerId: 'worker-live',
+          claimedAt: NOW.toISOString(),
+        },
+        runRequest: {
+          generation: 2,
+          claimedGeneration: 1,
+          requestedAt: NOW.toISOString(),
+        },
+        lastExecution: {
+          kind: 'skipped',
+          executionId: 'execution-previous',
+          summary: 'Previous durable outcome.',
+          finishedAt: NOW.toISOString(),
+        },
+      },
+    });
+    const desired = createTask({
+      id: current.id,
+      workspaceId: 'ignored-workspace',
+      checkpointPath: '/ignored/checkpoint.json',
+      name: 'Managed name',
+      admissionGroupId: 'managed-group',
+      task: '  Managed instructions.  ',
+      continuationMode: 'agent',
+      schedule: {
+        intervalMs: 120_000,
+        nextRunAt: '2099-01-01T00:00:00.000Z',
+      },
+      runtime: {
+        model: 'managed-model',
+        maxSteps: 4,
+        workspaceRoot: '/ignored/workspace',
+        stateDir: '/ignored/state',
+        memoryDir: '/ignored/memory',
+        searchIgnoreDirs: ['managed-ignore'],
+        systemContext: 'Managed context.',
+      },
+      state: { status: 'idle' },
+    });
+
+    const reconciliation = HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: [current],
+      input: {
+        namespace: 'managed-',
+        desired: [desired],
+        existingTaskPolicy: 'synchronize-configuration',
+      },
+      now: NOW,
+    });
+
+    expect(reconciliation.updated).toHaveLength(1);
+    expect(reconciliation.updated[0]).toMatchObject({
+      id: current.id,
+      workspaceId: current.workspaceId,
+      checkpointPath: current.checkpointPath,
+      name: desired.name,
+      admissionGroupId: desired.admissionGroupId,
+      task: 'Managed instructions.',
+      enabled: true,
+      continuationMode: 'agent',
+      schedule: {
+        intervalMs: desired.schedule.intervalMs,
+        nextRunAt: current.schedule.nextRunAt,
+      },
+      runtime: {
+        model: desired.runtime?.model,
+        maxSteps: desired.runtime?.maxSteps,
+        workspaceRoot: current.runtime?.workspaceRoot,
+        stateDir: current.runtime?.stateDir,
+        memoryDir: current.runtime?.memoryDir,
+        searchIgnoreDirs: desired.runtime?.searchIgnoreDirs,
+        systemContext: desired.runtime?.systemContext,
+      },
+      state: {
+        status: 'running',
+        execution: current.state?.execution,
+        runRequest: current.state?.runRequest,
+        lastExecution: current.state?.lastExecution,
+        updatedAt: NOW.toISOString(),
+      },
+    });
+    expect(reconciliation.preservedRunning).toEqual(reconciliation.updated);
+    expect(current.name).toBe('Old name');
+
+    expect(() => HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: [current],
+      input: {
+        namespace: 'managed-',
+        desired: [desired],
+        existingTaskPolicy: 'synchronize-configuration',
+      },
+    })).toThrow(/requires a current timestamp/i);
+
+    expect(HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: reconciliation.updated,
+      input: {
+        namespace: 'managed-',
+        desired: [desired],
+        existingTaskPolicy: 'synchronize-configuration',
+      },
+      now: new Date(NOW.getTime() + 60_000),
+    }).updated).toEqual([]);
+  });
+
+  it('uses normal enablement safety when synchronizing code-owned configuration', () => {
+    const disabled = createTask({
+      id: 'managed-disabled',
+      enabled: false,
+      schedule: { intervalMs: 60_000 },
+      state: { status: 'idle' },
+    });
+    const enabled = HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: [disabled],
+      input: {
+        namespace: 'managed-',
+        desired: [{ ...disabled, enabled: true }],
+        existingTaskPolicy: 'synchronize-configuration',
+      },
+      now: NOW,
+    }).updated[0];
+
+    expect(enabled).toMatchObject({
+      enabled: true,
+      schedule: { nextRunAt: '2026-08-07T23:59:59.000Z' },
+      state: { status: 'waiting' },
+    });
+
+    const blocked = {
+      ...disabled,
+      id: 'managed-blocked',
+      state: { status: 'blocked' as const, resumable: true },
+    };
+    expect(() => HeartbeatTaskControlPolicy.reconcileTasks({
+      currentTasks: [blocked],
+      input: {
+        namespace: 'managed-',
+        desired: [{ ...blocked, enabled: true }],
+        existingTaskPolicy: 'synchronize-configuration',
+      },
+      now: NOW,
+    })).toThrow(/blocked.*resume/i);
   });
 
   it('validates and projects a durable run request for adapters', () => {

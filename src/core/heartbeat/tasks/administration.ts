@@ -33,17 +33,28 @@ export type UpdateHeartbeatTaskInput = {
   systemContext?: string;
 };
 
+export type HeartbeatExistingTaskPolicy = 'preserve' | 'synchronize-configuration';
+
 export type ReconcileHeartbeatTasksInput = {
   /** Prefix that limits this reconciliation to tasks owned by one host concern. */
   namespace: string;
-  /** Desired members of the namespace. Existing members retain their stored configuration and state. */
+  /** Desired members of the namespace. */
   desired: readonly HeartbeatTask[];
+  /**
+   * Existing members are preserved by default. Code-owned catalogs may opt in
+   * to synchronizing mutable configuration without replacing durable runtime
+   * state, checkpoint identity, or run history. Scheduling state is preserved
+   * unless the desired `enabled` value requires a normal enablement transition.
+   */
+  existingTaskPolicy?: HeartbeatExistingTaskPolicy;
 };
 
 export type ReconcileHeartbeatTasksResult = {
   created: HeartbeatTask[];
+  /** Existing desired tasks whose mutable configuration changed. */
+  updated: HeartbeatTask[];
   deleted: HeartbeatTask[];
-  /** Running tasks retained without rewriting their execution claim or state. */
+  /** Running tasks retained with their execution claim and state intact. */
   preservedRunning: HeartbeatTask[];
 };
 

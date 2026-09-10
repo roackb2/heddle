@@ -504,6 +504,7 @@ hosted state.
 
 ```ts
 import type {
+  HeartbeatTask,
   HeartbeatTaskAdministrationService,
 } from '@heddleagent/runtime/advanced';
 
@@ -518,11 +519,43 @@ const task = await heartbeatTasks.createTask({
 await heartbeatTasks.setTaskEnabled(task.taskId, false);
 ```
 
+The default reconciliation policy preserves existing members wholesale, which
+is appropriate when operators may edit their configuration. A code-owned
+catalog can make its mutable configuration authoritative in one atomic call:
+
+```ts
+const desiredTask: HeartbeatTask = {
+  id: 'managed-digest',
+  name: 'Managed digest',
+  task: 'Produce the configured digest.',
+  enabled: true,
+  schedule: { intervalMs: 60_000 },
+};
+
+await heartbeatTasks.reconcileTasks({
+  namespace: 'managed-',
+  desired: [desiredTask],
+  existingTaskPolicy: 'synchronize-configuration',
+});
+```
+
+This synchronizes `name`, `admissionGroupId`, task instructions, `enabled`,
+`continuationMode`, `intervalMs`, and the mutable model/runtime options. It
+preserves identity/storage fields, the existing `nextRunAt`, execution and
+run-request state, checkpoint association, and run history. An actual enabled
+state transition intentionally updates scheduling and pending-request state
+through the normal enablement policy; in particular, a blocked task still
+requires an explicit `resumeTask()` call. The result's `updated`
+collection contains only tasks whose configuration changed, so repeated startup
+reconciliation is idempotent.
+
 Remote implementations should reuse `HeartbeatTaskControlPolicy` for task
 projections and `HeartbeatTaskViewProjector` for public views. Apply the control
 policy to the latest locked row inside the same database transaction that
-persists the result. The pure policy deliberately owns no transaction, lease,
-tenant authorization, or notification mechanism; reading through
+persists every `created`, `updated`, and `deleted` result. Supply the transaction's
+current timestamp when configuration synchronization is requested. The pure
+policy deliberately owns no transaction, lease, tenant authorization, or
+notification mechanism; reading through
 `loadTask()` and later writing through `saveTask()` is not an atomic
 administration implementation.
 

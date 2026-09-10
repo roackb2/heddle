@@ -443,6 +443,7 @@ export type {
   FileHeartbeatTaskServiceOptions,
   HeartbeatAdmissionDecision,
   HeartbeatAdmissionTarget,
+  HeartbeatExistingTaskPolicy,
   HeartbeatTaskAdministrationService,
   HeartbeatTaskAdmissionControl,
   HeartbeatTaskDetail,

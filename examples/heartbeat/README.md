@@ -18,7 +18,10 @@ for the work and controls you actually operate.
 Every stage uses `reconcileTasks()` at startup. Re-running an example therefore
 creates a missing task without overwriting its durable state, pending request,
 checkpoint association, or operator changes. Use the explicit task update APIs
-when the host intentionally changes an existing task.
+when the host intentionally changes an existing operator-managed task. A
+code-owned catalog can instead use the `synchronize-configuration` existing-task
+policy to update mutable configuration atomically while preserving its durable
+lifecycle state.
 
 ## Choose by two independent axes
 
