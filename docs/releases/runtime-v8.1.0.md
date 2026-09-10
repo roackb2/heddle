@@ -8,6 +8,10 @@ successful terminal-result behavior.
 - Add `McpHostToolOverride.returnDirect` to the public MCP host-extension API.
 - Project the host-owned override into the generated `ToolDefinition`, including
   request-scoped MCP extensions with short-lived authorization headers.
+- Treat resolved MCP SDK responses marked `isError: true` as failed Heddle tool
+  results instead of allowing a return-direct tool to finish successfully.
+  Ordinary calls retain bounded text details for model recovery, while
+  request-scoped calls keep the existing response-body redaction boundary.
 - Keep existing behavior unchanged by default: tools without the override
   continue through the normal model loop, and failed overridden calls remain
   recoverable within the current run.
@@ -26,5 +30,6 @@ for authorization, idempotency, domain persistence, and the returned result.
 
 The release candidate is verified with focused request-scoped MCP tests for
 successful terminal completion, unchanged non-overridden behavior, and failed
-call recovery, plus the repository build/test baseline and Runtime package
-build.
+call recovery; raw SDK-response boundary regressions for `isError`, including
+request-scoped response-body redaction; successful compatibility `toolResult`
+coverage; plus the repository build/test baseline and Runtime package build.

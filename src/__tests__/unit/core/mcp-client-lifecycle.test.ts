@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AgentRunService } from '@/core/agent/index.js';
+import { prepareMcpHostExtension } from '@/core/chat/engine/index.js';
+import type { LlmAdapter, LlmResponse } from '@/core/llm/types.js';
 import type { McpServerConfig } from '@/core/mcp/index.js';
+import type { ToolToolkitContext } from '@/core/tools/index.js';
+import { createLogger } from '@/core/utils/logger.js';
 
 const mocks = vi.hoisted(() => ({
   clientCallTool: vi.fn(),
@@ -52,6 +57,8 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 }));
 
 import { McpClientService } from '@/core/mcp/client-service.js';
+
+const silentLogger = createLogger({ level: 'silent', console: false });
 
 const servers: McpServerConfig[] = [
   {
@@ -122,6 +129,149 @@ describe('MCP client lifecycle', () => {
 
     expect(mocks.clientClose).toHaveBeenCalledTimes(1);
     expect(mocks.transportClose).toHaveBeenCalledWith('http');
+  });
+
+  it('maps a resolved SDK isError response to a bounded failed tool result', async () => {
+    const omittedStructuredValue = 'structured-value-must-not-enter-the-error';
+    mocks.clientCallTool.mockResolvedValueOnce({
+      isError: true,
+      content: [{ type: 'text', text: `Validation failed: ${'x'.repeat(5_000)}` }],
+      structuredContent: { internal: omittedStructuredValue },
+    });
+
+    const result = await new McpClientService().callTool(servers[2]!, 'commit_workflow_result', {});
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error('Expected the MCP SDK error result to remain failed.');
+    }
+    expect(result.error).toMatch(/^Validation failed:/);
+    expect(result.error).toHaveLength(4_000);
+    expect(result.error.endsWith('…')).toBe(true);
+    expect(result.error).not.toContain(omittedStructuredValue);
+    expect(mocks.clientClose).toHaveBeenCalledOnce();
+    expect(mocks.transportClose).toHaveBeenCalledWith('http');
+  });
+
+  it('redacts resolved SDK isError content for request-scoped tool calls', async () => {
+    const reflectedCapability = 'reflected-capability-secret';
+    mocks.clientCallTool.mockResolvedValueOnce({
+      isError: true,
+      content: [{ type: 'text', text: `backend echoed ${reflectedCapability}` }],
+    });
+
+    const result = await new McpClientService().callTool(
+      servers[2]!,
+      'read_scope',
+      {},
+      undefined,
+      async () => ({ Authorization: `Bearer ${reflectedCapability}` }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Request-scoped MCP operation failed: http/call_tool',
+    });
+    expect(JSON.stringify(result)).not.toContain(reflectedCapability);
+  });
+
+  it('preserves successful compatibility toolResult responses', async () => {
+    mocks.clientCallTool.mockResolvedValueOnce({
+      toolResult: { status: 'committed', revision: 3 },
+    });
+
+    await expect(new McpClientService().callTool(servers[2]!, 'commit_workflow_result', {}))
+      .resolves.toEqual({
+        ok: true,
+        output: { status: 'committed', revision: 3 },
+      });
+  });
+
+  it('keeps a raw SDK isError response recoverable for a return-direct MCP tool', async () => {
+    mocks.clientListTools.mockResolvedValueOnce({
+      tools: [{
+        name: 'commit_workflow_result',
+        description: 'Commit the canonical workflow result.',
+        inputSchema: { type: 'object', properties: {} },
+      }],
+    });
+    mocks.clientCallTool.mockResolvedValueOnce({
+      isError: true,
+      content: [{ type: 'text', text: 'Workflow result was not committed: secret-capability.' }],
+    });
+    const prepared = await prepareMcpHostExtension({
+      mode: 'request-scoped',
+      id: 'workflow-capabilities',
+      serverId: 'workflow_backend',
+      server: {
+        transport: 'http',
+        url: 'https://workflow.example/mcp',
+        tools: { allow: ['commit_workflow_result'], approval: 'never' },
+      },
+      includeTools: ['commit_workflow_result'],
+      toolOverrides: {
+        commit_workflow_result: { returnDirect: true },
+      },
+      resolveRequestHeaders: async () => ({ Authorization: 'Bearer test-capability' }),
+    });
+    if (!prepared.ok) {
+      throw new Error(prepared.error);
+    }
+
+    const context: ToolToolkitContext = {
+      workspaceRoot: '/workspace',
+      stateRoot: '/state',
+      artifactRoot: '/state/artifacts',
+      sessionId: 'session-mcp-error',
+      model: 'gpt-5.5',
+      memoryDir: '/state/memory',
+      memoryMode: 'none',
+    };
+    const [tool] = prepared.extension.toolkits
+      ?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+    if (!tool) {
+      throw new Error('Expected the prepared MCP extension to expose its selected tool.');
+    }
+
+    let modelCalls = 0;
+    const llm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        modelCalls += 1;
+        return modelCalls === 1
+          ? {
+              toolCalls: [{
+                id: 'call-terminal',
+                tool: 'commit_workflow_result',
+                input: {},
+              }],
+            }
+          : { content: 'The workflow recovered after the failed commit.' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Complete the workflow.',
+      llm,
+      tools: [tool],
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(result).toMatchObject({
+      outcome: 'done',
+      summary: 'The workflow recovered after the failed commit.',
+    });
+    expect(result.transcript).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify({
+        ok: false,
+        error: 'Request-scoped MCP operation failed: workflow_backend/call_tool',
+      }),
+      toolCallId: 'call-terminal',
+    });
+    expect(JSON.stringify(result.transcript)).not.toContain('secret-capability');
+    expect(modelCalls).toBe(2);
+    expect(mocks.clientCallTool).toHaveBeenCalledOnce();
   });
 
   it.each(servers.slice(1))('resolves request-scoped headers for $transport discovery', async (server) => {

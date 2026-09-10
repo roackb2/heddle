@@ -6,6 +6,7 @@ import type {
   FetchLike,
   Transport,
 } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { truncate } from '@/core/utils/text.js';
 import type {
   McpCallToolResult,
   McpClientSessionInfo,
@@ -17,6 +18,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_MCP_TIMEOUT_MS = 30_000;
+const MAX_MCP_TOOL_ERROR_LENGTH = 4_000;
 
 export class McpClientService {
   async listTools(
@@ -64,10 +66,14 @@ export class McpClientService {
           timeout: DEFAULT_MCP_TIMEOUT_MS,
         });
 
-        return {
-          ok: true,
-          output: normalizeToolResult(result),
-        };
+        return isMcpToolErrorResult(result)
+          ? {
+              ok: false,
+              error: requestHeaders
+                ? requestScopedOperationError(server.id, 'call_tool').message
+                : normalizeMcpToolError(result),
+            }
+          : { ok: true, output: normalizeToolResult(result) };
       }, { operation: 'call_tool', serverId: server.id, toolName, signal }, signal, requestHeaders);
     } catch (error) {
       return {
@@ -234,4 +240,27 @@ function normalizeToolResult(result: unknown): unknown {
     structuredContent: value.structuredContent,
     content: value.content,
   };
+}
+
+function isMcpToolErrorResult(result: unknown): result is { content?: unknown[]; isError: true } {
+  return result !== null
+    && typeof result === 'object'
+    && (result as { isError?: unknown }).isError === true;
+}
+
+function normalizeMcpToolError(result: { content?: unknown[] }): string {
+  const text = (result.content ?? [])
+    .filter(isMcpTextContent)
+    .map((entry) => entry.text.trim())
+    .filter(Boolean)
+    .join('\n');
+
+  return truncate(text || 'MCP tool reported an error without text details.', MAX_MCP_TOOL_ERROR_LENGTH);
+}
+
+function isMcpTextContent(value: unknown): value is { type: 'text'; text: string } {
+  return value !== null
+    && typeof value === 'object'
+    && (value as { type?: unknown }).type === 'text'
+    && typeof (value as { text?: unknown }).text === 'string';
 }
