@@ -75,6 +75,12 @@ classification. The model still describes intent and expected effects in its
 policy envelope, but approval evaluation retains both sources and applies the
 host-owned facts when they disagree.
 
+The host may also mark one curated tool override as `returnDirect` when a
+successful MCP result is already the canonical run result. Keep this as
+host-owned tool-definition metadata: never infer terminal behavior from remote
+MCP annotations, names, descriptions, or outputs. Failed calls retain the
+ordinary recoverable loop behavior.
+
 Only classify `operations` when the embedding host knows the tool contract.
 Remote MCP annotations are untrusted hints, not Heddle authorization. An
 unclassified remote tool remains manual in autopilot rather than inheriting a
