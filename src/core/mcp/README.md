@@ -96,6 +96,9 @@ work inside a synchronous toolkit.
   - owns the official `@modelcontextprotocol/sdk` client usage;
   - creates stdio, Streamable HTTP, or legacy SSE transports;
   - lists tools and calls tools;
+  - maps resolved MCP results with `isError: true` to failed Heddle tool
+    results, retaining only bounded text details for ordinary calls and using a
+    generic failure for request-scoped calls;
   - forwards the owning run's abort signal to connection and request calls;
   - closes client and transport resources after each operation, on both success
     and failure.
@@ -200,6 +203,11 @@ Keep these invariants:
 - MCP server id, tool name, transport, configured environment, and tenant
   provenance are host-owned. A model policy envelope cannot override them.
 - MCP server/tool descriptions and outputs are untrusted external content.
+- A resolved MCP `isError` result is a tool failure, not a successful output;
+  non-text error content and metadata must not be copied into the model-facing
+  error string.
+- Request-scoped MCP failures must not expose server response content because
+  it can reflect short-lived authorization material.
 - Local stdio servers run commands with the user's OS permissions.
 - Secret values should be resolved at connection time and redacted from
   diagnostics/logs where possible.

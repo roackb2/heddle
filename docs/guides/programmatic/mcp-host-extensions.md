@@ -64,10 +64,14 @@ const prepared = await prepareMcpHostExtension({
 `returnDirect` is host-owned. Use it only when a successful MCP response is the
 canonical end of the run. Heddle records that tool result and finishes without
 another model turn. Failed calls remain recoverable, and tools without the
-override retain the normal loop. Never infer terminal behavior from remote MCP
-annotations, descriptions, names, or result content. The remote operation must
-remain authorized and idempotent because every tool call in the current model
-turn is executed before Heddle applies the terminal transition.
+override retain the normal loop. This includes resolved MCP responses marked
+`isError: true`, which become failed Heddle tool results so the model can
+self-correct. Ordinary calls retain bounded text details; request-scoped calls
+use a generic error so reflected authorization material cannot enter the model
+transcript. Never infer terminal behavior from remote MCP annotations,
+descriptions, names, or result content. The remote operation must remain
+authorized and idempotent because every tool call in the current model turn is
+executed before Heddle applies the terminal transition.
 
 `resultArtifacts: true` is the recommended starting point for MCP servers that
 return generated source, HTML, JSON, or other large text outputs. Heddle scans
