@@ -49,7 +49,25 @@ model sees the curated host tool names instead of both paths.
 
 Use `toolNamePrefix` only when multiple MCP servers expose overlapping tool
 names in the same engine. Use `toolOverrides` when a host needs a sharper
-description, capability, approval setting, or public tool name.
+description, capability, approval setting, public tool name, or terminal
+result behavior:
+
+```ts
+const prepared = await prepareMcpHostExtension({
+  // ...server and scope configuration...
+  toolOverrides: {
+    commit_workflow_result: { returnDirect: true },
+  },
+})
+```
+
+`returnDirect` is host-owned. Use it only when a successful MCP response is the
+canonical end of the run. Heddle records that tool result and finishes without
+another model turn. Failed calls remain recoverable, and tools without the
+override retain the normal loop. Never infer terminal behavior from remote MCP
+annotations, descriptions, names, or result content. The remote operation must
+remain authorized and idempotent because every tool call in the current model
+turn is executed before Heddle applies the terminal transition.
 
 `resultArtifacts: true` is the recommended starting point for MCP servers that
 return generated source, HTML, JSON, or other large text outputs. Heddle scans

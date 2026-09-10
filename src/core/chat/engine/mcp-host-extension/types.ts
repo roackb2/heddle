@@ -18,6 +18,8 @@ export type McpHostToolOverride = {
   description?: string;
   capabilities?: string[];
   requiresApproval?: boolean;
+  /** Finish the current run from this tool's successful MCP result. */
+  returnDirect?: boolean;
   /**
    * Host-owned effect classification. Omit when the host cannot verify the
    * remote tool's effects; model claims remain proposals.

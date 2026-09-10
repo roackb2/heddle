@@ -96,6 +96,7 @@ export class McpHostToolDefinitionService {
       requiresApproval: override?.requiresApproval ?? shouldMcpToolRequireApproval(args.server),
       description: override?.description ?? McpHostToolDefinitionService.describeTool(args.options, args.tool),
       capabilities: override?.capabilities ?? args.options.defaultCapabilities ?? ['mcp.unknown'],
+      returnDirect: override?.returnDirect,
       parameters: args.tool.inputSchema,
       hostPolicy: McpPolicyContextService.create({
         server: args.server,
