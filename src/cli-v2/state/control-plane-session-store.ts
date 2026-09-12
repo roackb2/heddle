@@ -24,6 +24,7 @@ import type {
   ControlPlaneSlashCommandHint,
   ControlPlaneWorkspaceFileSuggestion,
 } from '@/client-shared/api/types.js';
+import { ClientSharedSessionSelectionService } from '@/client-shared/services/session-selection/index.js';
 import { ControlPlaneSessionLoader } from './control-plane-session-loader.js';
 import { ControlPlaneDirectShellController } from './control-plane-direct-shell-controller.js';
 import { ControlPlaneSlashCommandController } from './control-plane-slash-command-controller.js';
@@ -201,7 +202,9 @@ export class ControlPlaneSessionStore {
       ]);
       this.subscriptions.subscribeToSessionList(workspaceId);
       const sessions = await this.refreshSessions();
-      const sessionId = input.sessionId ?? sessions[0]?.id ?? (await this.createSession()).id;
+      const sessionId = input.sessionId
+        ?? ClientSharedSessionSelectionService.resolveStartupSession(sessions)?.id
+        ?? (await this.createSession()).id;
       await this.selectSession(sessionId);
     } catch (error) {
       this.state.patch({ error: formatError(error), loading: false });

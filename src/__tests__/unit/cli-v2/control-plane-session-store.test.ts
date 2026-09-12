@@ -52,6 +52,43 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('starts on the most recently updated session instead of the first pinned session', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionsQuery.mockResolvedValueOnce({
+      workspaceId: 'workspace-1',
+      sessions: [
+        {
+          id: 'pinned-old',
+          name: 'Pinned old',
+          pinned: true,
+          updatedAt: '2026-08-28T09:00:00.000Z',
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+        {
+          id: 'recent-work',
+          name: 'Recent work',
+          pinned: false,
+          updatedAt: '2026-08-29T09:00:00.000Z',
+          messageCount: 1,
+          turnCount: 1,
+          queuedPromptCount: 0,
+        },
+      ],
+    });
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+    await store.start();
+
+    expect(fixture.calls.sessionQuery).toHaveBeenCalledWith({
+      id: 'recent-work',
+      workspaceId: 'workspace-1',
+    });
+    expect(store.getSnapshot().activeSessionId).toBe('recent-work');
+    store.dispose();
+  });
+
   it('refreshes the canonical workspace change list after a live workspace-changing activity', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
