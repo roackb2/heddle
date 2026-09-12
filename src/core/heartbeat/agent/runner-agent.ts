@@ -8,6 +8,7 @@
 import { resolve } from 'node:path';
 import dayjs from 'dayjs';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
+import { projectMemoryRunResult } from '@/core/memory/run-result.js';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import { HeartbeatDecisionPolicy } from './decision.js';
@@ -57,6 +58,7 @@ export class HeartbeatRunnerAgent {
     return {
       decision,
       summary: result.summary,
+      memory: projectMemoryRunResult(result.trace),
       checkpoint,
       state: result.state,
     };

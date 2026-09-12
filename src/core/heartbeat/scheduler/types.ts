@@ -158,9 +158,11 @@ export type HeartbeatTaskRunnerAgentOptions = Partial<Pick<
   | 'maxSteps'
   | 'maxToolConcurrency'
   | 'tools'
+  | 'toolkits'
   | 'extraTools'
   | 'includeDefaultTools'
   | 'includePlanTool'
+  | 'memoryMode'
   | 'searchIgnoreDirs'
   | 'systemContext'
   | 'history'
@@ -245,7 +247,9 @@ export type HeartbeatTaskRunnerRuntimeOptions = {
   model?: string;
   maxSteps?: number;
   tools?: RunAgentHeartbeatOptions['tools'];
+  toolkits?: RunAgentHeartbeatOptions['toolkits'];
   includeDefaultTools?: RunAgentHeartbeatOptions['includeDefaultTools'];
+  memoryMode?: RunAgentHeartbeatOptions['memoryMode'];
   approvalPolicies?: RunAgentHeartbeatOptions['approvalPolicies'];
   searchIgnoreDirs?: string[];
   systemContext?: string;

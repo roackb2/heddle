@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../types.js';
+import type { MemoryToolMode } from '../memory/tool-mode.js';
 
 export type ToolToolkitContext = {
   workspaceRoot: string;
@@ -13,7 +14,7 @@ export type ToolToolkitContext = {
   providerCredentialSource?: import('../runtime/credentials/index.js').ProviderCredentialSource;
   credentialStorePath?: string;
   memoryDir: string;
-  memoryMode: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
+  memoryMode: MemoryToolMode;
   searchIgnoreDirs?: string[];
   hiddenMcpServerIds?: string[];
 };

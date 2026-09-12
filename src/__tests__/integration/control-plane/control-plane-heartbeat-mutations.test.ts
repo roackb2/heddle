@@ -421,6 +421,7 @@ function createHeartbeatResult(
   return {
     decision: 'continue',
     summary,
+    memory: { changed: false },
     checkpoint: {
       version: 1,
       runId,

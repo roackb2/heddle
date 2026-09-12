@@ -8,7 +8,7 @@ import { createMemoryCheckpointTool } from './memory-checkpoint.js';
 import { createRecordKnowledgeTool } from './record-knowledge.js';
 import type { ToolToolkit } from '../../toolkit.js';
 
-export const knowledgeToolkit: ToolToolkit = {
+export const memoryToolkit: ToolToolkit = {
   id: 'knowledge',
   createTools(context) {
     if (context.memoryMode === 'none') {
@@ -20,6 +20,10 @@ export const knowledgeToolkit: ToolToolkit = {
       createReadMemoryNoteTool({ memoryRoot: context.memoryDir }),
       createSearchMemoryNotesTool({ memoryRoot: context.memoryDir }),
     ];
+
+    if (context.memoryMode === 'read-only') {
+      return readableKnowledgeTools;
+    }
 
     if (context.memoryMode === 'read-and-record') {
       return [
@@ -37,3 +41,6 @@ export const knowledgeToolkit: ToolToolkit = {
     throw new Error(`Unsupported memory mode: ${exhaustive}`);
   },
 };
+
+// Preserve the internal knowledge-domain name for existing imports.
+export const knowledgeToolkit = memoryToolkit;

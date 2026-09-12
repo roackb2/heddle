@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { REASONING_EFFORTS } from '@/core/llm/types.js';
+import { MEMORY_TOOL_MODES } from '@/core/memory/tool-mode.js';
 
 export const CustomAgentModeAliasSchema = z.enum(['ask', 'code', 'review']);
 export const CustomAgentSourceKindSchema = z.enum(['project', 'user', 'built-in']);
 export const CustomAgentToolPresetSchema = z.enum(['default', 'inspect', 'none', 'custom']);
 export const CustomAgentApprovalPresetSchema = z.enum(['interactive', 'read_only', 'auto', 'custom']);
 export const CustomAgentReasoningEffortSchema = z.enum(REASONING_EFFORTS);
-export const CustomAgentMemoryModeSchema = z.enum(['none', 'read-and-record', 'maintainer', 'legacy-full']);
+export const CustomAgentMemoryModeSchema = z.enum(MEMORY_TOOL_MODES);
 export const ToolCapabilitySchema = z.enum([
   'workspace.read',
   'workspace.write',

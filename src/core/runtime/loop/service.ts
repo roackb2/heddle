@@ -281,6 +281,7 @@ export class AgentLoopRuntimeService {
       stateDir: options.stateDir,
       stateRoot: this.resolveStateRoot(runtime.workspaceRoot, options.stateDir),
       memoryDir: options.memoryDir,
+      memoryMode: options.memoryMode,
       searchIgnoreDirs: options.searchIgnoreDirs,
       includePlanTool: options.includePlanTool,
       includeDefaultTools: options.includeDefaultTools,

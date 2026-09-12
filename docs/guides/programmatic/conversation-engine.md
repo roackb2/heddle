@@ -74,6 +74,16 @@ const engine = createConversationEngine({
 })
 ```
 
+The public `MemoryToolMode` values are:
+
+| Mode | Heddle memory tools |
+| --- | --- |
+| `none` | none |
+| `read-only` | list, read, and search notes |
+| `read-and-record` | read-only tools plus candidate recording and the explicit memory checkpoint decision tool |
+| `maintainer` | read-only tools plus direct note editing |
+| `legacy-full` | legacy direct-edit compatibility |
+
 This is separate from `memoryMaintenanceMode`. `toolProfile.memoryMode`
 controls the memory tools visible to the model, while
 `memoryMaintenanceMode` controls post-turn memory maintenance scheduling. If a
@@ -85,6 +95,14 @@ assistant output is not held back. The returned turn promise still waits for
 maintenance to reach a stable boundary before reporting memory changes to
 checkpointing hosts. `inline` includes maintenance events in the primary
 persisted turn result; `none` leaves recorded candidates pending.
+
+Every settled turn result includes `memory.changed`. It is true after Heddle
+records a memory candidate or successfully edits a memory note and false after
+read-only activity, a skipped checkpoint, or a failed write. A host with a
+durable external memory store can use this receipt to checkpoint after the turn
+promise settles. It still owns authenticated scope selection, restore-before-
+run ordering, durable checkpoint retries, and retention. The receipt does not
+cover arbitrary product tools or direct filesystem writes.
 
 For host event adapters, import `HeddleEventType` instead of duplicating event
 name strings:

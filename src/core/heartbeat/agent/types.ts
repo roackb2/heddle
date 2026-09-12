@@ -1,4 +1,5 @@
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState, RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
+import type { MemoryRunResult } from '@/core/memory/run-result.js';
 import type { StopReason } from '@/core/types.js';
 
 export type HeartbeatDecision = 'continue' | 'pause' | 'complete' | 'escalate';
@@ -43,6 +44,8 @@ export type RunAgentHeartbeatOptions = Omit<RunAgentLoopOptions, 'goal' | 'resum
 export type AgentHeartbeatResult = {
   decision: HeartbeatDecision;
   summary: string;
+  /** Settled Heddle memory-tool mutation receipt for host checkpoint policy. */
+  memory: MemoryRunResult;
   checkpoint: AgentLoopCheckpoint;
   state: AgentLoopState;
 };

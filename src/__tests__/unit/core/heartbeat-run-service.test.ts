@@ -294,6 +294,7 @@ function result(): AgentHeartbeatResult {
   return {
     decision: 'complete',
     summary: state.summary,
+    memory: { changed: false },
     state,
     checkpoint: {
       version: 1,

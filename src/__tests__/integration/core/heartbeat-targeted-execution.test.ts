@@ -326,6 +326,7 @@ function createAgentResult(runId: string): AgentHeartbeatResult {
   return {
     decision: 'continue',
     summary: state.summary,
+    memory: { changed: false },
     state,
     checkpoint: { version: 1, runId, createdAt: state.finishedAt, state },
   };

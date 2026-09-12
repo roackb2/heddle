@@ -8,6 +8,7 @@ import {
   DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
   HeartbeatRunnerAgent,
   HeartbeatSchedulerService,
+  memoryToolkit,
   type AgentHeartbeatResult,
   type HeartbeatExecutionContext,
   type HeartbeatAgentExecutionTransport,
@@ -211,6 +212,8 @@ describe('heartbeat execution context', () => {
           task: 'Process claimed work item domain-42.',
           systemContext: 'Only operate on domain-42.',
           tools: [domainTool],
+          toolkits: [memoryToolkit],
+          memoryMode: 'read-only',
           maxSteps: 3,
         });
       },
@@ -223,6 +226,8 @@ describe('heartbeat execution context', () => {
       task: 'Process claimed work item domain-42.',
       systemContext: 'Only operate on domain-42.',
       tools: [domainTool],
+      toolkits: [memoryToolkit],
+      memoryMode: 'read-only',
       maxSteps: 3,
       checkpoint: undefined,
       abortSignal: executionContext?.signal,
@@ -822,6 +827,7 @@ function createHeartbeatResult(
   return {
     decision,
     summary,
+    memory: { changed: false },
     state,
     checkpoint: AgentLoopCheckpointService.createCheckpoint(state, {
       createdAt: state.finishedAt,

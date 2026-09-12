@@ -134,6 +134,11 @@ export type {
 } from './core/chat/engine/host-extension.js';
 export { RuntimeToolService } from './core/runtime/tools/index.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/tools/index.js';
+export { memoryToolkit } from './core/tools/toolkits/knowledge/toolkit.js';
+export { MemoryRunResultSchema, projectMemoryRunResult } from './core/memory/run-result.js';
+export type { MemoryRunResult } from './core/memory/run-result.js';
+export { MEMORY_TOOL_MODES } from './core/memory/tool-mode.js';
+export type { MemoryToolMode } from './core/memory/tool-mode.js';
 export {
   ToolBundleComposer,
   ToolExecutionService,

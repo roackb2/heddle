@@ -3,6 +3,7 @@ import { AutonomyPermissionModeService, ToolApprovalProfileService } from '@/cor
 import { ArtifactService } from '@/core/artifacts/index.js';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
+import { projectMemoryRunResult } from '@/core/memory/run-result.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import {
   DelegationService,
@@ -263,13 +264,9 @@ export class EngineConversationTurnService implements ConversationTurnService {
         }),
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
         ...(delegation ? { delegation } : {}),
-        memory: {
-          // Background maintenance runs after the primary turn is persisted,
-          // but the result does not resolve until that working copy is stable.
-          changed: resultForPersistence.trace.some(
-            ({ type }) => type === HeddleEventType.memoryCandidateRecorded,
-          ),
-        },
+        // Background maintenance runs after the primary turn is persisted,
+        // but the result does not resolve until that working copy is stable.
+        memory: projectMemoryRunResult(resultForPersistence.trace),
       };
     } finally {
       await delegationScope?.cancelAndWait();

@@ -10,6 +10,7 @@ import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../advanced.js';
+import { memoryToolkit } from '../../../index.js';
 import { createLogger } from '../../../core/utils/logger.js';
 import {
   HeartbeatDecisionPolicy,
@@ -897,6 +898,12 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
       memoryDir,
       memoryMode: 'none',
     }).map((tool) => tool.name);
+    const readOnly = RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-test',
+      workspaceRoot,
+      memoryDir,
+      memoryMode: 'read-only',
+    }).map((tool) => tool.name);
     const maintainer = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
       workspaceRoot,
@@ -912,6 +919,14 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
 
     expect(none).not.toContain('list_memory_notes');
     expect(none).not.toContain('record_knowledge');
+    expect(readOnly).toEqual(expect.arrayContaining([
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+    ]));
+    expect(readOnly).not.toContain('memory_checkpoint');
+    expect(readOnly).not.toContain('record_knowledge');
+    expect(readOnly).not.toContain('edit_memory_note');
     expect(maintainer).toEqual(expect.arrayContaining([
       'list_memory_notes',
       'read_memory_note',
@@ -962,6 +977,100 @@ describe('ToolBundleComposer', () => {
 });
 
 describe('HeartbeatRunnerAgent.run', () => {
+  it('composes exactly the read-only memory toolkit for an isolated heartbeat run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-heartbeat-read-only-memory-'));
+    let modelVisibleTools: string[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(_messages, tools): Promise<LlmResponse> {
+        modelVisibleTools = tools.map((tool) => tool.name);
+        return {
+          content: 'Read-only inspection is complete.\n\nHEARTBEAT_DECISION: continue',
+        };
+      },
+    };
+
+    const result = await HeartbeatRunnerAgent.run({
+      task: 'Inspect durable memory without changing it.',
+      llm: fakeLlm,
+      apiKey: 'test-api-key',
+      apiKeyProvider: 'explicit',
+      preferApiKey: true,
+      toolkits: [memoryToolkit],
+      includeDefaultTools: false,
+      memoryMode: 'read-only',
+      memoryDir: join(root, 'memory'),
+      workspaceRoot: root,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(modelVisibleTools).toEqual([
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+    ]);
+    expect(result.memory).toEqual({ changed: false });
+  });
+
+  it('reports a settled memory change after a heartbeat records knowledge', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-heartbeat-memory-change-'));
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls += 1;
+        if (modelCalls === 1) {
+          return {
+            toolCalls: [{
+              id: 'record-1',
+              tool: 'record_knowledge',
+              input: { summary: 'Use the focused heartbeat verification command for this repository.' },
+            }],
+          };
+        }
+        return {
+          content: 'The durable observation was recorded.\n\nHEARTBEAT_DECISION: continue',
+        };
+      },
+    };
+
+    const result = await HeartbeatRunnerAgent.run({
+      task: 'Capture one durable heartbeat observation.',
+      llm: fakeLlm,
+      apiKey: 'test-api-key',
+      apiKeyProvider: 'explicit',
+      preferApiKey: true,
+      toolkits: [memoryToolkit],
+      includeDefaultTools: false,
+      memoryMode: 'read-and-record',
+      memoryDir: join(root, 'memory'),
+      workspaceRoot: root,
+      maxSteps: 2,
+      logger: silentLogger,
+    });
+
+    expect(result.memory).toEqual({ changed: true });
+  });
+
   it('runs an autonomous runner cycle and returns a checkpoint with the parsed decision', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
@@ -993,6 +1102,7 @@ describe('HeartbeatRunnerAgent.run', () => {
     });
 
     expect(result.decision).toBe('continue');
+    expect(result.memory).toEqual({ changed: false });
     expect(result.checkpoint.version).toBe(1);
     expect(result.state.goal).toContain('# Heartbeat Run');
     expect(seenMessages[0][0]).toMatchObject({

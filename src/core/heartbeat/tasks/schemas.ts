@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
+import { MemoryRunResultSchema } from '@/core/memory/run-result.js';
 import {
   type HeartbeatAdmissionDecision,
   MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
@@ -152,6 +153,7 @@ export const AgentLoopCheckpointSchema = z.object({
 export const AgentHeartbeatResultSchema = z.object({
   decision: HeartbeatDecisionSchema,
   summary: z.string(),
+  memory: MemoryRunResultSchema.default({ changed: false }),
   checkpoint: AgentLoopCheckpointSchema,
   state: z.object({
     runId: z.string(),
