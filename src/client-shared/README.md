@@ -33,8 +33,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
 - `ClientSharedProxyApiService` for non-React proxy clients used by CLI/TUI/ask
   callers;
 - shared API-consumer services such as transient conversation message
-  shaping, session activity effect dispatch, and approval payload display
-  shaping;
+  shaping, implicit startup-session selection, session activity effect
+  dispatch, and approval payload display shaping;
 - shared live and settled subagent rows derived from correlated lifecycle
   events and durable turn records, excluding raw child transcripts and traces;
 - shared conversation-run cursor, duplicate suppression, terminal detection,

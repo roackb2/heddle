@@ -11,6 +11,18 @@ const trpc = createTRPCProxyClient<AppRouter>({
   ],
 });
 
+test('resumes the most recent session without letting pinned display order override it', async ({ page }) => {
+  const pinned = await trpc.controlPlane.sessionCreate.mutate({ name: `Pinned startup smoke ${Date.now()}` });
+  await trpc.controlPlane.sessionPinnedUpdate.mutate({ id: pinned.id, pinned: true });
+  const recent = await trpc.controlPlane.sessionCreate.mutate({ name: `Recent startup smoke ${Date.now()}` });
+
+  await page.goto('/sessions');
+
+  await expect(page).toHaveURL(new RegExp(`/sessions/${recent.id}$`));
+  await expect(page.getByTestId('web-v2-workbench-title')).toHaveText(recent.name);
+  await expect(page.getByRole('button', { name: new RegExp(pinned.name) })).toBeVisible();
+});
+
 test('loads the web v2 shell sections', async ({ page }) => {
   const eventStreams = new Set<string>();
   page.on('request', (request) => {

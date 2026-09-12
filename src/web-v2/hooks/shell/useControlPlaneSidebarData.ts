@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { trpcReact } from '@web/api/client';
 import type { ControlPlaneState } from '@web/api/client';
+import { ClientSharedSessionSelectionService } from '@/client-shared/services/session-selection/index.js';
 import type { useWorkbenchNavigation } from '../useWorkbenchNavigation';
 import { applyLiveTaskState } from '../tasks/useControlPlaneTaskLiveState';
 import type { useControlPlaneHeartbeatEvents } from '../tasks/useControlPlaneHeartbeatEvents';
@@ -68,11 +69,14 @@ export function useControlPlaneSidebarData({
   );
 
   useEffect(() => {
-    if (navigation.selectedSessionId || navigation.settingsOpen || navigation.activeSurfaceId !== 'sessions' || sessions.length === 0) {
+    if (navigation.selectedSessionId || navigation.settingsOpen || navigation.activeSurfaceId !== 'sessions') {
       return;
     }
 
-    navigation.selectSession(sessions[0]!.id, { workspaceId, replace: true });
+    const startupSession = ClientSharedSessionSelectionService.resolveStartupSession(sessions);
+    if (startupSession) {
+      navigation.selectSession(startupSession.id, { workspaceId, replace: true });
+    }
   }, [navigation, sessions, workspaceId]);
 
   useEffect(() => {
