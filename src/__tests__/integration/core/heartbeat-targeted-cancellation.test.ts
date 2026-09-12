@@ -413,6 +413,7 @@ function createHeartbeatResult(runId: string): AgentHeartbeatResult {
   return {
     decision: 'continue',
     summary,
+    memory: { changed: false },
     state,
     checkpoint: AgentLoopCheckpointService.createCheckpoint(state, {
       createdAt: NOW.toISOString(),

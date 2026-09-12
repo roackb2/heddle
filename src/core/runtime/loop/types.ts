@@ -19,6 +19,7 @@ import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } 
 import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type { AgentModelContextRecovery } from '@/core/agent/index.js';
+import type { MemoryToolMode } from '@/core/memory/tool-mode.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 
 export type AgentLoopStatus = 'finished';
@@ -106,6 +107,8 @@ export type RunAgentLoopOptions = {
   workspaceRoot?: string;
   stateDir?: string;
   memoryDir?: string;
+  /** Selects the Heddle memory capabilities exposed by composed memory toolkits. */
+  memoryMode?: MemoryToolMode;
   searchIgnoreDirs?: string[];
   systemContext?: string;
   history?: ChatMessage[];

@@ -11,7 +11,9 @@ operator-facing heartbeat views.
 
 - `agent/`: `HeartbeatRunnerAgent` owns one autonomous runner-agent cycle on top of
   `AgentLoopRuntimeService.run`, with prompt and decision policy classes kept
-  beside it.
+  beside it. Every current result includes `memory.changed`, projected from the
+  settled Heddle memory-tool trace so a host can make an explicit checkpoint
+  decision.
 - `runs/`: `HeartbeatRunService` owns the process-local lifecycle for one
   explicitly requested heartbeat cycle: run identity, cancellation, ordered
   activity, awaited host result projection, and exactly one terminal result,
@@ -203,6 +205,18 @@ operator-facing heartbeat views.
   approval callbacks, filesystem paths, loggers, and model adapters. The
   execution process resolves those locally; the scheduler validates its
   returned result before committing the new checkpoint or successful state.
+- `AgentHeartbeatResult.memory.changed` is required on current results. The
+  persisted-result schema supplies `{ changed: false }` when decoding older
+  records that predate the receipt. A read-only run therefore remains
+  checkpoint-free, while a successful Heddle candidate record or direct memory
+  edit produces `true`. The host must restore authenticated memory before the
+  invocation and checkpoint it only after the successful result settles.
+- `context.runAgent({ includeDefaultTools: false, toolkits: [memoryToolkit],
+  memoryMode: 'read-only' })` is the portable local composition for heartbeat
+  memory reads. Toolkits and filesystem paths are deliberately not serialized
+  through `HeartbeatAgentExecutionTransport`; a remote execution process must
+  compose its own signed, authenticated capability set rather than trusting a
+  coordinator-selected function or path.
 - Local interface adapters should use `FileHeartbeatTaskService` methods or the
   control-plane heartbeat API. Remote operator surfaces should depend on
   `HeartbeatTaskAdministrationService` and keep backend transaction mechanics

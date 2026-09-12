@@ -727,6 +727,7 @@ export class HeartbeatTaskRunnerService {
       && typeof value === 'object'
       && 'decision' in value
       && 'summary' in value
+      && 'memory' in value
       && 'state' in value
       && 'checkpoint' in value,
     );

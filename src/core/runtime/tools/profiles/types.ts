@@ -1,3 +1,5 @@
+import type { MemoryToolMode } from '@/core/memory/tool-mode.js';
+
 export type ToolCapability =
   | 'agent.delegate'
   | 'workspace.read'
@@ -20,5 +22,5 @@ export type RuntimeToolSelectionProfile = {
   excludeTools?: string[];
   allowedCapabilities?: ToolCapability[];
   deniedCapabilities?: ToolCapability[];
-  memoryMode?: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
+  memoryMode?: MemoryToolMode;
 };

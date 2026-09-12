@@ -301,6 +301,7 @@ function createHeartbeatResult(): AgentHeartbeatResult {
   return {
     decision: 'continue',
     summary: 'Repository check complete.',
+    memory: { changed: false },
     checkpoint: {
       version: 1,
       runId: 'run_1',

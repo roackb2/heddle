@@ -670,6 +670,7 @@ checkpoint, execution record, and framework events:
 ```ts
 import {
   HeartbeatSchedulerService,
+  memoryToolkit,
   type HeartbeatTaskHandler,
 } from '@heddleagent/runtime/advanced';
 
@@ -683,6 +684,8 @@ const handler: HeartbeatTaskHandler = async (context) => {
     task: `${context.task.task}\n\nClaimed work: ${claim.instruction}`,
     systemContext: `Operate only on claim ${claim.id}.`,
     tools: domainTools,
+    toolkits: [memoryToolkit],
+    memoryMode: 'read-only',
     includeDefaultTools: false,
   });
 
@@ -710,6 +713,41 @@ OpenAI OAuth login state, and local/OpenAI-compatible endpoints inside Heddle.
 The host does not receive credential records or token fields and must not retain
 the execution context. Set `preferApiKey: true` in `runtime` only when an
 environment API key should take precedence over stored OpenAI OAuth state.
+
+With `includeDefaultTools: false`, the explicit `memoryToolkit` plus
+`memoryMode: 'read-only'` exposes exactly `list_memory_notes`,
+`read_memory_note`, and `search_memory_notes` in addition to the host tools.
+It does not expose candidate recording, the memory checkpoint decision tool,
+or direct note editing. Memory mode selects Heddle memory capabilities only;
+the host remains responsible for authenticating product identity and
+authorizing every product-owned tool.
+
+Every current `AgentHeartbeatResult` includes a settled mutation receipt:
+
+```ts
+const result = await context.runAgent({
+  includeDefaultTools: false,
+  toolkits: [memoryToolkit],
+  memoryMode: 'read-and-record',
+});
+
+if (result.memory.changed) {
+  await durableMemory.checkpointAfterSuccessfulRun();
+}
+```
+
+`memory.changed` is true only when the trace proves that a Heddle-owned memory
+mutation completed. Read-only activity, an explicit checkpoint skip, and a
+failed write report false. Historical persisted heartbeat results without the
+field decode as `{ changed: false }`. A hosted adapter must restore the
+authenticated working copy before `runAgent()`, wait for successful settlement,
+then checkpoint on `true`; Heddle does not choose the storage key, authenticate
+the scope, or retry the host checkpoint.
+
+`HeartbeatAgentExecutionTransport` intentionally does not serialize toolkits or
+filesystem paths. When the nested agent runs in another process, that execution
+host must compose the same capability mode from its own signed allowlist and
+resolved memory working copy.
 
 When the handler itself completes admitted host-owned work without invoking the
 Heddle agent loop, return `context.complete()` instead:

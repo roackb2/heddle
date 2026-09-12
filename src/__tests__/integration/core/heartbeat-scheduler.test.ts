@@ -805,6 +805,7 @@ function createHeartbeatResult(decision: AgentHeartbeatResult['decision']): Agen
   return {
     decision,
     summary,
+    memory: { changed: false },
     state,
     checkpoint: AgentLoopCheckpointService.createCheckpoint(state, {
       createdAt: '2026-04-13T00:00:01.000Z',

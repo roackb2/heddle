@@ -1,4 +1,5 @@
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
+import type { MemoryToolMode } from '@/core/memory/tool-mode.js';
 import type {
   ProviderCredentialSource,
   ResolvedProviderCredential,
@@ -21,7 +22,7 @@ export type DefaultAgentToolsOptions = {
   artifactsEnabled?: boolean;
   sessionId?: string;
   memoryDir?: string;
-  memoryMode?: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
+  memoryMode?: MemoryToolMode;
   tools?: ToolDefinition[];
   toolkits?: ToolToolkit[];
   hiddenMcpServerIds?: string[];

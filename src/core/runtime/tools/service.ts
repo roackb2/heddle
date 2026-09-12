@@ -7,7 +7,7 @@ import { codingAwarenessToolkit } from '@/core/tools/toolkits/coding-awareness/t
 import { codingFilesToolkit } from '@/core/tools/toolkits/coding-files/toolkit.js';
 import { externalContextToolkit } from '@/core/tools/toolkits/external-context/toolkit.js';
 import { internalToolkit } from '@/core/tools/toolkits/internal/toolkit.js';
-import { knowledgeToolkit } from '@/core/tools/toolkits/knowledge/toolkit.js';
+import { memoryToolkit } from '@/core/tools/toolkits/knowledge/toolkit.js';
 import { mcpToolkit } from '@/core/tools/toolkits/mcp/toolkit.js';
 import { shellProcessToolkit } from '@/core/tools/toolkits/shell-process/toolkit.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
@@ -91,7 +91,7 @@ export class RuntimeToolService {
       codingAwarenessToolkit,
       codingFilesToolkit,
       externalContextToolkit,
-      knowledgeToolkit,
+      memoryToolkit,
       mcpToolkit,
       ...browserToolkits,
       ...(args.artifactsEnabled ? [artifactsToolkit] : []),

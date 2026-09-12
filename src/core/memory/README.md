@@ -11,6 +11,8 @@ guidance.
 - Knowledge candidate records and maintenance runs.
 - Maintainer-mode execution over pending candidates.
 - Memory maintenance integration after chat turns.
+- Per-run memory capability modes and the public memory toolkit composition.
+- A settled mutation receipt projected from Heddle-owned memory tool events.
 - Memory note templates and slug generation.
 - Host-facing memory visibility helpers.
 - Stable, opaque memory scope derivation from verified subject and agent or
@@ -28,6 +30,7 @@ guidance.
   memory scope derivation.
 - Runtime-session, conversation-session, or storage-key selection.
 - Provider SDKs, checkpoint scheduling, or execution-host lifecycle hooks.
+- Mutations performed by arbitrary host tools or direct filesystem access.
 
 ## Public Entry Points
 
@@ -59,6 +62,14 @@ guidance.
   trace-triggered maintenance scheduling, locking, and lifecycle events.
 - `note-service.ts`: `MemoryNoteService` owns note list/read/search/edit
   behavior. Tool adapters should call this service, not duplicate file logic.
+- `tool-mode.ts`: `MemoryToolMode` is the shared per-run capability vocabulary.
+  `read-only` exposes only list, read, and search; `read-and-record` additionally
+  exposes candidate recording; `maintainer` and `legacy-full` expose direct
+  note editing.
+- `run-result.ts`: `projectMemoryRunResult()` maps settled Heddle memory-tool
+  trace evidence into `{ changed }`. Candidate recording and successful direct
+  note edits report a change; reads, skipped checkpoints, and failed writes do
+  not.
 - `path-utils.ts`: `MemoryPathUtils` owns memory-root path resolution. It
   delegates containment to `WorkspacePathPolicy` — the same canonical policy
   the coding-files toolkit uses — so an in-root symlink cannot redirect a read,
@@ -138,6 +149,41 @@ adapter must authorize the verified identity before reading, writing,
 retaining, or deleting that address. Heddle now defines the portable checkpoint
 contract; an official object-store adapter and Execution Host lifecycle
 integration remain separate work.
+
+## Host Composition And Checkpoint Receipt
+
+Use the exported `memoryToolkit` when a host wants Heddle memory without the
+rest of the default tool bundle:
+
+```ts
+import { memoryToolkit } from '@heddleagent/runtime';
+
+const result = await context.runAgent({
+  includeDefaultTools: false,
+  toolkits: [memoryToolkit],
+  memoryMode: 'read-only',
+  memoryDir: restoredWorkingCopy,
+});
+```
+
+`read-only` creates exactly `list_memory_notes`, `read_memory_note`, and
+`search_memory_notes`. It never adds `record_knowledge`, `memory_checkpoint`,
+or `edit_memory_note`, so its settled `result.memory.changed` is false unless a
+different explicitly composed Heddle memory mutation tool ran.
+
+For a writable mode, `result.memory.changed` is the portable signal that the
+Heddle-managed memory working copy should be checkpointed. It does not perform
+the checkpoint. A hosted authority still owns this order:
+
+1. authenticate the durable memory scope;
+2. restore its working copy before the agent invocation;
+3. run the agent with the allowlisted toolkit and mode; and
+4. after successful settlement, checkpoint only when `memory.changed` is true.
+
+The receipt covers only Heddle-owned memory tools. Product tools, shell writes,
+and direct filesystem mutations require their own host-domain receipts. Heddle
+does not authenticate the memory scope, schedule host checkpoints, or decide
+which product identity may read it.
 
 ## Common Changes
 
