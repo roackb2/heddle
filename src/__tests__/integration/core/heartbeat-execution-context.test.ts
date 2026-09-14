@@ -211,6 +211,10 @@ describe('heartbeat execution context', () => {
         return await context.runAgent({
           task: 'Process claimed work item domain-42.',
           systemContext: 'Only operate on domain-42.',
+          promptComposition: {
+            mode: 'host-owned',
+            systemPrompt: 'Use the product-owned domain charter.',
+          },
           tools: [domainTool],
           toolkits: [memoryToolkit],
           memoryMode: 'read-only',
@@ -225,6 +229,10 @@ describe('heartbeat execution context', () => {
     expect(receivedOptions).toMatchObject({
       task: 'Process claimed work item domain-42.',
       systemContext: 'Only operate on domain-42.',
+      promptComposition: {
+        mode: 'host-owned',
+        systemPrompt: 'Use the product-owned domain charter.',
+      },
       tools: [domainTool],
       toolkits: [memoryToolkit],
       memoryMode: 'read-only',
@@ -283,6 +291,12 @@ describe('heartbeat execution context', () => {
       store,
       now: () => NOW,
       agentExecutionTransport: transport,
+      runtime: {
+        promptComposition: {
+          mode: 'host-owned',
+          systemPrompt: 'This local prompt must not cross the transport.',
+        },
+      },
       onEvent: (event) => events.push(event),
     })).resolves.toMatchObject({ checked: 1, ran: 1, failed: 0 });
 
@@ -303,6 +317,7 @@ describe('heartbeat execution context', () => {
     expect(received?.request).not.toHaveProperty('apiKey');
     expect(received?.request).not.toHaveProperty('tools');
     expect(received?.request).not.toHaveProperty('workspaceRoot');
+    expect(received?.request).not.toHaveProperty('promptComposition');
     expect(events).toContainEqual(expect.objectContaining({
       type: 'heartbeat.task.agent_activity',
       taskId: task.id,

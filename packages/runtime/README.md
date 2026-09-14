@@ -56,6 +56,13 @@ reimplementing callback buffering or terminal sequencing. Scheduling, task
 persistence, and deployment-specific model/tool/MCP preparation stay outside
 the service.
 
+Low-level agent and heartbeat runs use Heddle's built-in prompt composition by
+default. A host with a complete product-owned charter may pass
+`promptComposition: { mode: 'host-owned', systemPrompt }`. Heddle then sends
+that non-blank system prompt exactly and keeps the goal or durable heartbeat
+task as a separate, unchanged user message. This option changes no tool,
+approval, lifecycle, checkpoint, trace, or heartbeat decision semantics.
+
 `RuntimeCredentialService.acquireRequestScopedCredentialForModel` lets a Node
 host reuse its Heddle OpenAI account login safely across an isolation boundary.
 Heddle refreshes and persists the stored credential at the host boundary, then

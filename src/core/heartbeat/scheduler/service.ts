@@ -97,6 +97,7 @@ export class HeartbeatSchedulerService {
         maxSteps: options.maxSteps,
         searchIgnoreDirs: options.searchIgnoreDirs,
         systemContext: options.systemContext,
+        promptComposition: options.promptComposition,
         onAgentEvent: options.onAgentEvent,
       },
       pollIntervalMs: options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS,

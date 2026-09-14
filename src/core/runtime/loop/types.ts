@@ -20,6 +20,7 @@ import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, Trace
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type { AgentModelContextRecovery } from '@/core/agent/index.js';
 import type { MemoryToolMode } from '@/core/memory/tool-mode.js';
+import type { AgentPromptComposition } from '@/core/prompts/system-prompt.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 
 export type AgentLoopStatus = 'finished';
@@ -111,6 +112,8 @@ export type RunAgentLoopOptions = {
   memoryMode?: MemoryToolMode;
   searchIgnoreDirs?: string[];
   systemContext?: string;
+  /** Controls whether Heddle composes its prompt or the host supplies it whole. */
+  promptComposition?: AgentPromptComposition;
   history?: ChatMessage[];
   resumeFrom?: AgentLoopState | AgentLoopCheckpoint;
   llm?: LlmAdapter;

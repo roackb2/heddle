@@ -22,6 +22,121 @@ import {
 const silentLogger = createLogger({ level: 'silent', console: false });
 
 describe('AgentLoopRuntimeService.run', () => {
+  it('keeps the built-in coding prompt when prompt composition is omitted', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return { content: 'Done.' };
+      },
+    };
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Inspect the repository.',
+      systemContext: 'HOST_CONTEXT_SENTINEL',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]?.[0]).toMatchObject({
+      role: 'system',
+      content: expect.stringContaining('You are Heddle, a task-owning coding and workspace agent.'),
+    });
+    expect(seenMessages[0]?.[0]?.content).toContain('HOST_CONTEXT_SENTINEL');
+    expect(seenMessages[0]?.at(-1)).toEqual({
+      role: 'user',
+      content: 'Inspect the repository.',
+    });
+  });
+
+  it('passes an exact host-owned system prompt without Heddle prompt composition', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const systemPrompt = 'You are the product-owned agent.\n\nUse only the supplied capability.\n';
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return { content: 'Done.' };
+      },
+    };
+    const readAgentSkillTool: ToolDefinition = {
+      name: 'read_agent_skill',
+      description: 'Read a host-selected skill.',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => ({ ok: true, output: 'unused' }),
+    };
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Complete the product-owned task.',
+      systemContext: 'THIS_APPENDIX_MUST_NOT_BE_VISIBLE',
+      promptComposition: { mode: 'host-owned', systemPrompt },
+      llm: fakeLlm,
+      tools: [readAgentSkillTool],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toEqual([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Complete the product-owned task.' },
+    ]);
+  });
+
+  it('rejects a blank host-owned system prompt before calling the model', async () => {
+    const chat = vi.fn(async (): Promise<LlmResponse> => ({ content: 'Unexpected.' }));
+    const onEvent = vi.fn();
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      chat,
+    };
+
+    await expect(AgentLoopRuntimeService.run({
+      goal: 'Complete the product-owned task.',
+      promptComposition: { mode: 'host-owned', systemPrompt: '   ' },
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent,
+    })).rejects.toThrow('Host-owned system prompt must be non-empty.');
+
+    expect(chat).not.toHaveBeenCalled();
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
   it('constructs an exact host toolkit with the run-scoped OAuth credential', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-run-toolkit-credential-'));
     const credentialStorePath = join(root, 'auth.json');
@@ -1113,6 +1228,52 @@ describe('HeartbeatRunnerAgent.run', () => {
       role: 'user',
       content: expect.stringContaining('## Durable Task'),
     });
+  });
+
+  it('uses the exact host-owned prompt and durable task without heartbeat wrappers', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const systemPrompt = 'You are the standing product agent.\n\nFollow the durable charter.\n';
+    const task = 'Review the owner inbox.\n\nDraft one useful update.\n';
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return { content: 'Completed the bounded review.' };
+      },
+    };
+
+    const result = await HeartbeatRunnerAgent.run({
+      task,
+      systemContext: 'THIS_HEARTBEAT_APPENDIX_MUST_NOT_BE_VISIBLE',
+      promptComposition: { mode: 'host-owned', systemPrompt },
+      runContext: {
+        currentDateTime: '2026-09-14T00:00:00.000Z',
+        intervalMs: 60_000,
+        continuationMode: 'operator',
+      },
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toEqual([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: task },
+    ]);
+    expect(result.state.goal).toBe(task);
+    expect(result.decision).toBe('pause');
+    expect(result.memory).toEqual({ changed: false });
   });
 
   it('resumes a heartbeat from a prior checkpoint', async () => {

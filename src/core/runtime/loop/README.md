@@ -25,6 +25,31 @@ Static `tools` remain supported. Toolkit and tool names are duplicate-checked
 through the same runtime tool assembly path whether default tools are enabled
 or disabled.
 
+## Prompt composition ownership
+
+The default prompt path remains Heddle-owned: `systemContext` is appended to
+the built-in coding-agent system prompt, and activated Agent Skill catalog
+metadata is added when the matching tool is available.
+
+A host that owns its complete agent charter can opt out explicitly:
+
+```ts
+await AgentLoopRuntimeService.run({
+  goal: durableTask,
+  promptComposition: {
+    mode: 'host-owned',
+    systemPrompt: resolvedHostPrompt,
+  },
+  // model, tools, lifecycle callbacks, and other runtime options
+});
+```
+
+In `host-owned` mode the system prompt must be non-blank. Heddle passes its
+original text exactly and does not append the coding persona, `systemContext`,
+or an Agent Skill catalog. The goal remains a separate user message. Prompt
+ownership does not alter tool authority, approvals, events, checkpointing,
+traces, model stepping, or result semantics.
+
 ## Event delivery
 
 `onEvent` may be synchronous or asynchronous. Synchronous listeners retain

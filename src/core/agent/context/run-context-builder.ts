@@ -40,6 +40,7 @@ export class AgentRunContextBuilder {
         goal: options.goal,
         toolNames,
         systemContext: options.systemContext,
+        promptComposition: options.promptComposition,
         history: options.history,
       }),
       trace,
@@ -87,7 +88,14 @@ export class AgentRunContextBuilder {
 
   static buildInitialMessages(args: BuildInitialAgentMessagesArgs): ChatMessage[] {
     return [
-      { role: 'system', content: buildSystemPrompt(args.toolNames, args.systemContext) },
+      {
+        role: 'system',
+        content: buildSystemPrompt(
+          args.toolNames,
+          args.systemContext,
+          args.promptComposition,
+        ),
+      },
       ...AgentHistorySanitizer.sanitize({ history: args.history ?? [] }),
       { role: 'user', content: args.goal },
     ];

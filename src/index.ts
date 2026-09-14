@@ -80,6 +80,7 @@ export type {
   TraceEvent,
   StopReason,
 } from './core/types.js';
+export type { AgentPromptComposition } from './core/prompts/system-prompt.js';
 export type {
   LlmModelUsage,
   LlmUsage,

@@ -165,6 +165,7 @@ export type HeartbeatTaskRunnerAgentOptions = Partial<Pick<
   | 'memoryMode'
   | 'searchIgnoreDirs'
   | 'systemContext'
+  | 'promptComposition'
   | 'history'
   | 'logger'
   | 'onTraceEvent'
@@ -253,6 +254,7 @@ export type HeartbeatTaskRunnerRuntimeOptions = {
   approvalPolicies?: RunAgentHeartbeatOptions['approvalPolicies'];
   searchIgnoreDirs?: string[];
   systemContext?: string;
+  promptComposition?: RunAgentHeartbeatOptions['promptComposition'];
   onAgentEvent?: RunAgentHeartbeatOptions['onEvent'];
 };
 
@@ -426,6 +428,7 @@ export type StartHeartbeatSchedulerOptions = {
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   systemContext?: string;
+  promptComposition?: RunAgentHeartbeatOptions['promptComposition'];
   onAgentEvent?: RunAgentHeartbeatOptions['onEvent'];
   handler?: HeartbeatTaskHandler;
   /** @deprecated Use `handler`. */

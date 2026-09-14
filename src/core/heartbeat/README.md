@@ -217,6 +217,14 @@ operator-facing heartbeat views.
   through `HeartbeatAgentExecutionTransport`; a remote execution process must
   compose its own signed, authenticated capability set rather than trusting a
   coordinator-selected function or path.
+- `promptComposition: { mode: 'host-owned', systemPrompt }` is the explicit
+  local escape hatch for a host that owns the complete model charter. In that
+  mode `HeartbeatRunnerAgent` sends the durable task unchanged and omits its
+  heartbeat goal wrapper, run-context prose, checklist, shell examples, memory
+  catalog/instructions, and required decision-line instruction. The decision
+  policy remains code-owned: a successful answer without a decision line still
+  resolves to `pause`. Prompt composition is not part of the remote execution
+  request; the trusted execution process resolves it locally.
 - Local interface adapters should use `FileHeartbeatTaskService` methods or the
   control-plane heartbeat API. Remote operator surfaces should depend on
   `HeartbeatTaskAdministrationService` and keep backend transaction mechanics

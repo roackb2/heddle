@@ -4,10 +4,42 @@
 // ---------------------------------------------------------------------------
 
 /**
+ * Selects who owns the model-visible system prompt for one agent run.
+ *
+ * Omitting this option preserves Heddle's built-in coding-agent prompt. A
+ * host-owned prompt is complete rather than append-only: Heddle passes it to
+ * the model exactly and does not add its coding persona or runtime catalogs.
+ */
+export type AgentPromptComposition =
+  | { mode: 'heddle-owned' }
+  | { mode: 'host-owned'; systemPrompt: string };
+
+/** Fails before a run starts when an explicit host prompt is unusable. */
+export function assertAgentPromptComposition(
+  promptComposition: AgentPromptComposition | undefined,
+): void {
+  if (
+    promptComposition?.mode === 'host-owned'
+    && !promptComposition.systemPrompt.trim()
+  ) {
+    throw new Error('Host-owned system prompt must be non-empty.');
+  }
+}
+
+/**
  * Build the system prompt for the agent.
  * Keep it high-level and concise unless stronger steering is clearly needed.
  */
-export function buildSystemPrompt(toolNames: string[], projectContext?: string): string {
+export function buildSystemPrompt(
+  toolNames: string[],
+  projectContext?: string,
+  promptComposition?: AgentPromptComposition,
+): string {
+  assertAgentPromptComposition(promptComposition);
+  if (promptComposition?.mode === 'host-owned') {
+    return promptComposition.systemPrompt;
+  }
+
   return `You are Heddle, a task-owning coding and workspace agent.
 
 You help the user inspect, understand, change, verify, and explain work in the current project using the tools the host gives you.
