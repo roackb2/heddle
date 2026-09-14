@@ -46,9 +46,12 @@ await AgentLoopRuntimeService.run({
 
 In `host-owned` mode the system prompt must be non-blank. Heddle passes its
 original text exactly and does not append the coding persona, `systemContext`,
-or an Agent Skill catalog. The goal remains a separate user message. Prompt
-ownership does not alter tool authority, approvals, events, checkpointing,
-traces, model stepping, or result semantics.
+an Agent Skill catalog, or Heddle-authored in-run reminders. Restored history
+and model-context recovery cannot reintroduce an older system message: Heddle
+removes every recovered system message and reasserts the current host prompt
+once. The goal remains a separate user message. Prompt ownership does not alter
+tool authority, approvals, events, checkpointing, traces, model stepping, or
+result semantics.
 
 ## Event delivery
 

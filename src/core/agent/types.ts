@@ -110,6 +110,7 @@ export type AgentRunState = {
 
 export type AgentRunContext = {
   goal: string;
+  promptComposition?: AgentPromptComposition;
   maxSteps: number;
   maxToolConcurrency: number;
   llm: LlmAdapter;

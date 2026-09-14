@@ -221,10 +221,12 @@ operator-facing heartbeat views.
   local escape hatch for a host that owns the complete model charter. In that
   mode `HeartbeatRunnerAgent` sends the durable task unchanged and omits its
   heartbeat goal wrapper, run-context prose, checklist, shell examples, memory
-  catalog/instructions, and required decision-line instruction. The decision
-  policy remains code-owned: a successful answer without a decision line still
-  resolves to `pause`. Prompt composition is not part of the remote execution
-  request; the trusted execution process resolves it locally.
+  catalog/instructions, in-run memory reminders, and required decision-line
+  instruction. It also removes older system messages when resuming a checkpoint
+  or accepting model-context recovery. The decision policy remains code-owned:
+  a successful answer without a decision line still resolves to `pause`.
+  Prompt composition is not part of the remote execution request; the trusted
+  execution process resolves it locally.
 - Local interface adapters should use `FileHeartbeatTaskService` methods or the
   control-plane heartbeat API. Remote operator surfaces should depend on
   `HeartbeatTaskAdministrationService` and keep backend transaction mechanics

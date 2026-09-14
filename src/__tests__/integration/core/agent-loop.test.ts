@@ -105,6 +105,89 @@ describe('AgentLoopRuntimeService.run', () => {
     ]);
   });
 
+  it('removes restored system messages from host-owned model history', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const systemPrompt = 'You are the current product-owned agent.';
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return { content: 'Done.' };
+      },
+    };
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Continue the durable task.',
+      promptComposition: { mode: 'host-owned', systemPrompt },
+      history: [
+        { role: 'system', content: 'STALE_HEDDLE_SYSTEM_PROMPT' },
+        { role: 'user', content: 'Earlier durable task.' },
+        { role: 'assistant', content: 'Earlier progress.' },
+      ],
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toEqual([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Earlier durable task.' },
+      { role: 'assistant', content: 'Earlier progress.' },
+      { role: 'user', content: 'Continue the durable task.' },
+    ]);
+  });
+
+  it('does not inject Heddle memory reminders during a host-owned run', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const systemPrompt = 'You are the product-owned agent.';
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'inspect-1', tool: 'inspect_project', input: {} }],
+          };
+        }
+        return { content: 'Inspection complete.' };
+      },
+    };
+    const tools: ToolDefinition[] = [
+      {
+        name: 'inspect_project',
+        description: 'Inspect the current project.',
+        parameters: { type: 'object', properties: {} },
+        execute: async () => ({ ok: true, output: 'Project inspected.' }),
+      },
+      {
+        name: 'memory_checkpoint',
+        description: 'Record or skip a memory checkpoint.',
+        parameters: { type: 'object', properties: {} },
+        execute: async () => ({ ok: true, output: 'Not called.' }),
+      },
+    ];
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Inspect the current project.',
+      promptComposition: { mode: 'host-owned', systemPrompt },
+      llm: fakeLlm,
+      tools,
+      includeDefaultTools: false,
+      maxSteps: 2,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages).toHaveLength(2);
+    for (const messages of seenMessages) {
+      expect(messages.filter((message) => message.role === 'system')).toEqual([
+        { role: 'system', content: systemPrompt },
+      ]);
+    }
+    expect(JSON.stringify(seenMessages)).not.toContain(
+      'Before your final answer, call memory_checkpoint',
+    );
+  });
+
   it('rejects a blank host-owned system prompt before calling the model', async () => {
     const chat = vi.fn(async (): Promise<LlmResponse> => ({ content: 'Unexpected.' }));
     const onEvent = vi.fn();

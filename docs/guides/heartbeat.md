@@ -52,8 +52,10 @@ const result = await HeartbeatRunnerAgent.run({
 durable `task` is sent unchanged as the user message. Heddle does not add its
 coding persona, heartbeat checklist, run timing prose, shell examples, memory
 instructions, Agent Skill catalog, or required `HEARTBEAT_DECISION` line in
-this mode. The caller must place every model-visible instruction it needs in
-the host prompt.
+this mode. It also suppresses Heddle-authored in-run reminders and removes
+older system messages from resumed or model-recovered history before asserting
+the current host prompt once. The caller must place every model-visible
+instruction it needs in the host prompt.
 
 This changes prompt ownership only. Heddle still owns tool schemas and
 execution, approvals, trace and event delivery, checkpointing, and heartbeat

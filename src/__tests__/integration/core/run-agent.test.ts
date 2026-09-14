@@ -409,6 +409,48 @@ describe('AgentRunService.run', () => {
     ]);
   });
 
+  it('reasserts the host-owned system prompt after model context recovery', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const systemPrompt = 'You are the current product-owned agent.';
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        if (seenMessages.length === 1) {
+          throw Object.assign(new Error('provider rejected oversized input'), {
+            status: 400,
+            error: { code: 'context_length_exceeded' },
+          });
+        }
+        return { content: 'Recovered under the current charter.' };
+      },
+    };
+    const recoverModelContext = vi.fn(
+      async ({ messages }: { messages: ChatMessage[] }) => ({
+        messages: [
+          { role: 'system' as const, content: 'STALE_RECOVERY_SYSTEM_PROMPT' },
+          ...messages,
+        ],
+      }),
+    );
+
+    const result = await AgentRunService.run({
+      goal: 'Continue the durable task.',
+      promptComposition: { mode: 'host-owned', systemPrompt },
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+      recoverModelContext,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(recoverModelContext).toHaveBeenCalledOnce();
+    expect(seenMessages[1]?.filter((message) => message.role === 'system')).toEqual([
+      { role: 'system', content: systemPrompt },
+    ]);
+    expect(JSON.stringify(seenMessages[1])).not.toContain('STALE_RECOVERY_SYSTEM_PROMPT');
+  });
+
   it('attempts context recovery only once for the current model step', async () => {
     let calls = 0;
     const recoverModelContext = vi.fn(async ({ messages }: { messages: ChatMessage[] }) => ({ messages }));

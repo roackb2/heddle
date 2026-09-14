@@ -14,8 +14,9 @@ policy.
   heartbeat and execution-context agent invocation.
 - Add explicit `AgentPromptComposition` ownership for low-level agent and
   heartbeat runs. Existing callers retain the exact Heddle prompt; a
-  `host-owned` composition supplies the complete system prompt and leaves the
-  durable heartbeat task unchanged.
+  `host-owned` composition supplies the complete system prompt, leaves the
+  durable heartbeat task unchanged, suppresses Heddle-authored in-run
+  reminders, and removes older system messages during resume or recovery.
 - Require `AgentHeartbeatResult.memory.changed` on current results. Conversation
   turns and heartbeat runs now share the same trace projector for Heddle-owned
   memory mutations.

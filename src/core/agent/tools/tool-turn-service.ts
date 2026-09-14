@@ -221,7 +221,7 @@ export class AgentToolTurnService {
       toolCallId,
     });
     if (!returnDirect) {
-      AgentToolTurnService.pushHostRequirementReminders(context);
+      AgentToolTurnService.pushHeddleRequirementReminders(context);
     }
     return returnDirect
       ? { toolName: effectiveCall.tool, result }
@@ -232,7 +232,11 @@ export class AgentToolTurnService {
     context.state.consecutiveErrors++;
   }
 
-  private static pushHostRequirementReminders(context: HandleAgentToolTurnArgs['context']): void {
+  private static pushHeddleRequirementReminders(context: HandleAgentToolTurnArgs['context']): void {
+    if (context.promptComposition?.mode === 'host-owned') {
+      return;
+    }
+
     const memoryReminder = AgentMemoryCheckpointTracker.buildReminder(context);
     if (memoryReminder && !context.state.reminders.memoryCheckpointSent) {
       context.state.reminders.memoryCheckpointSent = true;
