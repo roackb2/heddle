@@ -12,6 +12,11 @@ policy.
   read, and search tools.
 - Add `RunAgentLoopOptions.memoryMode` and carry the mode through direct
   heartbeat and execution-context agent invocation.
+- Add explicit `AgentPromptComposition` ownership for low-level agent and
+  heartbeat runs. Existing callers retain the exact Heddle prompt; a
+  `host-owned` composition supplies the complete system prompt, leaves the
+  durable heartbeat task unchanged, suppresses Heddle-authored in-run
+  reminders, and removes older system messages during resume or recovery.
 - Require `AgentHeartbeatResult.memory.changed` on current results. Conversation
   turns and heartbeat runs now share the same trace projector for Heddle-owned
   memory mutations.
@@ -39,6 +44,10 @@ or filesystem paths through the heartbeat execution transport.
   conservative `false` default when the field is absent.
 - `read-and-record` remains the default for the ordinary default tool bundle.
   Select `read-only` explicitly for inspection-only runs.
+- Omitting `promptComposition` preserves the built-in coding and heartbeat
+  prompts. Host-owned mode requires a non-blank complete system prompt and does
+  not change lifecycle, tool authority, approvals, checkpointing, traces, or
+  the heartbeat decision fallback.
 
 ## Verification
 

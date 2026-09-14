@@ -2,7 +2,10 @@ import { resolve } from 'node:path';
 import { ToolRegistry } from '@/core/tools/index.js';
 import { TraceRecorder } from '@/core/trace/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
-import { buildSystemPrompt } from '@/core/prompts/system-prompt.js';
+import {
+  applyAgentPromptComposition,
+  buildSystemPrompt,
+} from '@/core/prompts/system-prompt.js';
 import { logger as defaultLogger } from '@/core/utils/logger.js';
 import { DEFAULT_MAX_STEPS } from '../constants.js';
 import { AgentStepBudget } from '../budget/index.js';
@@ -30,6 +33,7 @@ export class AgentRunContextBuilder {
 
     return {
       goal: options.goal,
+      promptComposition: options.promptComposition,
       maxSteps,
       maxToolConcurrency,
       llm: options.llm,
@@ -40,6 +44,7 @@ export class AgentRunContextBuilder {
         goal: options.goal,
         toolNames,
         systemContext: options.systemContext,
+        promptComposition: options.promptComposition,
         history: options.history,
       }),
       trace,
@@ -86,10 +91,17 @@ export class AgentRunContextBuilder {
   }
 
   static buildInitialMessages(args: BuildInitialAgentMessagesArgs): ChatMessage[] {
-    return [
-      { role: 'system', content: buildSystemPrompt(args.toolNames, args.systemContext) },
+    return applyAgentPromptComposition([
+      {
+        role: 'system',
+        content: buildSystemPrompt(
+          args.toolNames,
+          args.systemContext,
+          args.promptComposition,
+        ),
+      },
       ...AgentHistorySanitizer.sanitize({ history: args.history ?? [] }),
       { role: 'user', content: args.goal },
-    ];
+    ], args.promptComposition);
   }
 }

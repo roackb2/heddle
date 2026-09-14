@@ -6,6 +6,7 @@ import type { AutonomyEvaluation } from '@/core/approvals/autonomy/index.js';
 import type { ToolApprovalDecision, ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { ToolRegistry } from '@/core/tools/index.js';
 import type { PlanItem } from '@/core/tools/toolkits/internal/update-plan.js';
+import type { AgentPromptComposition } from '@/core/prompts/system-prompt.js';
 import type { RunFailure, RunResult, ToolDefinition, ToolCall, TraceEvent, StopReason } from '@/core/types.js';
 import type { TraceRecorder } from '@/core/trace/index.js';
 import type { AgentStepBudget } from './budget/index.js';
@@ -61,6 +62,7 @@ export type RunAgentOptions = {
   logger?: Logger;
   history?: ChatMessage[];
   systemContext?: string;
+  promptComposition?: AgentPromptComposition;
   onEvent?: (event: AgentRunEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (
@@ -108,6 +110,7 @@ export type AgentRunState = {
 
 export type AgentRunContext = {
   goal: string;
+  promptComposition?: AgentPromptComposition;
   maxSteps: number;
   maxToolConcurrency: number;
   llm: LlmAdapter;

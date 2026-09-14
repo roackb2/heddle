@@ -9,6 +9,7 @@ import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, LlmRuntimeContext, ReasoningEffort } from '@/core/llm/types.js';
 import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
 import type { ToolDefinition } from '@/core/types.js';
+import { assertAgentPromptComposition } from '@/core/prompts/system-prompt.js';
 import { createLogger } from '@/core/utils/logger.js';
 import type {
   ProviderCredentialSource,
@@ -26,6 +27,7 @@ import type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './typ
  */
 export class AgentLoopRuntimeService {
   static async run(options: RunAgentLoopOptions): Promise<AgentLoopResult> {
+    assertAgentPromptComposition(options.promptComposition);
     const runId = AgentLoopCheckpointService.resolveRunId(options.runId);
     const model = options.model ?? options.llm?.info?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
     const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
@@ -117,6 +119,7 @@ export class AgentLoopRuntimeService {
         logger,
         history: AgentLoopCheckpointService.resolveHistory(options),
         systemContext,
+        promptComposition: options.promptComposition,
         onEvent: (event) => {
           AgentLoopRuntimeService.emitAgentRunEvent({
             event,
@@ -295,6 +298,9 @@ export class AgentLoopRuntimeService {
     tools: ToolDefinition[];
     workspaceRoot: string;
   }): Promise<string | undefined> {
+    if (args.options.promptComposition?.mode === 'host-owned') {
+      return undefined;
+    }
     if (!args.tools.some((tool) => tool.name === 'read_agent_skill')) {
       return args.options.systemContext;
     }

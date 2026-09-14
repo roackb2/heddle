@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { LlmUsageService } from '@/core/llm/usage/index.js';
+import { applyAgentPromptComposition } from '@/core/prompts/system-prompt.js';
 import type { LlmStreamEvent } from '@/core/llm/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { isAbortError } from '@/core/agent/utils/index.js';
@@ -62,7 +63,10 @@ export class AgentModelTurnService {
             failure: retry.failure,
           });
           if (recovered) {
-            context.messages = recovered.messages;
+            context.messages = applyAgentPromptComposition(
+              recovered.messages,
+              context.promptComposition,
+            );
             AgentModelTurnService.recordContextRecoveryRetry({ context, retry });
             attempt = 1;
             continue;

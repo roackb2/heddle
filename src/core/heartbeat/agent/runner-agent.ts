@@ -78,13 +78,16 @@ export class HeartbeatRunnerAgent {
       ...runtimeOptions
     } = options;
     const memoryDir = providedMemoryDir ?? resolve(workspaceRoot ?? process.cwd(), stateDir ?? '.heddle', 'memory');
-    const systemContext = HeartbeatRunnerAgentPrompt.appendSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
-      systemContext: providedSystemContext,
-    }));
+    const hostOwnsPrompt = options.promptComposition?.mode === 'host-owned';
+    const systemContext = hostOwnsPrompt
+      ? undefined
+      : HeartbeatRunnerAgentPrompt.appendSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
+        systemContext: providedSystemContext,
+      }));
 
     return {
       ...runtimeOptions,
-      goal: HeartbeatRunnerAgentPrompt.buildGoal(task, runContext),
+      goal: hostOwnsPrompt ? task : HeartbeatRunnerAgentPrompt.buildGoal(task, runContext),
       maxSteps: maxSteps ?? DEFAULT_HEARTBEAT_MAX_STEPS,
       workspaceRoot,
       stateDir,

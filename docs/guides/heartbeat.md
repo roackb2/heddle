@@ -27,6 +27,46 @@ continuation or agent-selected continuation, and a blocked or paused task must b
 resumed through the resume path rather than being silently unblocked by an
 ordinary run-now action.
 
+### Use a host-owned charter
+
+By default, Heddle retains its coding-agent system prompt and adds the heartbeat
+checklist around the durable task. A product host that has already assembled a
+complete system charter can opt out of both prompt wrappers:
+
+```ts
+import { HeartbeatRunnerAgent } from '@heddleagent/runtime/advanced';
+
+const result = await HeartbeatRunnerAgent.run({
+  task: durableTask,
+  promptComposition: {
+    mode: 'host-owned',
+    systemPrompt: resolvedHostPrompt,
+  },
+  model,
+  tools,
+  includeDefaultTools: false,
+});
+```
+
+`systemPrompt` must be non-blank and is passed to the model exactly. The
+durable `task` is sent unchanged as the user message. Heddle does not add its
+coding persona, heartbeat checklist, run timing prose, shell examples, memory
+instructions, Agent Skill catalog, or required `HEARTBEAT_DECISION` line in
+this mode. It also suppresses Heddle-authored in-run reminders and removes
+older system messages from resumed or model-recovered history before asserting
+the current host prompt once. The caller must place every model-visible
+instruction it needs in the host prompt.
+
+This changes prompt ownership only. Heddle still owns tool schemas and
+execution, approvals, trace and event delivery, checkpointing, and heartbeat
+decision inference. In particular, a successful response without a decision
+line retains the existing conservative `pause` fallback. Omit
+`promptComposition` to preserve the current Heddle-owned prompt exactly.
+
+For remote heartbeat execution, resolve the host-owned prompt inside the
+trusted execution process. `HeartbeatAgentExecutionRequest` intentionally does
+not serialize prompt composition or treat it as adopter-selected wire policy.
+
 ## CLI Usage
 
 The installed CLI exposes the local heartbeat scheduler:

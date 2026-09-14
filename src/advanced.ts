@@ -181,6 +181,7 @@ export {
   TRACE_EVENT_TYPES,
 } from './core/observability/index.js';
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';
+export type { AgentPromptComposition } from './core/prompts/system-prompt.js';
 
 // --- Building blocks: portable directory checkpoints -----------------------
 export {
