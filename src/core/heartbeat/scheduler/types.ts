@@ -189,6 +189,16 @@ export type HeartbeatExecutionContext = {
   signal: AbortSignal;
   runAgent: (options?: HeartbeatTaskRunnerAgentOptions) => Promise<AgentHeartbeatResult>;
   /**
+   * Prefers an earlier one-off next run after the current agent result settles
+   * successfully. Heddle never lets this postpone the normal recurring
+   * deadline, and this does not create a run request.
+   *
+   * Call this once after `runAgent()` settles and return that exact result.
+   * Product policy, persistence, validation, and user visibility for the
+   * preferred time remain host responsibilities.
+   */
+  preferNextRunAt: (input: { at: Date }) => void;
+  /**
    * Records successful host-owned work without fabricating an agent result.
    * This completes only the current execution; an enabled recurring task is
    * scheduled normally. The summary is durable operator text and must be

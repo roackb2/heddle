@@ -188,15 +188,24 @@ export class HeartbeatTaskStateProjector {
     result: AgentHeartbeatResult;
     now: Date;
     loadedCheckpoint: boolean;
+    preferredNextRunAt?: Date;
   }): HeartbeatTask {
     const continuationMode = args.task.continuationMode ?? 'operator';
     const terminal = HeartbeatTaskStateProjector.isTerminalDecision(args.result.decision, continuationMode);
-    const delayMs = HeartbeatTaskStateProjector.nextDelayMs({
+    const normalDelayMs = HeartbeatTaskStateProjector.nextDelayMs({
       decision: args.result.decision,
       intervalMs: args.task.schedule.intervalMs,
       continuationMode,
       terminal,
     });
+    const nextRunAt = HeartbeatTaskStateProjector.resolveNextRunAt({
+      now: args.now,
+      normalDelayMs,
+      preferredNextRunAt: args.preferredNextRunAt,
+    });
+    const delayMs = nextRunAt === undefined ?
+      undefined
+    : Math.max(0, dayjs(nextRunAt).diff(dayjs(args.now)));
     const projection = HeartbeatTaskStateProjector.projectResult(args.result, delayMs);
 
     return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
@@ -204,7 +213,7 @@ export class HeartbeatTaskStateProjector {
       enabled: terminal ? false : args.task.enabled,
       schedule: {
         ...args.task.schedule,
-        nextRunAt: delayMs === undefined ? undefined : dayjs(args.now).add(delayMs, 'millisecond').toISOString(),
+        nextRunAt,
       },
       state: {
         status: projection.status,
@@ -567,6 +576,30 @@ export class HeartbeatTaskStateProjector {
     return args.decision === 'continue' ?
       args.intervalMs
     : HeartbeatDecisionPolicy.suggestNextDelayMs(args.decision) ?? args.intervalMs;
+  }
+
+  private static resolveNextRunAt(args: {
+    now: Date;
+    normalDelayMs: number | undefined;
+    preferredNextRunAt: Date | undefined;
+  }): string | undefined {
+    const preferredNextRunAt = args.preferredNextRunAt === undefined ?
+      undefined
+    : dayjs(args.preferredNextRunAt);
+    if (
+      args.preferredNextRunAt !== undefined
+      && (!(args.preferredNextRunAt instanceof Date) || !preferredNextRunAt?.isValid())
+    ) {
+      throw new Error('Heartbeat preferred next run timestamp must be a valid Date.');
+    }
+    if (args.normalDelayMs === undefined) {
+      return undefined;
+    }
+
+    const normalNextRunAt = dayjs(args.now).add(args.normalDelayMs, 'millisecond');
+    return preferredNextRunAt?.isBefore(normalNextRunAt) ?
+      preferredNextRunAt.toISOString()
+    : normalNextRunAt.toISOString();
   }
 
   private static requirePendingRecovery(

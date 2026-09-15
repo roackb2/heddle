@@ -63,6 +63,13 @@ that non-blank system prompt exactly and keeps the goal or durable heartbeat
 task as a separate, unchanged user message. This option changes no tool,
 approval, lifecycle, checkpoint, trace, or heartbeat decision semantics.
 
+A custom recurring heartbeat handler may call
+`context.preferNextRunAt({ at: Date })` once after `runAgent()` succeeds, then
+return that exact result. Claim-fenced settlement chooses the earlier of this
+one-off preference and the normal recurring deadline. It cannot delay or
+disable the configured cadence and is not an explicit run request; product
+policy and persistence remain outside Runtime.
+
 `RuntimeCredentialService.acquireRequestScopedCredentialForModel` lets a Node
 host reuse its Heddle OpenAI account login safely across an isolation boundary.
 Heddle refreshes and persists the stored credential at the host boundary, then
