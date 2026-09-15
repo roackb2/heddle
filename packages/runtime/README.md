@@ -68,7 +68,9 @@ A custom recurring heartbeat handler may call
 return that exact result. Claim-fenced settlement chooses the earlier of this
 one-off preference and the normal recurring deadline. It cannot delay or
 disable the configured cadence and is not an explicit run request; product
-policy and persistence remain outside Runtime.
+policy and persistence remain outside Runtime. Once applied, the preference is
+the ordinary next deadline without separate provenance or cancellation, so a
+later product-side clear can leave one already-scheduled extra run.
 
 `RuntimeCredentialService.acquireRequestScopedCredentialForModel` lets a Node
 host reuse its Heddle OpenAI account login safely across an isolation boundary.

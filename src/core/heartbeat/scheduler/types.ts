@@ -195,7 +195,9 @@ export type HeartbeatExecutionContext = {
    *
    * Call this once after `runAgent()` settles and return that exact result.
    * Product policy, persistence, validation, and user visibility for the
-   * preferred time remain host responsibilities.
+   * preferred time remain host responsibilities. Once settlement applies the
+   * preference, it becomes the ordinary next deadline without separate
+   * provenance or cancellation semantics.
    */
   preferNextRunAt: (input: { at: Date }) => void;
   /**

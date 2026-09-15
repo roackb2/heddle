@@ -815,6 +815,12 @@ failure, cancellation, and recovery retain their existing precedence. The
 host owns any model tool, scope, product persistence, validation policy, clear
 operation, and owner-visible explanation for the preference.
 
+After successful settlement, the selected timestamp is the task's ordinary
+`schedule.nextRunAt`; Heddle does not retain separate preference provenance or
+offer a second cancellation primitive. Clearing the product-owned preference
+afterward can therefore leave at most one already-scheduled extra run. That run
+then settles through the normal recurring cadence.
+
 When the handler itself completes admitted host-owned work without invoking the
 Heddle agent loop, return `context.complete()` instead:
 

@@ -110,6 +110,9 @@ operator-facing heartbeat views.
   request or terminal/disabled state win. Retry, block, failure, cancellation,
   and recovery ignore this success-only path. Adopters own how the timestamp is
   chosen, validated against product policy, persisted, cleared, and shown.
+  Once applied, it is the task's ordinary next deadline; no separate provenance
+  or cancellation remains, so a later product-side clear may leave one extra
+  already-scheduled run before normal cadence resumes.
 - A fresh final claim is eligible only when the task is enabled, its `due`
   schedule is eligible (unless explicit `any` run-now mode is used), namespace
   admission is `ready`, and its optional assigned group is `ready`. Missing
