@@ -261,6 +261,96 @@ describe('heartbeat execution context', () => {
     }]);
   });
 
+  it('uses a successful agent preference only when it makes the next recurring run earlier', async () => {
+    const dir = createStateRoot('preferred-next-run');
+    const store = new FileHeartbeatTaskService({ dir });
+    const tasks = [
+      createTask('earlier-preference'),
+      createTask('later-preference'),
+      {
+        ...createTask('terminal-decision'),
+        continuationMode: 'agent' as const,
+      },
+    ];
+    await Promise.all(tasks.map(async (task) => await store.saveTask(task)));
+    const preferences = new Map([
+      ['earlier-preference', new Date(NOW.valueOf() + 15_000)],
+      ['later-preference', new Date(NOW.valueOf() + 120_000)],
+      ['terminal-decision', new Date(NOW.valueOf() + 15_000)],
+    ]);
+    let retainedContext: HeartbeatExecutionContext | undefined;
+    vi.spyOn(HeartbeatRunnerAgent, 'run').mockImplementation(async (options) => (
+      createHeartbeatResult(
+        options.task === 'Process terminal-decision.' ? 'complete' : 'continue',
+        `run-${options.task}`,
+      )
+    ));
+
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      handler: async (context) => {
+        retainedContext = context;
+        const result = await context.runAgent();
+        context.preferNextRunAt({ at: preferences.get(context.task.id)! });
+        return result;
+      },
+    })).resolves.toMatchObject({ checked: 3, ran: 3, failed: 0 });
+
+    await expect(store.requireTask('earlier-preference')).resolves.toMatchObject({
+      schedule: { nextRunAt: '2026-08-01T05:00:15.000Z' },
+      state: {
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 15s.',
+      },
+    });
+    await expect(store.requireTask('later-preference')).resolves.toMatchObject({
+      schedule: { nextRunAt: '2026-08-01T05:01:00.000Z' },
+      state: {
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
+      },
+    });
+    const terminalTask = await store.requireTask('terminal-decision');
+    expect(terminalTask).toMatchObject({ enabled: false, state: { status: 'complete' } });
+    expect(terminalTask.schedule).not.toHaveProperty('nextRunAt');
+    expect(() => retainedContext?.preferNextRunAt({ at: new Date() })).toThrow(/no longer active/);
+  });
+
+  it('keeps a newer external run request ahead of a preferred recurring deadline', async () => {
+    const dir = createStateRoot('preferred-next-run-request');
+    const store = new FileHeartbeatTaskService({ dir });
+    const task = createTask('preferred-next-run-request');
+    await store.saveTask(task);
+    vi.spyOn(HeartbeatRunnerAgent, 'run').mockResolvedValue(
+      createHeartbeatResult('continue', 'preferred-next-run-request-result'),
+    );
+
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      handler: async (context) => {
+        const result = await context.runAgent();
+        await store.requestTaskRun(task.id, {
+          reason: 'new-external-work',
+          requestedAt: new Date(NOW.valueOf() + 10_000),
+        });
+        context.preferNextRunAt({ at: new Date(NOW.valueOf() + 30_000) });
+        return result;
+      },
+    })).resolves.toMatchObject({ checked: 1, ran: 1, failed: 0 });
+
+    await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      schedule: { nextRunAt: '2026-08-01T05:00:09.000Z' },
+      state: {
+        progress: 'A newer heartbeat run was requested during this execution. Waiting for an immediate follow-up.',
+        runRequest: {
+          generation: 1,
+          claimedGeneration: 0,
+          reason: 'new-external-work',
+        },
+      },
+    });
+  });
+
   it('delegates portable agent work and validates the result before durable settlement', async () => {
     const dir = createStateRoot('remote-transport');
     const store = new FileHeartbeatTaskService({ dir });
@@ -750,6 +840,42 @@ describe('heartbeat execution context', () => {
           return context.retry({ summary: 'Invalid delay.', delayMs: 0 });
         },
         error: /positive integer/i,
+      },
+      {
+        id: 'premature-next-run-preference',
+        handler: async (context: HeartbeatExecutionContext) => {
+          context.preferNextRunAt({ at: new Date(NOW.valueOf() + 1_000) });
+          return undefined as never;
+        },
+        error: /preferNextRunAt\(\).*runAgent\(\).*settle first/i,
+      },
+      {
+        id: 'invalid-next-run-preference',
+        handler: async (context: HeartbeatExecutionContext) => {
+          const result = await context.runAgent();
+          context.preferNextRunAt({ at: new Date(Number.NaN) });
+          return result;
+        },
+        error: /preferred next run timestamp must be a valid Date/i,
+      },
+      {
+        id: 'repeated-next-run-preference',
+        handler: async (context: HeartbeatExecutionContext) => {
+          const result = await context.runAgent();
+          context.preferNextRunAt({ at: new Date(NOW.valueOf() + 1_000) });
+          context.preferNextRunAt({ at: new Date(NOW.valueOf() + 2_000) });
+          return result;
+        },
+        error: /preferNextRunAt\(\).*only once/i,
+      },
+      {
+        id: 'retry-after-next-run-preference',
+        handler: async (context: HeartbeatExecutionContext) => {
+          await context.runAgent();
+          context.preferNextRunAt({ at: new Date(NOW.valueOf() + 1_000) });
+          return context.retry({ summary: 'Retry instead.' });
+        },
+        error: /cannot retry.*after preferring/i,
       },
     ];
 

@@ -283,23 +283,36 @@ export class HeartbeatTaskStoreConformance {
     const current = await requireTask(second, task.id);
     await second.saveTask({ ...current, name: 'Operator changed this while it ran' });
     await second.requestTaskRun(task.id, { requestedAt: at(harness, 4_000), reason: 'after-claim' });
-    const settled = await first.recordTaskExecutionOutcome({
+    const requestResult = createResult('request-success');
+    const settled = await first.completeTaskExecution({
       taskId: task.id,
       execution,
-      kind: 'skipped',
-      summary: 'No work remained after the claim.',
-      finishedAt: at(harness, 5_000),
+      checkpoint: requestResult.checkpoint,
+      result: requestResult,
+      loadedCheckpoint: false,
+      completedAt: at(harness, 5_000),
+      preferredNextRunAt: at(harness, 30_000),
     });
-    assert(settled.status === 'saved', 'a current skip must settle');
+    assert(settled.status === 'saved', 'a current success must settle');
     const persisted = await requireTask(first, task.id);
     assert(persisted.name === 'Operator changed this while it ran', 'settlement must preserve a newer operator update');
     assert(persisted.state?.runRequest?.generation === 3, 'a request after claim must remain durable');
     assert(persisted.state?.runRequest?.claimedGeneration === 2, 'settlement must not consume a post-claim request');
+    assert(
+      persisted.schedule.nextRunAt === at(harness, 3_000).toISOString(),
+      'a post-claim request must take precedence over a preferred recurring deadline',
+    );
   }
 
   private static async verifySettlements(namespace: string, harness: HeartbeatTaskStoreConformanceHarness): Promise<void> {
     const store = await harness.createStore(namespace);
-    const tasks = ['success', 'completed', 'skip', 'cancel', 'failure'].map(createTask);
+    const tasks = [
+      ...['success', 'later-preference', 'completed', 'skip', 'cancel', 'failure'].map(createTask),
+      {
+        ...createTask('terminal-preference'),
+        continuationMode: 'agent' as const,
+      },
+    ];
     await Promise.all(tasks.map(async (task) => await store.saveTask(task)));
     const retainedCheckpoint = createResult('completed-prior').checkpoint;
     await store.saveCheckpoint(createTask('completed'), retainedCheckpoint);
@@ -309,11 +322,16 @@ export class HeartbeatTaskStoreConformance {
     const success = await store.completeTaskExecution({
       taskId: 'success', execution: successExecution, checkpoint: createResult('success').checkpoint,
       result: createResult('success'), loadedCheckpoint: false, completedAt: at(harness, 2_000),
+      preferredNextRunAt: at(harness, 17_000),
     });
     assert(success.status === 'saved' && success.record?.outcome?.kind === 'agent', 'success must atomically return its durable run record');
     const persistedSuccess = await requireTask(store, 'success');
     const persistedCheckpoint = await store.loadCheckpoint(persistedSuccess);
     assert(persistedSuccess.state?.lastExecution?.kind === 'agent', 'success must durably settle the task state');
+    assert(
+      persistedSuccess.schedule.nextRunAt === at(harness, 17_000).toISOString(),
+      'success must atomically preserve an earlier preferred next-run deadline',
+    );
     assert(persistedCheckpoint?.runId === 'success', 'success must durably persist its checkpoint');
     if (harness.capabilities?.runHistory) {
       assert(store.listRunRecords, 'runHistory requires listRunRecords');
@@ -323,8 +341,45 @@ export class HeartbeatTaskStoreConformance {
     const repeatedSuccess = await store.completeTaskExecution({
       taskId: 'success', execution: successExecution, checkpoint: createResult('success').checkpoint,
       result: createResult('success'), loadedCheckpoint: false, completedAt: at(harness, 2_000),
+      preferredNextRunAt: at(harness, 18_000),
     });
     assert(repeatedSuccess.status === 'claim-lost', 'repeating a settled execution must not duplicate or overwrite it');
+
+    const laterPreferenceExecution = createExecution('later-preference-execution', 'owner-a', harness);
+    await assertClaimed(store, 'later-preference', laterPreferenceExecution, harness, 2_500);
+    const laterPreference = await store.completeTaskExecution({
+      taskId: 'later-preference',
+      execution: laterPreferenceExecution,
+      checkpoint: createResult('later-preference').checkpoint,
+      result: createResult('later-preference'),
+      loadedCheckpoint: false,
+      completedAt: at(harness, 3_000),
+      preferredNextRunAt: at(harness, 120_000),
+    });
+    assert(laterPreference.status === 'saved', 'a success with a later preference must settle');
+    assert(
+      laterPreference.task.schedule.nextRunAt === at(harness, 63_000).toISOString(),
+      'a preferred timestamp must not postpone the configured periodic deadline',
+    );
+
+    const terminalPreferenceExecution = createExecution('terminal-preference-execution', 'owner-a', harness);
+    await assertClaimed(store, 'terminal-preference', terminalPreferenceExecution, harness, 3_500);
+    const terminalResult = createResult('terminal-preference', 'complete');
+    const terminalPreference = await store.completeTaskExecution({
+      taskId: 'terminal-preference',
+      execution: terminalPreferenceExecution,
+      checkpoint: terminalResult.checkpoint,
+      result: terminalResult,
+      loadedCheckpoint: false,
+      completedAt: at(harness, 4_000),
+      preferredNextRunAt: at(harness, 17_000),
+    });
+    assert(terminalPreference.status === 'saved', 'a terminal success with a preference must settle');
+    assert(!terminalPreference.task.enabled, 'a preferred timestamp must not keep a terminal task enabled');
+    assert(
+      terminalPreference.task.schedule.nextRunAt === undefined,
+      'a preferred timestamp must not schedule a terminal task',
+    );
 
     const completedExecution = createExecution('completed-execution', 'owner-a', harness);
     await assertClaimed(store, 'completed', completedExecution, harness, 3_000);
@@ -437,6 +492,7 @@ export class HeartbeatTaskStoreConformance {
         result: staleResult,
         loadedCheckpoint: false,
         completedAt: at(harness, 7_000),
+        preferredNextRunAt: at(harness, 8_000),
       }),
       first.failTaskExecution({
         taskId: task.id,
@@ -879,13 +935,16 @@ function createExecution(executionId: string, ownerId: string, harness: Heartbea
   return { executionId, ownerId, claimedAt: at(harness, 0).toISOString() };
 }
 
-function createResult(runId: string): AgentHeartbeatResult {
+function createResult(
+  runId: string,
+  decision: AgentHeartbeatResult['decision'] = 'continue',
+): AgentHeartbeatResult {
   const state: AgentLoopState = {
     status: 'finished', runId, goal: 'Conformance result.', model: 'gpt-test', provider: 'openai', workspaceRoot: '/tmp/conformance',
     startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:00:01.000Z', outcome: 'done', summary: `Result ${runId}.`, transcript: [], trace: [],
   };
   const checkpoint: AgentLoopCheckpoint = { version: 1, runId, createdAt: state.finishedAt, state };
-  return { decision: 'continue', summary: state.summary, memory: { changed: false }, state, checkpoint };
+  return { decision, summary: state.summary, memory: { changed: false }, state, checkpoint };
 }
 
 function createRunRecord(taskId: string, executionId: string, harness: HeartbeatTaskStoreConformanceHarness) {

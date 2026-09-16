@@ -269,6 +269,11 @@ export type HeartbeatTaskStore = {
     result: AgentHeartbeatResult;
     loadedCheckpoint: boolean;
     completedAt: Date;
+    /**
+     * Optional one-off host preference. Settlement must atomically choose the
+     * earlier of this timestamp and the normal resolved recurring deadline.
+     */
+    preferredNextRunAt?: Date;
     signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   failTaskExecution: (input: {

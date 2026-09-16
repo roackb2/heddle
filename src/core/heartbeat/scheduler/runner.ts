@@ -50,6 +50,10 @@ type ResolvedHeartbeatRunnerAgentOptions = Omit<
 > & {
   checkpoint?: AgentLoopCheckpoint;
 };
+type HeartbeatHandlerInvocation = {
+  result: AgentHeartbeatResult | HeartbeatHandlerOutcome;
+  preferredNextRunAt?: Date;
+};
 
 export class HeartbeatTaskRunnerService {
   // Runs one already-selected task and persists its final claim-fenced outcome.
@@ -120,7 +124,7 @@ export class HeartbeatTaskRunnerService {
     options.onEvent?.(HeartbeatTaskRunnerService.startedEvent(runningTask, execution, loadedCheckpoint, startedAt));
 
     try {
-      const result = await HeartbeatTaskRunnerService.invokeHandler({
+      const invocation = await HeartbeatTaskRunnerService.invokeHandler({
         task: runningTask,
         checkpoint,
         execution,
@@ -133,6 +137,7 @@ export class HeartbeatTaskRunnerService {
         agentExecutionTransport: options.agentExecutionTransport,
         onEvent: options.onEvent,
       });
+      const { result } = invocation;
       if (options.signal?.aborted) {
         return await HeartbeatTaskRunnerService.persistCancellation({
           ...options,
@@ -247,6 +252,7 @@ export class HeartbeatTaskRunnerService {
         result,
         loadedCheckpoint,
         completedAt: settledAt,
+        ...(invocation.preferredNextRunAt ? { preferredNextRunAt: invocation.preferredNextRunAt } : {}),
         signal: options.signal,
       });
       if (completion.status === 'cancelled') {
@@ -347,10 +353,11 @@ export class HeartbeatTaskRunnerService {
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     agentExecutionTransport?: HeartbeatAgentExecutionTransport;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
-  }): Promise<AgentHeartbeatResult | HeartbeatHandlerOutcome> {
+  }): Promise<HeartbeatHandlerInvocation> {
     let active = true;
     let agentInvocation: Promise<AgentHeartbeatResult> | undefined;
     let agentResult: AgentHeartbeatResult | undefined;
+    let preferredNextRunAt: Date | undefined;
     let selectedOutcome: HeartbeatHandlerOutcome | undefined;
 
     const context: HeartbeatExecutionContext = Object.freeze({
@@ -381,6 +388,20 @@ export class HeartbeatTaskRunnerService {
           : HeartbeatRunnerAgent.run(runnerOptions);
         agentResult = await agentInvocation;
         return agentResult;
+      },
+      preferNextRunAt: (input: { at: Date }) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        if (!agentResult) {
+          throw new Error('Heartbeat execution context preferNextRunAt() requires context.runAgent() to settle first.');
+        }
+        if (selectedOutcome) {
+          throw new Error('Cannot prefer a next heartbeat run after selecting another execution outcome.');
+        }
+        if (preferredNextRunAt) {
+          throw new Error('Heartbeat execution context preferNextRunAt() may be called only once.');
+        }
+
+        preferredNextRunAt = HeartbeatTaskRunnerService.normalizePreferredNextRunAt(input.at);
       },
       complete: (input: { summary: string }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
@@ -417,6 +438,9 @@ export class HeartbeatTaskRunnerService {
       retry: (input: { summary: string; delayMs?: number }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
         const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
+        if (preferredNextRunAt) {
+          throw new Error('Cannot retry a heartbeat execution after preferring its next successful run.');
+        }
         if (selectedOutcome) {
           throw new Error('Heartbeat execution context may select only one outcome.');
         }
@@ -433,6 +457,9 @@ export class HeartbeatTaskRunnerService {
       block: (input: { summary: string }) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
         const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
+        if (preferredNextRunAt) {
+          throw new Error('Cannot block a heartbeat execution after preferring its next successful run.');
+        }
         if (selectedOutcome) {
           throw new Error('Heartbeat execution context may select only one outcome.');
         }
@@ -464,13 +491,13 @@ export class HeartbeatTaskRunnerService {
         if (agentInvocation || result !== selectedOutcome) {
           throw new Error('Custom heartbeat handlers must return the completed or skipped outcome created by their execution context before runAgent().');
         }
-        return result;
+        return { result };
       }
       if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(result)) {
         if (!agentInvocation || !agentResult || result !== selectedOutcome) {
           throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after runAgent() settles.');
         }
-        return result;
+        return { result };
       }
       if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(selectedOutcome)) {
         throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after selecting it.');
@@ -487,7 +514,10 @@ export class HeartbeatTaskRunnerService {
       if (agentInvocation && result !== agentResult) {
         throw new Error('Heartbeat handler returned an agent result other than the result produced by context.runAgent().');
       }
-      return result;
+      return {
+        result,
+        ...(preferredNextRunAt ? { preferredNextRunAt } : {}),
+      };
     } catch (error) {
       if (agentInvocation && !agentResult) {
         args.scopeController.abort(error);
@@ -768,6 +798,13 @@ export class HeartbeatTaskRunnerService {
       throw new Error(`Heartbeat retry delay must be a positive integer no greater than ${MAX_HEARTBEAT_HANDLER_RETRY_MS} milliseconds.`);
     }
     return resolvedDelayMs;
+  }
+
+  private static normalizePreferredNextRunAt(at: Date): Date {
+    if (!(at instanceof Date) || !dayjs(at).isValid()) {
+      throw new Error('Heartbeat preferred next run timestamp must be a valid Date.');
+    }
+    return new Date(at);
   }
 
   private static startedEvent(

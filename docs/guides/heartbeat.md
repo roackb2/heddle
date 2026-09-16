@@ -143,6 +143,8 @@ Custom stores implement this protocol through `HeartbeatTaskStore`:
   fencing token; exact recovery mode also matches and consumes its durable
   interrupted-execution marker
 - `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` project from the latest stored task and reject a stale token with `claim-lost`
+- `completeTaskExecution` passes an optional `preferredNextRunAt` through
+  `HeartbeatTaskStateProjector.afterResult` inside the same atomic transition
 - `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
 
 The built-in file adapter serializes those transitions within one Node.js
@@ -788,6 +790,36 @@ the scope, or retry the host checkpoint.
 filesystem paths. When the nested agent runs in another process, that execution
 host must compose the same capability mode from its own signed allowlist and
 resolved memory working copy.
+
+When successful model work discovers that the recurring task should run again
+before its configured interval, the custom handler can prefer one earlier
+deadline without creating a second wake mechanism:
+
+```ts
+const result = await context.runAgent();
+const preferredNextRunAt = await productSchedule.readPreferredTime();
+
+if (preferredNextRunAt) {
+  context.preferNextRunAt({ at: preferredNextRunAt });
+}
+
+return result;
+```
+
+Call `preferNextRunAt()` at most once, after `runAgent()` settles, and return
+that exact result. Heddle atomically stores the earlier of the normal resolved
+deadline and the valid `Date`. A later preference cannot postpone the periodic
+run, and the method does not create or consume a `requestTaskRun` generation.
+A newer external run request, terminal or disabled task state, retry, block,
+failure, cancellation, and recovery retain their existing precedence. The
+host owns any model tool, scope, product persistence, validation policy, clear
+operation, and owner-visible explanation for the preference.
+
+After successful settlement, the selected timestamp is the task's ordinary
+`schedule.nextRunAt`; Heddle does not retain separate preference provenance or
+offer a second cancellation primitive. Clearing the product-owned preference
+afterward can therefore leave at most one already-scheduled extra run. That run
+then settles through the normal recurring cadence.
 
 When the handler itself completes admitted host-owned work without invoking the
 Heddle agent loop, return `context.complete()` instead:

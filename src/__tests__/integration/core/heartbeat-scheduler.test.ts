@@ -713,6 +713,7 @@ function createMemoryTaskStore(options: {
         result: input.result,
         now: input.completedAt,
         loadedCheckpoint: input.loadedCheckpoint,
+        preferredNextRunAt: input.preferredNextRunAt,
       });
       const record = {
         task: nextTask,

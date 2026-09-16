@@ -59,7 +59,11 @@ operator-facing heartbeat views.
   `context.runAgent()` path, so hosts can add domain prompts and tools without
   receiving or translating provider credentials. `context.complete()` records
   successful host-owned work and `context.skip()` records explicit no-work;
-  neither fabricates agent state.
+  neither fabricates agent state. After `context.runAgent()` settles, a custom
+  handler may call `context.preferNextRunAt({ at })` once before returning that
+  exact result. Successful settlement atomically chooses the earlier of the
+  normal recurring deadline and this one-off preference; it never creates a
+  run request or lets the handler postpone the configured cadence.
   An optional provider-neutral `HeartbeatAgentExecutionTransport` replaces only
   the nested agent call. Task lookup, claim fencing, checkpoint load,
   cancellation, settlement, history, and recovery remain in this service; when
@@ -98,6 +102,17 @@ operator-facing heartbeat views.
 - Execution settlement must read and project from the latest stored task inside
   the same atomic store transition. Saving a projection derived from the
   pre-run snapshot can erase newer run requests or operator control changes.
+- A successful custom agent handler may prefer one earlier next run through
+  `context.preferNextRunAt({ at })`. The preference exists only for that
+  execution and is applied by `completeTaskExecution` under the current claim
+  fence. The state projector chooses the earlier of the latest task's normally
+  resolved deadline and the preference, then still lets a newer pending run
+  request or terminal/disabled state win. Retry, block, failure, cancellation,
+  and recovery ignore this success-only path. Adopters own how the timestamp is
+  chosen, validated against product policy, persisted, cleared, and shown.
+  Once applied, it is the task's ordinary next deadline; no separate provenance
+  or cancellation remains, so a later product-side clear may leave one extra
+  already-scheduled run before normal cadence resumes.
 - A fresh final claim is eligible only when the task is enabled, its `due`
   schedule is eligible (unless explicit `any` run-now mode is used), namespace
   admission is `ready`, and its optional assigned group is `ready`. Missing
@@ -121,7 +136,9 @@ operator-facing heartbeat views.
   from `@heddleagent/runtime/advanced` for normalization, request, claim,
   settlement, and recovery transitions. The adapter still owns the backend
   transaction and fencing predicate; it must not copy Heddle's transition
-  rules into provider-specific persistence code.
+  rules into provider-specific persistence code. Its
+  `completeTaskExecution()` implementation must pass the optional
+  `preferredNextRunAt` into `afterResult()` inside that same transaction.
 - Operator-facing adapters should implement the public
   `HeartbeatTaskAdministrationService` and use `HeartbeatTaskControlPolicy`
   plus `HeartbeatTaskViewProjector`. Every mutation must lock or compare-and-set
