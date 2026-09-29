@@ -2390,7 +2390,7 @@ describe('AgentRunService.run', () => {
     });
   });
 
-  it('bounds parallel-safe tool calls and projects mixed results in call order', async () => {
+  it('bounds model-selected tool calls and projects mixed results in call order', async () => {
     const started: string[] = [];
     const completed: string[] = [];
     let active = 0;
@@ -2429,7 +2429,6 @@ describe('AgentRunService.run', () => {
     const parallelRead: ToolDefinition = {
       name: 'parallel_read',
       description: 'Reads one independent value.',
-      concurrency: 'parallel-safe',
       parameters: { type: 'object', properties: { id: { type: 'string' } } },
       async execute(input) {
         const id = (input as { id: string }).id;
@@ -2482,6 +2481,131 @@ describe('AgentRunService.run', () => {
       { ok: false, error: 'second failed' },
       { ok: true, output: 'third result' },
     ]);
+  });
+
+  it('starts twenty unmarked calls by default and waits for capacity before the next one', async () => {
+    const started: number[] = [];
+    const gates = Array.from({ length: 21 }, () => deferred<{ ok: true; output: number }>());
+    let modelCalls = 0;
+    const llm: LlmAdapter = {
+      info: {
+        provider: 'openai', model: 'gpt-test',
+        capabilities: { parallelToolCalls: true, reasoningSummaries: false, systemMessages: true, toolCalls: true },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1
+          ? { toolCalls: gates.map((_, index) => ({
+              id: `call-${index}`, tool: 'independent', input: { index },
+            })) }
+          : { content: 'All calls finished.' };
+      },
+    };
+    const tool: ToolDefinition = {
+      name: 'independent', description: 'Independent operation.',
+      parameters: { type: 'object' },
+      async execute(input) {
+        const index = (input as { index: number }).index;
+        started.push(index);
+        return await gates[index].promise;
+      },
+    };
+    const run = AgentRunService.run({ goal: 'Run many independent calls.', llm, tools: [tool], maxSteps: 2, logger: silentLogger });
+    await vi.waitFor(() => expect(started).toHaveLength(20));
+    expect(started).toEqual(Array.from({ length: 20 }, (_, index) => index));
+    gates[0].resolve({ ok: true, output: 0 });
+    await vi.waitFor(() => expect(started).toHaveLength(21));
+    gates.slice(1).forEach((gate, index) => gate.resolve({ ok: true, output: index + 1 }));
+    const result = await run;
+    expect(result.outcome).toBe('done');
+    expect(result.transcript.filter((message) => message.role === 'tool')).toHaveLength(21);
+  });
+
+  it('runs independent mutations by default without bypassing approvals', async () => {
+    const started: string[] = [];
+    const gates = [deferred<{ ok: true; output: string }>(), deferred<{ ok: true; output: string }>()];
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: { parallelToolCalls: true, reasoningSummaries: false, systemMessages: true, toolCalls: true },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1
+          ? { toolCalls: [
+              { id: 'first', tool: 'mutate', input: { id: 'first' } },
+              { id: 'second', tool: 'mutate', input: { id: 'second' } },
+            ] }
+          : { content: 'Done.' };
+      },
+    };
+    const tool: ToolDefinition = {
+      name: 'mutate',
+      description: 'Mutate an independent target.',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: { id: { type: 'string' } } },
+      async execute(input) {
+        const id = (input as { id: string }).id;
+        started.push(id);
+        return await gates[id === 'first' ? 0 : 1].promise;
+      },
+    };
+
+    const approvals: string[] = [];
+    const run = AgentRunService.run({
+      goal: 'Mutate independent targets.', llm: fakeLlm, tools: [tool], maxSteps: 2,
+      logger: silentLogger,
+      approveToolCall: async (call) => {
+        approvals.push(call.id);
+        return { approved: true };
+      },
+    });
+    await vi.waitFor(() => expect(started).toEqual(['first', 'second']));
+    expect(approvals).toEqual(['first', 'second']);
+    gates[1].resolve({ ok: true, output: 'second' });
+    gates[0].resolve({ ok: true, output: 'first' });
+    const result = await run;
+    expect(result.outcome).toBe('done');
+    expect(result.transcript.filter((message) => message.role === 'tool').map((message) => message.toolCallId))
+      .toEqual(['first', 'second']);
+  });
+
+  it('honors an all-serial host limit even for unmarked tools', async () => {
+    const started: string[] = [];
+    const first = deferred<{ ok: true; output: string }>();
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai', model: 'gpt-test',
+        capabilities: { parallelToolCalls: true, reasoningSummaries: false, systemMessages: true, toolCalls: true },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1 ? { toolCalls: [
+          { id: 'first', tool: 'shell_mutation', input: { id: 'first' } },
+          { id: 'second', tool: 'shell_mutation', input: { id: 'second' } },
+        ] } : { content: 'Done.' };
+      },
+    };
+    const tool: ToolDefinition = {
+      name: 'shell_mutation', description: 'Change workspace state.',
+      parameters: { type: 'object' },
+      async execute(input) {
+        const id = (input as { id: string }).id;
+        started.push(id);
+        return id === 'first' ? await first.promise : { ok: true, output: id };
+      },
+    };
+    const run = AgentRunService.run({
+      goal: 'Apply changes sequentially.', llm: fakeLlm, tools: [tool],
+      maxToolConcurrency: 1, maxSteps: 2, logger: silentLogger,
+    });
+    await vi.waitFor(() => expect(started).toEqual(['first']));
+    first.resolve({ ok: true, output: 'first' });
+    expect((await run).outcome).toBe('done');
+    expect(started).toEqual(['first', 'second']);
   });
 
   it('resolves every same-response approval before starting allowed calls', async () => {
@@ -2608,6 +2732,7 @@ describe('AgentRunService.run', () => {
     const serialEdit: ToolDefinition = {
       name: 'serial_edit',
       description: 'Mutates shared state after explicit approval.',
+      concurrency: 'serial',
       requiresApproval: true,
       parameters: { type: 'object', properties: { value: { type: 'string' } } },
       async execute(input) {
@@ -2715,14 +2840,14 @@ describe('AgentRunService.run', () => {
 
   it.each([
     {
-      name: 'the tool has not opted in',
+      name: 'the tool declares a serial barrier',
       adapterSupportsParallel: true,
-      concurrency: undefined,
+      concurrency: 'serial' as const,
     },
     {
       name: 'the adapter does not support parallel calls',
       adapterSupportsParallel: false,
-      concurrency: 'parallel-safe' as const,
+      concurrency: undefined,
     },
   ])(
     'keeps calls serial when $name',
@@ -2755,7 +2880,7 @@ describe('AgentRunService.run', () => {
       };
       const serialTool: ToolDefinition = {
         name: 'serial_tool',
-        description: 'Uses the default serial policy.',
+        description: 'Observes the selected serial policy.',
         parameters: { type: 'object', properties: { id: { type: 'string' } } },
         concurrency,
         async execute(input) {

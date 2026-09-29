@@ -12,6 +12,12 @@ in session history but never becomes user-visible text, trace content, or a
 Heddle reasoning summary. The shared persistence schema validates its block
 shape without dropping provider-added fields.
 
+When Claude returns multiple `tool_use` blocks in one response, the adapter
+replays one user message containing the corresponding tool results in call
+order. The agent runtime may execute independent calls concurrently, including
+host-approved mutations; a host can request serial execution with
+`maxToolConcurrency: 1`.
+
 The adapter selects only `text` for the visible answer and `tool_use` for tool
 execution. It rejects incomplete `max_tokens` responses instead of treating
 partial output as a finished turn. Current Claude 5 requests allow 16,384

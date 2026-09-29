@@ -14,10 +14,9 @@ export type ScheduledAgentToolCall = {
 /**
  * Owns bounded scheduling for one assistant response's authorized tool calls.
  *
- * Parallel execution is deliberately opt-in at both boundaries: the adapter
- * must support parallel calls and the tool owner must declare the tool
- * `parallel-safe`. Serial calls act as barriers, so mutations and tools with
- * unknown safety retain deterministic execution semantics.
+ * The model chooses independent calls in one response; those calls overlap by
+ * default when the adapter supports multiple calls. Tool owners may declare a
+ * serial barrier for stateful tools, and hosts can set the limit to 1.
  */
 export class AgentToolConcurrencyService {
   static resolveLimit(value: number | undefined): number {
@@ -127,6 +126,7 @@ export class AgentToolConcurrencyService {
   ): boolean {
     return args.adapterSupportsParallel
       && args.maxConcurrency > 1
-      && call.tool?.concurrency === 'parallel-safe';
+      && call.tool !== undefined
+      && call.tool.concurrency !== 'serial';
   }
 }

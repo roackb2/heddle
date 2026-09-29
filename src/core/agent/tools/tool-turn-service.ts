@@ -68,6 +68,8 @@ export class AgentToolTurnService {
       return interruptedBeforeScheduling;
     }
 
+    // Unknown tools are resolved by the dispatcher as failures, not executed;
+    // known calls are grouped in model order unless a tool requires a barrier.
     const executions = await AgentToolConcurrencyService.execute({
       calls: scheduledCalls,
       adapterSupportsParallel:

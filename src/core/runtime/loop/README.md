@@ -67,12 +67,14 @@ outside this lifecycle boundary.
 
 ## Tool Concurrency
 
-`maxToolConcurrency` bounds parallel-safe tool execution for one run. The
-default is `4`, valid values are integers from `1` through `32`, and `1`
-disables overlap.
+`maxToolConcurrency` bounds concurrent tool execution for one run. The default
+is `20`, valid values are integers from `1` through `50`, and `1` disables
+overlap. The model may request independent calls together, including shell
+mutations; execution still observes each call's host policy and approvals.
 
-Calls overlap only when both the active LLM adapter advertises
-`parallelToolCalls` and the tool declares `concurrency: 'parallel-safe'`.
-Authorization for every tool call in one model response finishes before any
-allowed call starts. Undeclared tools remain serial barriers, and results are
-projected back into the transcript in the model's original tool-call order.
+Calls overlap when the active LLM adapter advertises `parallelToolCalls` and
+the registered tool has not declared `concurrency: 'serial'`. Unknown tools and
+explicit serial tools remain barriers. Authorization for every call in a
+parallel batch finishes before any allowed call starts; results are projected
+back into the transcript in the model's original tool-call order. Hosts needing
+strict serial scheduling can pass `maxToolConcurrency: 1`.

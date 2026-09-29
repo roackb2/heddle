@@ -86,9 +86,12 @@ workspace.
   family, policy, or composition responsibility.
 - Attach approval policy through approval/toolkit registration rather than
   embedding host approval UI in tool implementations.
-- Tools are serial by default. Declare `concurrency: 'parallel-safe'` only when
-  separate calls can safely overlap. Approval eligibility does not imply
-  concurrency safety.
+- The model can request independent calls together; registered tools overlap by
+  default when the adapter supports multiple calls and the host limit is above
+  one. Declare `concurrency: 'serial'` for tools that must be barriers. Hosts
+  requiring all-serial execution can set `maxToolConcurrency: 1`. Approval
+  eligibility does not imply concurrency safety; each call still needs its
+  normal authorization before execution.
 - Long-running tools should observe `ToolExecutionContext.signal` so host
   cancellation can stop in-flight work promptly.
 - Use `ToolDefinition.timeoutMs: null` only when the tool owns a bounded or

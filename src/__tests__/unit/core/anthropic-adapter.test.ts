@@ -106,6 +106,47 @@ describe('AnthropicAdapter Claude 5', () => {
     expect(answer.providerContinuation).toBeUndefined();
   });
 
+  it('groups multiple tool results after exact signed-thinking replay', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const multiToolBlocks = [
+      { type: 'thinking', thinking: '', signature: 'signed-thinking' },
+      { type: 'tool_use', id: 'call-1', name: 'add', input: { a: 1, b: 2 } },
+      { type: 'tool_use', id: 'call-2', name: 'add', input: { a: 3, b: 4 } },
+    ];
+    const responses = [
+      anthropicResponse(multiToolBlocks, 'tool_use'),
+      anthropicResponse([{ type: 'text', text: 'Both done.', citations: null }], 'end_turn'),
+    ];
+    const adapter = new AnthropicAdapter({
+      model: 'claude-sonnet-5-5',
+      credentials: { apiKey: 'test-key' },
+      runtime: { fetchImpl: async (_url, init) => {
+        requests.push(JSON.parse(String((init as RequestInit).body)));
+        const response = responses.shift();
+        if (!response) throw new Error('Unexpected Claude request.');
+        return response;
+      } },
+    });
+
+    expect(adapter.info.capabilities.parallelToolCalls).toBe(true);
+    const first = await adapter.chat([{ role: 'user', content: 'Calculate both.' }], [addTool]);
+    expect(first.toolCalls?.map((call) => call.id)).toEqual(['call-1', 'call-2']);
+    await adapter.chat([
+      { role: 'user', content: 'Calculate both.' },
+      { role: 'assistant', content: '', toolCalls: first.toolCalls, providerContinuation: first.providerContinuation },
+      { role: 'tool', toolCallId: 'call-1', content: '3' },
+      { role: 'tool', toolCallId: 'call-2', content: '7' },
+    ], [addTool]);
+    expect(requests[1]?.messages).toEqual([
+      { role: 'user', content: 'Calculate both.' },
+      { role: 'assistant', content: multiToolBlocks },
+      { role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'call-1', content: '3' },
+        { type: 'tool_result', tool_use_id: 'call-2', content: '7' },
+      ] },
+    ]);
+  });
+
   it('rejects unsupported effort and incomplete capped responses', async () => {
     expect(() => new AnthropicAdapter({
       model: 'claude-opus-5-5',

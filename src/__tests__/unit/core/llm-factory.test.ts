@@ -100,7 +100,7 @@ describe('llm adapter factory', () => {
         toolCalls: true,
         systemMessages: true,
         reasoningSummaries: false,
-        parallelToolCalls: false,
+        parallelToolCalls: true,
       },
     });
   });
@@ -123,7 +123,7 @@ describe('llm adapter factory', () => {
         toolCalls: true,
         systemMessages: true,
         reasoningSummaries: false,
-        parallelToolCalls: false,
+        parallelToolCalls: true,
       },
     });
   });
@@ -216,6 +216,27 @@ describe('llm adapter factory', () => {
     });
   });
 
+  it('decodes multiple OpenAI-compatible tool calls in one response', async () => {
+    const adapter = LlmAdapterService.create({
+      model: 'ollama/llama3.2:latest',
+      runtime: {
+        endpoint: { baseUrl: 'http://ollama.test/v1', auth: { type: 'none' } },
+        fetchImpl: (async () => new Response(JSON.stringify({
+          choices: [{ message: { content: null, tool_calls: [
+            { id: 'first', type: 'function', function: { name: 'add', arguments: '{"a":1,"b":2}' } },
+            { id: 'second', type: 'function', function: { name: 'add', arguments: '{"a":3,"b":4}' } },
+          ] } }],
+        }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch,
+      },
+    });
+    expect(adapter.info?.capabilities.parallelToolCalls).toBe(true);
+    const result = await adapter.chat([{ role: 'user', content: 'Calculate both.' }], []);
+    expect(result.toolCalls).toEqual([
+      { id: 'first', tool: 'add', input: { a: 1, b: 2 } },
+      { id: 'second', tool: 'add', input: { a: 3, b: 4 } },
+    ]);
+  });
+
   it('sends OpenAI-compatible profile requests with bearer auth and provider-local model names', async () => {
     const requests: Array<{ url: string; headers: Headers; body: unknown }> = [];
     const adapter = LlmAdapterService.create({
@@ -259,7 +280,7 @@ describe('llm adapter factory', () => {
         toolCalls: true,
         systemMessages: true,
         reasoningSummaries: false,
-        parallelToolCalls: false,
+        parallelToolCalls: true,
       },
     });
     expect(requests).toHaveLength(1);

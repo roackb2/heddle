@@ -23,6 +23,7 @@ describe('AgentRunContextBuilder', () => {
     expect(context.maxSteps).toBe(DEFAULT_MAX_STEPS);
     expect(context.maxSteps).toBe(Number.MAX_SAFE_INTEGER);
     expect(context.maxToolConcurrency).toBe(DEFAULT_MAX_TOOL_CONCURRENCY);
+    expect(context.maxToolConcurrency).toBe(20);
   });
 
   it('still honors explicit host step budgets', () => {
@@ -45,9 +46,15 @@ describe('AgentRunContextBuilder', () => {
     });
 
     expect(context.maxToolConcurrency).toBe(1);
+    expect(AgentRunContextBuilder.create({
+      goal: 'Allow a larger batch.',
+      llm: fakeLlm,
+      maxToolConcurrency: 50,
+      tools: [],
+    }).maxToolConcurrency).toBe(50);
   });
 
-  it.each([0, 1.5, 33])(
+  it.each([0, 1.5, 51])(
     'rejects invalid tool concurrency limit %s',
     (maxToolConcurrency) => {
       expect(() =>
@@ -57,7 +64,7 @@ describe('AgentRunContextBuilder', () => {
           maxToolConcurrency,
           tools: [],
         }),
-      ).toThrow('maxToolConcurrency must be an integer between 1 and 32');
+      ).toThrow('maxToolConcurrency must be an integer between 1 and 50');
     },
   );
 });
