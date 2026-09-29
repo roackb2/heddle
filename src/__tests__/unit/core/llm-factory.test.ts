@@ -382,6 +382,35 @@ describe('llm adapter factory', () => {
     expect(ModelPolicyService.resolveDefaultReasoningEffort('gpt-5.6-sol')).toBe('medium');
   });
 
+  it('exposes GPT-6 with the supported effort levels and context estimate', () => {
+    expect(ModelCatalogService.isCommonBuiltInModel('gpt-6-astra')).toBe(true);
+    expect(ModelCatalogService.isOpenAiAccountSignInModel('gpt-6-luna')).toBe(true);
+    expect(ModelCatalogService.estimateOpenAiContextWindow('gpt-6-sol')).toBe(1_050_000);
+    expect(ModelPolicyService.supportedOpenAiRequestReasoningEfforts('gpt-6-astra')).toEqual([
+      'low', 'medium', 'high', 'ultrahigh', 'max',
+    ]);
+    expect(ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel('gpt-6-astra', 'none')).toBe(false);
+    expect(ModelPolicyService.supportedOpenAiRequestReasoningEfforts('gpt-6-luna')).toContain('none');
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('gpt-6-astra')).toBe('medium');
+  });
+
+  it('exposes current Claude 5 models with model-specific effort defaults', () => {
+    for (const model of ['claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5']) {
+      expect(ModelCatalogService.isCommonBuiltInModel(model)).toBe(true);
+      expect(ModelCatalogService.estimateBuiltInContextWindow(model)).toBe(1_000_000);
+      expect(ModelPolicyService.supportedRequestReasoningEfforts(model)).toEqual([
+        'low', 'medium', 'high', 'ultrahigh', 'max',
+      ]);
+      expect(ModelPolicyService.buildReasoningEffortOptions(model).find((option) => option.id === 'none')?.disabled).toBe(true);
+    }
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('claude-fable-5-1')).toBe('high');
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('claude-opus-5-5')).toBe('medium');
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('claude-sonnet-5-5')).toBe('high');
+    expect(ModelPolicyService.resolveAnthropicMaxTokens('claude-sonnet-5-5', 'medium')).toBe(16_384);
+    expect(ModelPolicyService.resolveAnthropicMaxTokens('claude-sonnet-5-5', 'max')).toBe(64_000);
+    expect(ModelPolicyService.resolveAnthropicMaxTokens('claude-sonnet-4-6')).toBe(4_096);
+  });
+
   it('supports Kimi K3 catalog and request policy without claiming reasoning summaries', () => {
     expect(ModelCatalogService.isCommonBuiltInModel('kimi/kimi-k3')).toBe(true);
     expect(ModelCatalogService.estimateBuiltInContextWindow('kimi/kimi-k3')).toBe(1_000_000);

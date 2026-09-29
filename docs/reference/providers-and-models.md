@@ -149,6 +149,7 @@ a provider default.
 
 OpenAI models currently included in the built-in shortlist:
 
+- `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`
 - `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`
 - `gpt-5.5`, `gpt-5.5-pro`
 - `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`
@@ -160,6 +161,7 @@ OpenAI models currently included in the built-in shortlist:
 
 Anthropic models currently included in the built-in shortlist:
 
+- `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5`
 - `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`
 - `claude-opus-4-1`, `claude-opus-4-0`, `claude-sonnet-4-0`
 - `claude-3-7-sonnet-latest`
@@ -173,6 +175,30 @@ Kimi K3 supports `low`, `high`, and `max` reasoning effort, with `max` as the
 default. Kimi's raw `reasoning_content` is private model-continuation state. It
 is replayed to Kimi when required by a tool turn, but is not exposed as Heddle
 reasoning summaries, commentary, logs, or traces.
+
+### GPT-6 and Claude 5
+
+Heddle exposes GPT-6 Astra, Sol, and Luna through OpenAI's Responses API. All
+three have a 1,050,000-token context estimate and default to `medium` reasoning
+effort. Astra supports `low` through `max`; Sol and Luna also support `none`.
+OpenAI account sign-in lists these models, but account availability still
+depends on the signed-in account; use an API key if the account endpoint does
+not grant a selected model.
+
+Claude Fable 5.1, Opus 5.5, and Sonnet 5.5 have a 1,000,000-token context
+estimate. Heddle exposes `low` through `max` effort, defaulting to `high` for
+Fable and Sonnet and `medium` for Opus. The Claude adapter preserves complete
+assistant content blocks privately when replaying tool results, because
+adaptive thinking is on by default for these models. It never presents those
+blocks as reasoning summaries. The request cap is 16,384 output tokens at
+`low`–`high` and 64,000 at `ultrahigh`/`max`; a response that reaches the cap
+is treated as incomplete rather than as a successful answer.
+
+These models are opt-in; Heddle's existing default models do not change.
+See the official [OpenAI model catalog](https://developers.openai.com/api/docs/models)
+and Anthropic pages for [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview),
+[Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview), and
+[Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview).
 
 ### GPT-5.6 family
 
@@ -204,6 +230,8 @@ See OpenAI's official model pages for
 You can select a model with CLI flags or chat commands:
 
 ```bash
+heddle --model gpt-6-luna ask "Summarize this repository"
+heddle --model claude-sonnet-5-5 ask "Summarize this repository"
 heddle --model gpt-5.4-mini
 heddle chat --model claude-3-5-haiku-latest
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
@@ -300,6 +328,9 @@ In the browser control plane, the same auth indicator appears in the session com
 
 OpenAI account sign-in is routed through the ChatGPT/Codex transport path and is limited to models Heddle has explicitly allowed for that path:
 
+- `gpt-6-astra`
+- `gpt-6-sol`
+- `gpt-6-luna`
 - `gpt-5.6` (Sol alias)
 - `gpt-5.6-sol`
 - `gpt-5.6-terra`

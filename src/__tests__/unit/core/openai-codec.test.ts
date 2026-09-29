@@ -61,6 +61,21 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     expect(maxRequest.reasoning).toEqual({ summary: 'detailed', effort: 'max' });
   });
 
+  it('uses GPT-6 reasoning without sending unsupported none effort to Astra', () => {
+    const astra = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-6-astra', tools: [], oauthMode: false,
+    });
+    const luna = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-6-luna', tools: [], oauthMode: false, reasoningEffort: 'none',
+    });
+
+    expect(astra.reasoning).toEqual({ summary: 'detailed', effort: 'medium' });
+    expect(luna.reasoning).toEqual({ summary: 'detailed', effort: 'none' });
+    expect(() => OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-6-astra', tools: [], oauthMode: false, reasoningEffort: 'none',
+    })).toThrow('Reasoning effort "none" is not supported for OpenAI model gpt-6-astra.');
+  });
+
   it('keeps summaries for o-series models without a Heddle-managed effort', () => {
     const request = OpenAiCodec.buildResponsesRequest(messages, {
       model: 'o4-mini',

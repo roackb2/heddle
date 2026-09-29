@@ -616,6 +616,9 @@ describe('createConversationEngine', () => {
       reasoningEffort: undefined,
       driftEnabled: true,
     }));
+    await engine.sessions.updateSettings(session.id, { model: 'gpt-6-luna', reasoningEffort: 'none' });
+    const claude = await engine.sessions.updateSettings(session.id, { model: 'claude-sonnet-5-5' });
+    expect(claude.reasoningEffort).toBeUndefined();
     await expect(engine.sessions.updateSettings('missing', { driftEnabled: false })).rejects.toThrow(
       'Chat session not found: missing',
     );

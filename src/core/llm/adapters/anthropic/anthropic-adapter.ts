@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmAdapterCreateInput } from '@/core/llm/types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmAdapterCreateInput, ReasoningEffort } from '@/core/llm/types.js';
 import type { ToolDefinition, ToolCall } from '@/core/types.js';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/core/config.js';
+import { ModelPolicyService } from '@/core/llm/models/index.js';
+import { AnthropicReplayBlocksSchema } from './anthropic-continuation.js';
 import { AnthropicCodec } from './anthropic-codec.js';
 
 export type AnthropicAdapterOptions = LlmAdapterCreateInput;
@@ -22,6 +24,7 @@ export class AnthropicAdapter implements LlmAdapter {
 
   private readonly client: Anthropic;
   private readonly model: string;
+  private readonly reasoningEffort?: ReasoningEffort;
 
   constructor(options: AnthropicAdapterOptions = {}) {
     this.client = new Anthropic({
@@ -30,8 +33,13 @@ export class AnthropicAdapter implements LlmAdapter {
         process.env.ANTHROPIC_API_KEY,
         process.env.PERSONAL_ANTHROPIC_API_KEY,
       ),
+      fetch: options.runtime?.fetchImpl,
     });
     this.model = options.model ?? DEFAULT_ANTHROPIC_MODEL;
+    this.reasoningEffort = options.runtime?.reasoningEffort ?? ModelPolicyService.resolveDefaultReasoningEffort(this.model);
+    if (this.reasoningEffort && !ModelPolicyService.supportedRequestReasoningEfforts(this.model).includes(this.reasoningEffort)) {
+      throw new Error(`Reasoning effort "${this.reasoningEffort}" is not supported for Anthropic model ${this.model}.`);
+    }
     this.info = {
       provider: 'anthropic',
       model: this.model,
@@ -45,13 +53,18 @@ export class AnthropicAdapter implements LlmAdapter {
       .map((message) => message.content)
       .join('\n\n');
     const anthropicMessages = AnthropicCodec.toMessages(messages);
-    const response = await this.client.messages.create({
+    const response = await this.client.messages.stream({
       model: this.model,
       system: system || undefined,
       messages: anthropicMessages,
       tools: tools.length > 0 ? tools.map((tool) => AnthropicCodec.toTool(tool)) : undefined,
-      max_tokens: 4096,
-    }, { signal });
+      max_tokens: ModelPolicyService.resolveAnthropicMaxTokens(this.model, this.reasoningEffort),
+      ...(this.reasoningEffort ? { output_config: { effort: AnthropicCodec.toReasoningEffort(this.reasoningEffort) } } : {}),
+    }, { signal }).finalMessage();
+
+    if (response.stop_reason === 'max_tokens') {
+      throw new Error(`Claude response reached max_tokens before completing for model ${this.model}.`);
+    }
 
     const text = response.content
       .flatMap((block) => (block.type === 'text' ? [block.text] : []))
@@ -72,6 +85,12 @@ export class AnthropicAdapter implements LlmAdapter {
     return {
       content: text || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      ...(toolCalls.length > 0 ? {
+        providerContinuation: {
+          provider: 'anthropic' as const,
+          contentBlocks: AnthropicReplayBlocksSchema.parse(response.content),
+        },
+      } : {}),
       usage: AnthropicCodec.extractUsage(response.usage, response.model),
     };
   }

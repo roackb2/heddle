@@ -1127,6 +1127,51 @@ describe('AgentRunService.run', () => {
     ]);
   });
 
+  it('drops stale provider continuation when an interrupted tool call is trimmed', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return { content: 'Continuing from the recorded tool result.' };
+      },
+    };
+
+    await AgentRunService.run({
+      goal: 'Continue.',
+      llm: fakeLlm,
+      tools: [],
+      history: [
+        { role: 'user', content: 'Inspect two files.' },
+        {
+          role: 'assistant',
+          content: 'Inspecting.',
+          toolCalls: [
+            { id: 'call-1', tool: 'read_file', input: { path: 'a' } },
+            { id: 'call-2', tool: 'read_file', input: { path: 'b' } },
+          ],
+          providerContinuation: {
+            provider: 'anthropic',
+            contentBlocks: [
+              { type: 'thinking', thinking: '', signature: 'private-signature' },
+              { type: 'tool_use', id: 'call-1', name: 'read_file', input: { path: 'a' } },
+              { type: 'tool_use', id: 'call-2', name: 'read_file', input: { path: 'b' } },
+            ],
+          },
+        },
+        { role: 'tool', content: 'A', toolCallId: 'call-1' },
+      ],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toContainEqual({
+      role: 'assistant',
+      content: 'Inspecting.',
+      toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: 'a' } }],
+      providerContinuation: undefined,
+    });
+  });
+
   it('requires approval for tools marked as approval-gated and feeds denials back to the model', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

@@ -27,7 +27,7 @@ For setup details, environment variables, and model-picker behavior, see
 
 ```bash
 heddle --model gpt-5.4-mini ask "Summarize this repository"
-heddle --model claude-sonnet-4-6 ask "Summarize this repository"
+heddle --model claude-sonnet-5-5 ask "Summarize this repository"
 heddle --model kimi/kimi-k3 ask "Summarize this repository"
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 heddle --model lmstudio/local-model ask "Summarize this repository"

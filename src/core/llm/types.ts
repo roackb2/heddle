@@ -108,7 +108,8 @@ export type LlmUsage = {
  * not render or log it as assistant work narration.
  */
 export type AssistantProviderContinuation =
-  | { provider: 'kimi'; reasoningContent: string };
+  | { provider: 'kimi'; reasoningContent: string }
+  | { provider: 'anthropic'; contentBlocks: unknown[] };
 
 /**
  * A message in the chat transcript.

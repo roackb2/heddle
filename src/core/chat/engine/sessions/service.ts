@@ -33,6 +33,7 @@ import {
   type ChatSessionLeaseOwner,
 } from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
+import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { ChatSessionRecords, ChatSessionTitles, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
@@ -594,7 +595,13 @@ export class FileConversationSessionService implements ConversationSessionServic
     input: UpdateConversationSessionSettingsInput,
   ): ChatSession {
     const model = input.model ?? session.model;
-    const reasoningEffort = input.reasoningEffort === null ? undefined : input.reasoningEffort ?? session.reasoningEffort;
+    const requestedEffort = input.reasoningEffort === null ? undefined : input.reasoningEffort ?? session.reasoningEffort;
+    const incompatibleInheritedEffort = model !== undefined
+      && typeof requestedEffort === 'string'
+      && model !== session.model
+      && input.reasoningEffort === undefined
+      && !ModelPolicyService.supportedRequestReasoningEfforts(model).includes(requestedEffort);
+    const reasoningEffort = incompatibleInheritedEffort ? undefined : requestedEffort;
     const driftEnabled = input.driftEnabled ?? session.driftEnabled;
 
     if (

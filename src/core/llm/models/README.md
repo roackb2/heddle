@@ -55,6 +55,18 @@ into the provider wire format. If translation discovers a provider limitation,
 move that limitation back into `ModelPolicyService` so every interface sees the
 same behavior before a request is made.
 
+## Current Model Families
+
+- GPT-6 Astra, Sol, and Luna use the OpenAI Responses path. Astra disallows
+  `none` effort; Sol and Luna allow it. All default to `medium`, and all use a
+  1,050,000-token context estimate.
+- Claude Fable 5.1, Opus 5.5, and Sonnet 5.5 use the Anthropic Messages path.
+  They support `low` through `max` effort (Heddle's persisted `ultrahigh` maps
+  to provider `xhigh`) and use a 1,000,000-token context estimate. The Claude
+  adapter owns exact private thinking-block replay with tool results.
+- Existing default models remain unchanged; adding a family to the shortlist
+  does not silently migrate existing sessions or system-model choices.
+
 ## GPT-5.6 Contract
 
 The GPT-5.6 product boundary is intentionally additive:

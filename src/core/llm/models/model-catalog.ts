@@ -13,17 +13,31 @@ export type BuiltInModelGroup = {
   models: string[];
 };
 
+export const OPENAI_GPT_6_MODELS = [
+  'gpt-6-astra',
+  'gpt-6-sol',
+  'gpt-6-luna',
+] as const;
 export const OPENAI_GPT_5_6_ALIAS = 'gpt-5.6';
 export const OPENAI_GPT_5_6_MODELS = [
   'gpt-5.6-sol',
   'gpt-5.6-terra',
   'gpt-5.6-luna',
 ] as const;
+export const ANTHROPIC_CLAUDE_5_MODELS = [
+  'claude-fable-5-1',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+] as const;
 
 export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
   {
     label: 'Kimi Platform · K3',
     models: ['kimi/kimi-k3'],
+  },
+  {
+    label: 'OpenAI · GPT-6',
+    models: [...OPENAI_GPT_6_MODELS],
   },
   {
     label: 'OpenAI · GPT-5.6',
@@ -58,6 +72,10 @@ export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
     models: ['gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini'],
   },
   {
+    label: 'Anthropic · Claude 5',
+    models: [...ANTHROPIC_CLAUDE_5_MODELS],
+  },
+  {
     label: 'Anthropic · Claude 4',
     models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
   },
@@ -82,6 +100,7 @@ export const OPENAI_MODEL_GROUPS: BuiltInModelGroup[] = BUILT_IN_MODEL_GROUPS.fi
 export const COMMON_BUILT_IN_MODELS = BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models);
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
 export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
+  ...OPENAI_GPT_6_MODELS,
   OPENAI_GPT_5_6_ALIAS,
   ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.5',
@@ -173,8 +192,12 @@ export class ModelCatalogService {
       return 1_000_000;
     }
 
-    if (model === OPENAI_GPT_5_6_ALIAS || model.startsWith(`${OPENAI_GPT_5_6_ALIAS}-`)) {
+    if (model.startsWith('gpt-6-') || model === OPENAI_GPT_5_6_ALIAS || model.startsWith(`${OPENAI_GPT_5_6_ALIAS}-`)) {
       return 1_050_000;
+    }
+
+    if (model.startsWith('claude-fable-5-') || model.startsWith('claude-opus-5-') || model.startsWith('claude-sonnet-5-')) {
+      return 1_000_000;
     }
 
     if (model.startsWith('gpt-5.5')) {

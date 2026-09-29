@@ -12,13 +12,16 @@ preferences.
 - Session-switch adoption rules between stored session settings and active host
   state.
 - Effective reasoning-effort resolution for display and request wiring.
+- On a model change, the session service clears an inherited explicit effort
+  if the new model does not support it. An explicit effort supplied with the
+  same update remains explicit and is validated at the provider boundary.
 
 ## Does Not Own
 
 - TUI rendering or React state management details.
 - Control-plane transport or API schemas.
 - LLM provider compatibility rules themselves. Those still belong to
-  `src/core/llm/model-policy.ts`.
+  `src/core/llm/models/model-policy-service.ts`.
 
 ## Why This Exists
 

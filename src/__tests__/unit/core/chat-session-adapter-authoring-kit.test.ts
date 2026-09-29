@@ -45,6 +45,37 @@ describe('chat session adapter-authoring primitives', () => {
     expect(ChatSessionPersistenceCodec.parseRecord(record)).toEqual(record);
   });
 
+  it('preserves Claude thinking signatures and ordered content blocks across persistence', () => {
+    const record = {
+      ...createSessionRecord(),
+      history: [{
+        role: 'assistant',
+        content: 'Checking.',
+        toolCalls: [{ id: 'call-1', tool: 'inspect', input: {} }],
+        providerContinuation: {
+          provider: 'anthropic',
+          contentBlocks: [
+            { type: 'thinking', thinking: '', signature: 'private-signature' },
+            { type: 'text', text: 'Checking.', citations: null },
+            { type: 'tool_use', id: 'call-1', name: 'inspect', input: {}, provider_extra: true },
+          ],
+        },
+      }],
+    };
+
+    expect(ChatSessionPersistenceCodec.parseRecord(record)).toEqual(record);
+    expect(() => ChatSessionPersistenceCodec.parseRecord({
+      ...record,
+      history: [{
+        ...record.history[0],
+        providerContinuation: {
+          provider: 'anthropic',
+          contentBlocks: [{ type: 'thinking', thinking: '', signature: 42 }],
+        },
+      }],
+    })).toThrow();
+  });
+
   it.each([
     ['invalid model history', (record: ReturnType<typeof createSessionRecord>) => ({
       ...record,

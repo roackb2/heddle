@@ -51,8 +51,14 @@ export class ConversationCompactionTokenEstimator {
   }
 
   private static estimateProviderContinuation(message: Extract<ChatMessage, { role: 'assistant' }>): number {
-    return message.providerContinuation?.provider === 'kimi'
-      ? ConversationCompactionTokenEstimator.estimateText(message.providerContinuation.reasoningContent)
-      : 0;
+    if (message.providerContinuation?.provider === 'kimi') {
+      return ConversationCompactionTokenEstimator.estimateText(message.providerContinuation.reasoningContent);
+    }
+
+    if (message.providerContinuation?.provider === 'anthropic') {
+      return ConversationCompactionTokenEstimator.estimateText(JSON.stringify(message.providerContinuation.contentBlocks));
+    }
+
+    return 0;
   }
 }

@@ -2,8 +2,10 @@ import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '@/core/config.js'
 import type { LlmProvider, ReasoningEffort } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import {
+  ANTHROPIC_CLAUDE_5_MODELS,
   ModelCatalogService,
   OPENAI_ACCOUNT_SIGN_IN_MODELS,
+  OPENAI_GPT_6_MODELS,
   OPENAI_GPT_5_6_ALIAS,
   OPENAI_GPT_5_6_MODELS,
 } from './model-catalog.js';
@@ -36,6 +38,7 @@ const OPENAI_OAUTH_IMAGE_MODEL_PREFERENCES = ['gpt-5.4', 'gpt-5.4-mini'];
 // Keep this explicit and aligned with the curated reasoning models in
 // model-catalog.ts so unknown/non-reasoning models never receive this parameter.
 const OPENAI_REASONING_SUMMARY_CAPABLE_MODELS = [
+  ...OPENAI_GPT_6_MODELS,
   OPENAI_GPT_5_6_ALIAS,
   ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.5',
@@ -63,6 +66,7 @@ const OPENAI_REASONING_SUMMARY_CAPABLE_MODELS = [
   'o4-mini',
 ] as const;
 const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
+  ...OPENAI_GPT_6_MODELS,
   OPENAI_GPT_5_6_ALIAS,
   ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.4',
@@ -73,6 +77,7 @@ const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
   'gpt-5.5-pro',
 ] as const;
 const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
+  ...OPENAI_GPT_6_MODELS,
   OPENAI_GPT_5_6_ALIAS,
   ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.4',
@@ -82,6 +87,9 @@ const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
   'gpt-5.5-pro',
 ] as const;
 const OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]> = {
+  'gpt-6-astra': ['low', 'medium', 'high', 'ultrahigh', 'max'],
+  'gpt-6-sol': ['none', 'low', 'medium', 'high', 'ultrahigh', 'max'],
+  'gpt-6-luna': ['none', 'low', 'medium', 'high', 'ultrahigh', 'max'],
   [OPENAI_GPT_5_6_ALIAS]: ['none', 'low', 'medium', 'high', 'ultrahigh', 'max'],
   ...Object.fromEntries(
     OPENAI_GPT_5_6_MODELS.map((model) => [model, ['none', 'low', 'medium', 'high', 'ultrahigh', 'max']]),
@@ -93,6 +101,7 @@ const OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[
   'gpt-5.5-pro': ['low', 'medium', 'high', 'ultrahigh'],
 };
 const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  ...Object.fromEntries(OPENAI_GPT_6_MODELS.map((model) => [model, 'medium'])),
   [OPENAI_GPT_5_6_ALIAS]: 'medium',
   ...Object.fromEntries(OPENAI_GPT_5_6_MODELS.map((model) => [model, 'medium'])),
   'gpt-5.4': 'medium',
@@ -107,6 +116,14 @@ const KIMI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]>
 };
 const DEFAULT_KIMI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
   'kimi/kimi-k3': 'max',
+};
+const ANTHROPIC_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]> = Object.fromEntries(
+  ANTHROPIC_CLAUDE_5_MODELS.map((model) => [model, ['low', 'medium', 'high', 'ultrahigh', 'max']]),
+);
+const DEFAULT_ANTHROPIC_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  'claude-fable-5-1': 'high',
+  'claude-opus-5-5': 'medium',
+  'claude-sonnet-5-5': 'high',
 };
 
 /**
@@ -305,12 +322,23 @@ export class ModelPolicyService {
   }
 
   static resolveDefaultReasoningEffort(model: string): ReasoningEffort | undefined {
-    return DEFAULT_KIMI_REASONING_EFFORT[model] ?? DEFAULT_OPENAI_REASONING_EFFORT[model];
+    return DEFAULT_KIMI_REASONING_EFFORT[model]
+      ?? DEFAULT_OPENAI_REASONING_EFFORT[model]
+      ?? DEFAULT_ANTHROPIC_REASONING_EFFORT[model];
   }
 
   static supportedRequestReasoningEfforts(model: string): ReasoningEffort[] {
     return KIMI_REQUEST_REASONING_EFFORTS_BY_MODEL[model]
+      ?? ANTHROPIC_REQUEST_REASONING_EFFORTS_BY_MODEL[model]
       ?? ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model);
+  }
+
+  static resolveAnthropicMaxTokens(model: string, effort?: ReasoningEffort): number {
+    if (!ANTHROPIC_REQUEST_REASONING_EFFORTS_BY_MODEL[model]) {
+      return 4_096;
+    }
+
+    return effort === 'ultrahigh' || effort === 'max' ? 64_000 : 16_384;
   }
 
   static formatOpenAiAccountSignInModels(): string {
