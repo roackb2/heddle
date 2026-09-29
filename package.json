@@ -213,7 +213,7 @@
     }
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.54.0",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@heddleagent/run-client": "^6.0.0",
     "@hookform/resolvers": "^5.4.0",

@@ -52,7 +52,14 @@ export class AgentHistorySanitizer {
     const resolvedCalls = message.toolCalls.filter((call) => resolved.has(call.id));
 
     if (resolvedCalls.length > 0) {
-      return [{ ...message, toolCalls: resolvedCalls }];
+      return [{
+        ...message,
+        toolCalls: resolvedCalls,
+        // A provider continuation signs the original assistant/tool turn.
+        // Once an interrupted call is trimmed, that continuation cannot be
+        // replayed against a different set of tool calls.
+        ...(resolvedCalls.length < message.toolCalls.length ? { providerContinuation: undefined } : {}),
+      }];
     }
 
     return message.content.trim()

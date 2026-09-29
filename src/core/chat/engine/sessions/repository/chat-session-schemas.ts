@@ -11,6 +11,7 @@ import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/pre
 import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import { REASONING_EFFORTS } from '@/core/llm/types.js';
+import { AnthropicReplayBlocksSchema } from '@/core/llm/adapters/anthropic/anthropic-continuation.js';
 import { MODEL_RUN_FAILURE_CODES } from '@/core/types.js';
 
 const ReasoningEffortSchema = z.enum(REASONING_EFFORTS);
@@ -30,6 +31,12 @@ const AssistantProviderContinuationSchema = z.discriminatedUnion('provider', [
     provider: z.literal('kimi'),
     reasoningContent: z.string().describe(
       'Provider-private Kimi continuation replayed to Kimi for preserved thinking. It is not user-facing reasoning narration.',
+    ),
+  }),
+  z.object({
+    provider: z.literal('anthropic'),
+    contentBlocks: AnthropicReplayBlocksSchema.describe(
+      'Exact Claude assistant blocks retained for private thinking and tool-result replay.',
     ),
   }),
 ]);
