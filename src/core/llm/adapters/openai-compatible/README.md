@@ -14,7 +14,12 @@ Profiles describe durable provider facts:
 
 The shared adapter owns only the common HTTP request/response translation. It
 does not read environment variables, choose credentials, or decide which models
-to show. Runtime credential services resolve concrete endpoint/auth facts, and
+to show. When a compatible model returns multiple `tool_calls`, Heddle can
+execute the returned calls concurrently within the host's bound; a provider or
+model that only emits one call remains effectively serial. The host may set
+`maxToolConcurrency: 1` for strictly serial execution.
+
+Runtime credential services resolve concrete endpoint/auth facts, and
 `src/core/llm/models/ModelOptionsService` aggregates discovered models for web
 and TUI pickers.
 

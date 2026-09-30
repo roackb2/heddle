@@ -11,7 +11,7 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Executing model-requested tools through a registry.
 - Completing a run directly from a successful host-declared return-direct tool
   result, without a ceremonial follow-up model response.
-- Scheduling explicitly parallel-safe tool calls within a bounded concurrency
+- Scheduling model-selected independent tool calls within a bounded concurrency
   limit while preserving deterministic transcript order.
 - Recording low-level `TraceEvent` evidence.
 - Emitting user-facing `ConversationActivity` for inner-loop moments that
@@ -52,9 +52,10 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Add per-step behavior by explicit callbacks or future turn/runtime middleware,
   not by importing host state.
 - Add tool execution behavior through `ToolDefinition` and the tool registry.
-- Mark a tool `concurrency: 'parallel-safe'` only when independent invocations
-  can overlap without shared-state, capability, or ordering conflicts. Adapter
-  support and the host concurrency limit must also opt in before calls overlap.
+- Independent calls in one model response overlap by default when the adapter
+  supports multiple calls. Mark `concurrency: 'serial'` for tools requiring a
+  barrier; hosts can set `maxToolConcurrency: 1` to keep all calls sequential.
+  This changes scheduling, not tool authority or approval policy.
 - Mark a host tool `returnDirect: true` when its successful execution is itself
   the canonical completion of the run. Heddle records every tool result already
   present in that assistant turn, then emits one terminal run result using the
@@ -75,11 +76,10 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
   integration tests in `run-agent.test.ts`.
 - To change approval behavior, prefer the approval domain. The agent loop should
   ask for decisions, not own policy storage or UI.
-- To change tool scheduling, preserve the dual opt-in contract, authorize every
-  call in a parallel batch before that batch starts, authorize serial calls
-  immediately before execution so previews observe earlier mutations, keep
-  serial calls as barriers, and project results in the model's original
-  tool-call order.
+- To change tool scheduling, authorize every call in a parallel batch before
+  that batch starts, authorize serial calls immediately before execution so
+  previews observe earlier mutations, keep explicit serial calls as barriers,
+  and project results in the model's original tool-call order.
 
 ## Tests
 

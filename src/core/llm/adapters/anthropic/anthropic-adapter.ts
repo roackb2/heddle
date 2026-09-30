@@ -17,7 +17,7 @@ export class AnthropicAdapter implements LlmAdapter {
     toolCalls: true,
     systemMessages: true,
     reasoningSummaries: false,
-    parallelToolCalls: false,
+    parallelToolCalls: true,
   };
 
   readonly info;

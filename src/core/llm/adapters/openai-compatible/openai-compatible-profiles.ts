@@ -1,11 +1,14 @@
 import type { LlmAdapterCapabilities, LlmProvider } from '@/core/llm/types.js';
 import type { OpenAiCompatibleProviderId, OpenAiCompatibleProviderProfile } from './types.js';
 
+// The codec already accepts multiple tool_calls in a single response. This
+// flag means Heddle can schedule them concurrently, not that every gateway or
+// model is guaranteed to emit multiple calls.
 const CHAT_COMPLETIONS_CAPABILITIES: LlmAdapterCapabilities = {
   toolCalls: true,
   systemMessages: true,
   reasoningSummaries: false,
-  parallelToolCalls: false,
+  parallelToolCalls: true,
 };
 
 export const OPENAI_COMPATIBLE_PROVIDER_PROFILES: readonly OpenAiCompatibleProviderProfile[] = [

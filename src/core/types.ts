@@ -48,9 +48,9 @@ export type ToolDefinition<Input = unknown, Output = unknown> = {
    */
   timeoutMs?: number | null;
   /**
-   * Defaults to `serial`. `parallel-safe` is an explicit guarantee from the
-   * tool owner that separate calls may overlap without conflicting effects or
-   * shared mutable state.
+   * Calls are concurrent by default when the model returns multiple calls in
+   * one turn. Set `serial` when the tool owner needs a deterministic barrier;
+   * `parallel-safe` remains an explicit hint for hosts inspecting tool metadata.
    */
   concurrency?: ToolConcurrencyMode;
   /**

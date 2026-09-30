@@ -61,16 +61,22 @@ export class AnthropicCodec {
           result.push({ role: 'assistant', content } as MessageParam);
           break;
         }
-        case 'tool':
-          result.push({
-            role: 'user',
-            content: [{
-              type: 'tool_result',
-              tool_use_id: message.toolCallId,
-              content: message.content,
-            } satisfies ToolResultBlockParam],
-          } as MessageParam);
+        case 'tool': {
+          const block = {
+            type: 'tool_result',
+            tool_use_id: message.toolCallId,
+            content: message.content,
+          } satisfies ToolResultBlockParam;
+          const previous = result.at(-1);
+          if (previous?.role === 'user' && Array.isArray(previous.content)
+            && previous.content.length > 0
+            && previous.content.every((item) => item.type === 'tool_result')) {
+            (previous.content as ToolResultBlockParam[]).push(block);
+          } else {
+            result.push({ role: 'user', content: [block] });
+          }
           break;
+        }
       }
     }
 
